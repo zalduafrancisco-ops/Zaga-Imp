@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import LOGO_WHITE from "./logo-white.png";
 import LOGO_DARK  from "./logo-dark.png";
 
@@ -197,6 +197,20 @@ function NInput({label,field,form,setForm,color,placeholder,note}){
     </div>
   );
 }
+// Error boundary para el tracker expandido
+class CardErrorBoundary extends React.Component {
+  constructor(props){ super(props); this.state={error:false}; }
+  static getDerivedStateFromError(){ return {error:true}; }
+  render(){
+    if(this.state.error) return (
+      <div style={{padding:16,background:"#fff1f2",border:"1px solid #fecdd3",borderRadius:10,color:"#c0392b",fontSize:13}}>
+        ⚠️ Error al cargar esta sección. <button onClick={()=>this.setState({error:false})} style={{marginLeft:8,background:"none",border:"1px solid #c0392b",borderRadius:6,color:"#c0392b",cursor:"pointer",padding:"2px 10px",fontSize:12}}>Reintentar</button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 function CheckItem({label,checked,onChange,disabled}){
   return(
     <div onClick={()=>!disabled&&onChange(!checked)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,cursor:disabled?"default":"pointer",background:checked?"#f0fdf4":"#f8fafc",border:`1px solid ${checked?"#1aa35855":"#e2e8f0"}`,opacity:disabled?.4:1,transition:"all .15s"}}>
@@ -1828,7 +1842,7 @@ Número de seguimiento: ${c.nro}`;
                         <button onClick={()=>handleDelete(c.id)} style={{background:"#fff1f2",color:"#c0392b",border:"1px solid #ef444433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>🗑</button>
                       </div>
                     </div>
-                    {isOpen&&(()=>{
+                    {isOpen&&<CardErrorBoundary>{(()=>{
                       const CHKL_LABELS={cot_enviada:"Cotización enviada al cliente",cliente_acepto:"Cliente aceptó",pago1_cliente:"1er pago recibido del cliente",factura1:"Factura 1er pago emitida",pago_china:"Pago a China realizado",en_produccion:"En proceso de producción",almacen_china:"Ingreso en almacén de China",ctrl_calidad:"Control de calidad en China OK",despachado:"Despachado desde China",llego_chile:"Llegó a Chile",retirado_bodega:"Retirado a mi bodega",pago2_cliente:"2do pago recibido del cliente",factura2:"Factura 2do pago emitida",en_venta:"Producto en venta / publicado",vendido_50:"50% vendido",vendido_100:"100% vendido"};
                       const CLIENTE_STEPS=[
                         {estado:"solicitud",       icon:"📥",label:"Solicitud recibida",           color:"#334155",checks:[]},
@@ -2099,7 +2113,7 @@ Número de seguimiento: ${c.nro}`;
                             <div style={{fontSize:10,color:"#2a8aaa",marginBottom:6,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>📝 Notas internas</div>
                             {/* Historial existente */}
                             {(()=>{
-                              var hist = c.notas_historial?(Array.isArray(c.notas_historial)?c.notas_historial:(typeof c.notas_historial==="string"?JSON.parse(c.notas_historial):[])):[]
+                              var hist = []; try{ if(Array.isArray(c.notas_historial)) hist=c.notas_historial; else if(typeof c.notas_historial==="string"&&c.notas_historial) hist=JSON.parse(c.notas_historial); }catch(e){ hist=[]; }
                               // Migrar notas_internas legacy a historial si aún no fue migrado
                               if(hist.length===0 && c.notas_internas){
                                 hist = [{texto:c.notas_internas, fecha: c.fecha_solicitud||"Anterior", autor:"Sistema"}]
@@ -2281,7 +2295,7 @@ Número de seguimiento: ${c.nro}`;
                           )}
                         </div>
                       );
-                    })()}
+                    })()||null}</CardErrorBoundary>}
                   </div>
                 );
               })}
