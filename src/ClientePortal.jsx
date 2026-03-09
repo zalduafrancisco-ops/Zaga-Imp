@@ -152,7 +152,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
           {/* BIENVENIDA */}
           <div style={{marginBottom:20}} className="anim-in">
             <div style={{fontSize:22,fontWeight:800,color:"#dce8f0",fontFamily:"'DM Serif Display',serif"}}>Hola, {perfil.nombre} 👋</div>
-            <div style={{fontSize:13,color:"#4a5a6a",marginTop:3}}>
+            <div style={{fontSize:13,color:"#8a9aaa",marginTop:3}}>
               {enProceso.length>0?`Tienes ${enProceso.length} importación${enProceso.length>1?"es":""} activa${enProceso.length>1?"s":""}.`:completadas.length>0?"Todas tus importaciones están completadas.":"Bienvenido a tu portal."}
             </div>
           </div>
@@ -166,7 +166,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {pendientesConfirmacion.map(c=>(
-                  <div key={c.id} onClick={()=>setOpenId(openId===c.id?null:c.id)}
+                  <div key={c.id} onClick={()=>{ setFiltro("todas"); setOpenId(c.id); setTimeout(()=>{ const el=document.getElementById("cot-"+c.id); if(el) el.scrollIntoView({behavior:"smooth",block:"center"}); },100); }}
                     style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#08111f",border:"1px solid #c9a05520",borderRadius:10,padding:"10px 14px",cursor:"pointer",transition:"border .2s"}}
                     onMouseEnter={e=>e.currentTarget.style.borderColor="#c9a05550"}
                     onMouseLeave={e=>e.currentTarget.style.borderColor="#c9a05520"}>
@@ -222,7 +222,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
           <div className="anim-in" style={{background:"linear-gradient(135deg,#0d1a2e,#080f1c)",border:"1px solid #c9a05522",borderRadius:14,padding:"14px 20px",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
             <div>
               <div style={{fontSize:11,color:"#c9a055",fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>💰 Total invertido con ZAGA</div>
-              <div style={{fontSize:11,color:"#2a3a4a",marginTop:2}}>Suma acumulada de todas tus importaciones</div>
+              <div style={{fontSize:11,color:"#5a6a7a",marginTop:2}}>Suma acumulada de todas tus importaciones</div>
             </div>
             <div style={{fontSize:28,fontWeight:800,color:"#c9a055",fontFamily:"'DM Serif Display',serif"}}>{fmt(totalInvertido)}</div>
           </div>
@@ -263,7 +263,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                 const tab=getTab(c.id)
 
                 return(
-                  <div key={c.id} className="card anim-in" style={{animationDelay:`${idx*0.04}s`}}>
+                  <div key={c.id} id={"cot-"+c.id} className="card anim-in" style={{animationDelay:`${idx*0.04}s`}}>
                     {/* CARD HEADER */}
                     <div onClick={()=>setOpenId(isOpen?null:c.id)} style={{padding:"16px 20px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
                       <div style={{flex:1,minWidth:0}}>
@@ -278,14 +278,14 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                         </div>
                         <div style={{fontSize:15,fontWeight:700,color:"#dce8f0",marginBottom:5,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.producto}</div>
                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                          {c.unidades&&<span style={{fontSize:11,color:"#3a5060",background:"#0d1a25",borderRadius:6,padding:"2px 8px"}}>📦 {fmtN(c.unidades)} und</span>}
-                          {c.transporte&&<span style={{fontSize:11,color:"#3a5060",background:"#0d1a25",borderRadius:6,padding:"2px 8px"}}>{c.transporte==='aereo'?'✈️ Aéreo':c.transporte==='ambos'?'🚢✈️ Ambos':'🚢 Marítimo'}</span>}
-                          {c.fecha_solicitud&&<span style={{fontSize:11,color:"#3a5060",background:"#0d1a25",borderRadius:6,padding:"2px 8px"}}>📅 {fmtDate(c.fecha_solicitud)}</span>}
+                          {c.unidades&&<span style={{fontSize:11,color:"#6a8090",background:"#0d1a25",borderRadius:6,padding:"2px 8px"}}>📦 {fmtN(c.unidades)} und</span>}
+                          {c.transporte&&<span style={{fontSize:11,color:"#6a8090",background:"#0d1a25",borderRadius:6,padding:"2px 8px"}}>{c.transporte==='aereo'?'✈️ Aéreo':c.transporte==='ambos'?'🚢✈️ Ambos':'🚢 Marítimo'}</span>}
+                          {c.fecha_solicitud&&<span style={{fontSize:11,color:"#6a8090",background:"#0d1a25",borderRadius:6,padding:"2px 8px"}}>📅 {fmtDate(c.fecha_solicitud)}</span>}
                         </div>
                       </div>
                       <div style={{textAlign:"right",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5}}>
                         <div style={{display:"flex",alignItems:"center",gap:7}}>
-                          <span style={{fontSize:11,color:"#2a3a4a",fontWeight:600}}>{pct}%</span>
+                          <span style={{fontSize:11,color:"#7a8a9a",fontWeight:600}}>{pct}%</span>
                           <div style={{width:56,height:5,background:"#0d1a25",borderRadius:3,overflow:"hidden"}}>
                             <div style={{width:`${pct}%`,height:"100%",background:c.estado==='completada'?"#0d9870":color,borderRadius:3,transition:"width .4s"}}/>
                           </div>
@@ -335,7 +335,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               <div style={{marginTop:14,background:`${color}10`,border:`1px solid ${color}28`,borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
                                 <div style={{fontSize:22}}>{icon}</div>
                                 <div>
-                                  <div style={{fontSize:10,color:"#4a5a6a",marginBottom:1}}>Estado actual</div>
+                                  <div style={{fontSize:10,color:"#8a9aaa",marginBottom:1}}>Estado actual</div>
                                   <div style={{fontSize:14,fontWeight:700,color}}>{label}</div>
                                   {c.fecha_llegada_est&&!['completada','en_bodega'].includes(c.estado)&&(
                                     <div style={{fontSize:11,color:"#4a5a6a",marginTop:2}}>
@@ -349,7 +349,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                 <div style={{marginTop:12,background:"#0d987015",border:"1px solid #0d987035",borderRadius:12,padding:"14px",textAlign:"center"}}>
                                   <div style={{fontSize:26,marginBottom:4}}>🏁</div>
                                   <div style={{fontSize:14,fontWeight:700,color:"#0d9870"}}>¡Importación completada!</div>
-                                  {c.fecha_llegada_real&&<div style={{fontSize:11,color:"#4a5a6a",marginTop:2}}>Completada el {fmtDate(c.fecha_llegada_real)}</div>}
+                                  {c.fecha_llegada_real&&<div style={{fontSize:11,color:"#8a9aaa",marginTop:2}}>Completada el {fmtDate(c.fecha_llegada_real)}</div>}
                                 </div>
                               )}
                             </div>
@@ -373,7 +373,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               ].map((row,i)=>(
                                 <div key={i} style={{background:row.paid?"#0d987012":"#0d1a25",border:`1px solid ${row.paid?"#0d987030":"#162035"}`,borderRadius:12,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                                   <div>
-                                    <div style={{fontSize:11,color:"#4a5a6a",marginBottom:3}}>{row.label}</div>
+                                    <div style={{fontSize:11,color:"#7a8a9a",marginBottom:3}}>{row.label}</div>
                                     <div style={{fontSize:20,fontWeight:800,color:row.paid?"#0d9870":"#dce8f0"}}>{fmt(row.amount)}</div>
                                     <div style={{fontSize:10,color:row.paid?"#0d9870":"#4a5a6a",marginTop:3,fontWeight:row.paid?600:400}}>{row.paid?row.done:row.pending}</div>
                                   </div>
@@ -385,7 +385,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               <div style={{background:"linear-gradient(135deg,#0d1520,#080e1a)",border:"1px solid #c9a05528",borderRadius:12,padding:"13px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                                 <div>
                                   <div style={{fontSize:11,color:"#c9a055",fontWeight:700,marginBottom:1}}>Total importación</div>
-                                  <div style={{fontSize:11,color:"#2a3a4a"}}>{c.unidades?`${fmtN(c.unidades)} unidades`:""}{conIva?" · Con IVA":""}</div>
+                                  <div style={{fontSize:11,color:"#5a6a7a"}}>{c.unidades?`${fmtN(c.unidades)} unidades`:""}{conIva?" · Con IVA":""}</div>
                                 </div>
                                 <div style={{fontSize:22,fontWeight:800,color:"#c9a055",fontFamily:"'DM Serif Display',serif"}}>{fmt(tot)}</div>
                               </div>
@@ -422,8 +422,8 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                 <div style={{background:"#0d1a25",borderRadius:10,padding:"12px 14px",border:"1px solid #b8922e30"}}>
                                   <div style={{fontSize:10,color:"#b8922e",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>💬 Historial de negociación</div>
                                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                                    {c.negociacion_rondas.map((r,i)=>(
-                                      <div key={i} style={{background:"#08111f",borderRadius:8,padding:"10px 12px",border:r.estado==="aplicada"?"1px solid #1aa35830":r.estado==="rechazada"?"1px solid #c0392b25":"1px solid #1a2d45"}}>
+                                    {c.negociacion_rondas.map((r,i)=>{ const rBorder=r.estado==="aplicada"?"1px solid #1aa35830":r.estado==="rechazada"?"1px solid #c0392b25":"1px solid #1a2d45"; return(
+                                      <div key={i} style={{background:"#08111f",borderRadius:8,padding:"10px 12px",border:rBorder}}>
                                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:r.nota?6:0,flexWrap:"wrap",gap:6}}>
                                           <div style={{display:"flex",alignItems:"center",gap:8}}>
                                             <span style={{fontSize:10,color:"#4a5a6a"}}>Ronda {i+1} · {r.fecha}</span>
@@ -438,7 +438,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                         </div>
                                         {r.nota&&<div style={{fontSize:12,color:"#8a9aaa",lineHeight:1.6}}>{r.nota}</div>}
                                       </div>
-                                    ))}
+                                    ); })}
                                   </div>
                                 </div>
                               )}
