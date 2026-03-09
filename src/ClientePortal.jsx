@@ -423,7 +423,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                   <div style={{fontSize:10,color:"#b8922e",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>💬 Historial de negociación</div>
                                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
                                     {c.negociacion_rondas.map((r,i)=>(
-                                      <div key={i} style={{background:"#08111f",borderRadius:8,padding:"10px 12px",border:}}>
+                                      <div key={i} style={{background:"#08111f",borderRadius:8,padding:"10px 12px",border:r.estado==="aplicada"?"1px solid #1aa35830":r.estado==="rechazada"?"1px solid #c0392b25":"1px solid #1a2d45"}}>
                                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:r.nota?6:0,flexWrap:"wrap",gap:6}}>
                                           <div style={{display:"flex",alignItems:"center",gap:8}}>
                                             <span style={{fontSize:10,color:"#4a5a6a"}}>Ronda {i+1} · {r.fecha}</span>
