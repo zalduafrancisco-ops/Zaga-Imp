@@ -561,7 +561,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                   </div>
                                 </div>
                                 <div style={{marginTop:14,background:bg,border:"1px solid "+color+"25",borderRadius:12,padding:"12px 14px",display:"flex",alignItems:"center",gap:12}}>
-                                  <span style={{fontSize:20}}>{icon}</span>
+                                  <span style={{fontSize:20}}>{label.split(" ")[0]}</span>
                                   <div>
                                     <div style={{fontSize:10,color:"#64748b",marginBottom:2}}>Estado actual</div>
                                     <div style={{fontSize:14,fontWeight:700,color:color}}>{label}</div>
