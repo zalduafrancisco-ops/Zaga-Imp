@@ -228,9 +228,6 @@ export default function App({ supabase, usuario, onLogout }){
   const [vistaClienteId,setVistaClienteId] = useState(null);
   const [negForm,setNegForm] = useState({});
   const [resumenChina,setResumenChina] = useState(null);
-  const [iaModal,setIaModal] = useState(false);
-  const [iaTexto,setIaTexto] = useState("");
-  const [iaCargando,setIaCargando] = useState(false); // cotizacion para mostrar resumen
   const [backupModal,setBackupModal] = useState(null); // null | "export" | "import"
   const [simModal,setSimModal]       = useState(false);
   const [backupText,setBackupText] = useState(""); // {[cotId]: {nota, unidades_prop, precio_prop}}
@@ -394,41 +391,6 @@ export default function App({ supabase, usuario, onLogout }){
   const handleEdit=(c)=>{ setForm({...defaultForm,...c}); setEditId(c.id); setTab("calc"); };
   const handleDelete=async id=>{ await persist(cotizaciones.filter(c=>c.id!==id)); showToast("Eliminada"); };
 
-  const handleIaFill=async()=>{
-    if(!iaTexto.trim()){ showToast("Pega el mensaje del cliente primero","err"); return; }
-    setIaCargando(true);
-    try{
-      const res=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:1000,
-          messages:[{role:"user",content:`Analiza este mensaje de un cliente que quiere hacer una importación desde China y extrae los datos. Responde SOLO con un JSON válido, sin texto adicional ni backticks.\n\nCampos a extraer:\n- cliente: nombre del cliente o empresa (string, vacío si no aparece)\n- producto: nombre del producto (string)\n- unidades: cantidad numérica (number o null)\n- link_alibaba: URL si aparece (string, vacío si no)\n- variantes: colores, tallas, cantidades por variante en texto libre (string, vacío si no hay)\n- notas: cualquier instrucción o detalle adicional (string, vacío si no hay)\n- transporte: "maritimo", "aereo" o "ambos" (inferir del contexto, default "maritimo")\n- categoria_cliente: "nuevo", "recurrente" o "premium" (default "nuevo")\n\nMensaje del cliente:\n${iaTexto}`}]
-        })
-      });
-      const data=await res.json();
-      const txt=data.content?.[0]?.text||"";
-      const clean=txt.replace(/```json|```/g,"").trim();
-      const parsed=JSON.parse(clean);
-      setForm(f=>({
-        ...f,
-        cliente:parsed.cliente||f.cliente,
-        producto:parsed.producto||f.producto,
-        unidades:parsed.unidades!=null?parsed.unidades:f.unidades,
-        link_alibaba:parsed.link_alibaba||f.link_alibaba,
-        variantes:parsed.variantes||f.variantes,
-        notas:parsed.notas||f.notas,
-        transporte:parsed.transporte||f.transporte,
-        categoria_cliente:parsed.categoria_cliente||f.categoria_cliente,
-      }));
-      setIaModal(false); setIaTexto("");
-      showToast("✨ Formulario completado con IA");
-    }catch(e){
-      showToast("Error al procesar — intenta de nuevo","err");
-    }
-    setIaCargando(false);
-  };
 
   const handleSaveSolicitud=async()=>{
     if(!form.producto){ showToast("Ingresa el nombre del producto","err"); return; }
@@ -690,40 +652,6 @@ export default function App({ supabase, usuario, onLogout }){
       {toast&&<div style={{position:"fixed",top:20,right:20,background:toast.type==="err"?"#c0392b":"#1aa358",color:"#fff",padding:"10px 22px",borderRadius:10,zIndex:999,fontWeight:600,fontSize:13,boxShadow:"0 4px 20px #0009",maxWidth:340,textAlign:"center"}}>{toast.msg}</div>}
       <ScrollTopBtn/>
 
-      {/* MODAL IA — LLENAR DESDE TEXTO */}
-      {iaModal&&(
-        <div style={{position:"fixed",inset:0,background:"#000d",zIndex:1400,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div style={{background:"#ffffff",borderRadius:16,border:"1px solid #ddd6fe",width:"100%",maxWidth:580,display:"flex",flexDirection:"column",maxHeight:"85vh"}}>
-            <div style={{padding:"20px 24px",borderBottom:"1px solid #e2e8f0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div>
-                <div style={{fontWeight:700,fontSize:15,color:"#334155"}}>✨ Llenar desde mensaje del cliente</div>
-                <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Pega el WhatsApp, email o texto tal como llegó</div>
-              </div>
-              <button onClick={()=>{setIaModal(false);setIaTexto("");}} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
-            </div>
-            <div style={{padding:"16px 24px",flex:1,overflow:"hidden",display:"flex",flexDirection:"column",gap:12}}>
-              <div style={{fontSize:12,color:"#334155",background:"#faf5ff",border:"1px solid #ddd6fe",borderRadius:8,padding:"10px 14px"}}>
-                💡 No necesitas ordenar nada. Pega el mensaje exactamente como te llegó — con emojis, errores ortográficos, en español o inglés — y la IA extrae lo importante.
-              </div>
-              <textarea
-                value={iaTexto}
-                onChange={e=>setIaTexto(e.target.value)}
-                rows={10}
-                autoFocus
-                placeholder={"Ejemplo:\n\nHola! Soy María de Tienda Ropa CL, quiero importar 200 poleras deportivas, acá el link https://alibaba.com/producto, necesito 100 azules talla M, 50 rojas talla L y 50 negras. Si puede ser por barco mejor, igual necesito precio en avión para comparar. Somos cliente hace 2 años con ustedes."}
-                style={{flex:1,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:8,color:"#0f172a",padding:"12px",fontSize:12,outline:"none",resize:"none",lineHeight:1.6,fontFamily:"inherit"}}
-              />
-            </div>
-            <div style={{padding:"16px 24px",borderTop:"1px solid #e2e8f0",display:"flex",gap:8,justifyContent:"flex-end"}}>
-              <button onClick={()=>{setIaModal(false);setIaTexto("");}} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,cursor:"pointer"}}>Cancelar</button>
-              <button onClick={handleIaFill} disabled={iaCargando} style={{background:iaCargando?"#1a2d45":"linear-gradient(135deg,#a78bfa,#7c3aed)",color:iaCargando?"#555":"#fff",border:"none",borderRadius:8,padding:"9px 24px",fontSize:13,cursor:iaCargando?"not-allowed":"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:8}}>
-                {iaCargando?<><span style={{display:"inline-block",width:14,height:14,border:"2px solid #555",borderTop:"2px solid #a78bfa",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>Analizando...</>:<>✨ Completar formulario</>}
-              </button>
-            </div>
-          </div>
-          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        </div>
-      )}
 
       {/* MODAL RESUMEN PARA CHINA */}
       {resumenChina&&(()=>{
@@ -1244,17 +1172,6 @@ Número de seguimiento: ${c.nro}`;
                 <button key={k} onClick={()=>setForm(p=>({...p,gestor:k}))} style={{background:form.gestor===k?col+"18":"#f8fafc",color:form.gestor===k?col:"#64748b",border:`1px solid ${form.gestor===k?col+"66":"#e2e8f0"}`,borderRadius:20,padding:"5px 16px",fontSize:12,cursor:"pointer",fontWeight:form.gestor===k?700:400}}>{l}</button>
               ))}
             </div>
-
-            {/* BOTÓN IA — solo para cliente */}
-            {form.tipo==="cliente"&&(
-              <button onClick={()=>setIaModal(true)} style={{display:"flex",alignItems:"center",gap:10,background:"#f5f3ff",border:"1px solid #c4b5fd",borderRadius:12,padding:"12px 20px",cursor:"pointer",marginBottom:20,width:"100%",textAlign:"left"}}>
-                <span style={{fontSize:22}}>✨</span>
-                <div>
-                  <div style={{fontWeight:700,fontSize:13,color:"#4c1d95"}}>Llenar desde mensaje del cliente</div>
-                  <div style={{fontSize:11,color:"#7c3aed",marginTop:1}}>Pega el WhatsApp, email o texto — la IA completa el formulario automáticamente</div>
-                </div>
-              </button>
-            )}
 
             <div style={{display:"grid",gridTemplateColumns:"minmax(0,360px) 1fr",gap:20}} className="calc-grid">
               {/* INPUTS */}
