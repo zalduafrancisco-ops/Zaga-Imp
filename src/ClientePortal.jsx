@@ -2,34 +2,29 @@ import { useState, useEffect } from 'react'
 import LOGO_WHITE from "./logo-white.png"
 import LOGO_DARK from "./logo-dark.png"
 
+// Etiquetas y colores idénticos al Tracker (cotizador_importaciones.jsx)
 const EST_LABEL = {
-  solicitud:"Solicitud recibida", enviado_china:"Enviado a proveedor",
-  respuesta_china:"Cotizando en China", enviada_cliente:"Cotizacion lista",
-  re_testeando:"En revision", en_negociacion:"En negociacion",
-  aceptada:"Aceptada", pagada_china:"Importando",
-  en_camino:"En camino a Chile", en_bodega:"Lista para retirar",
-  completada:"Completada", rechazada_cliente:"No procesada",
-  no_procesada:"No procesada", anulada:"Anulada",
+  solicitud:"📥 Solicitud recibida", enviado_china:"📨 Enviado a China",
+  respuesta_china:"🇨🇳 Respuesta de China recibida",
+  enviada_cliente:"Enviada al cliente", re_testeando:"🔄 Re-testeando",
+  en_negociacion:"En negociacion", aceptada:"Aceptada",
+  pagada_china:"Pagada / Importando", en_camino:"En camino",
+  en_bodega:"Disponible para retirar", completada:"Completada",
+  rechazada_cliente:"❌ Rechazada", no_procesada:"No procesada", anulada:"🚫 Anulada",
 }
 const EST_COLOR = {
-  solicitud:"#3b82f6", enviado_china:"#0ea5e9", respuesta_china:"#f59e0b",
-  enviada_cliente:"#3b82f6", en_negociacion:"#f97316", re_testeando:"#3b82f6",
-  rechazada_cliente:"#ef4444", anulada:"#94a3b8", aceptada:"#22c55e",
-  no_procesada:"#ef4444", pagada_china:"#f97316", en_camino:"#a855f7",
-  en_bodega:"#3b82f6", completada:"#16a34a",
+  solicitud:"#6a9fd4", enviado_china:"#2a8aaa", respuesta_china:"#b8922e",
+  enviada_cliente:"#2d78c8", en_negociacion:"#c47830", re_testeando:"#6a9fd4",
+  rechazada_cliente:"#c0392b", anulada:"#8b1a2e", aceptada:"#1aa358",
+  no_procesada:"#c0392b", pagada_china:"#c47830", en_camino:"#a85590",
+  en_bodega:"#3d7fc4", completada:"#0d9870",
 }
 const EST_BG = {
-  solicitud:"#eff6ff", enviado_china:"#f0f9ff", respuesta_china:"#fffbeb",
-  enviada_cliente:"#eff6ff", en_negociacion:"#fff7ed", re_testeando:"#eff6ff",
-  rechazada_cliente:"#fef2f2", anulada:"#f9fafb", aceptada:"#f0fdf4",
-  no_procesada:"#fef2f2", pagada_china:"#fff7ed", en_camino:"#faf5ff",
-  en_bodega:"#eff6ff", completada:"#f0fdf4",
-}
-const EST_ICON = {
-  solicitud:"📥", enviado_china:"📨", respuesta_china:"🇨🇳", enviada_cliente:"📋",
-  re_testeando:"🔄", en_negociacion:"💬", aceptada:"✅", pagada_china:"💳",
-  en_camino:"🚢", en_bodega:"📦", completada:"🏁", rechazada_cliente:"❌",
-  no_procesada:"❌", anulada:"🚫",
+  solicitud:"#eef4fb", enviado_china:"#e8f5f9", respuesta_china:"#fdf6e3",
+  enviada_cliente:"#eef4fb", en_negociacion:"#fdf0e3", re_testeando:"#eef4fb",
+  rechazada_cliente:"#fdf0f0", anulada:"#f5eaec", aceptada:"#eafaf1",
+  no_procesada:"#fdf0f0", pagada_china:"#fdf0e3", en_camino:"#f8f0fb",
+  en_bodega:"#eef4fb", completada:"#e8f9f4",
 }
 const TIMELINE = [
   {key:"enviado_china",label:"Enviado",icon:"📨"},
@@ -61,6 +56,7 @@ const CHECKLIST_FULL = [
 ]
 const RECHAZADAS_EST = ["rechazada_cliente","no_procesada","anulada"]
 const PROCESADAS_EST = ["aceptada","pagada_china","en_camino","en_bodega","completada"]
+const ESTADOS_ORDEN = ["solicitud","enviado_china","respuesta_china","enviada_cliente","re_testeando","en_negociacion","aceptada","pagada_china","en_camino","en_bodega","completada","rechazada_cliente","no_procesada","anulada"]
 
 const fmt = function(n){ return (!n&&n!==0)?"-":Number(n).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}) }
 const fmtN = function(n){ return Number(n).toLocaleString("es-CL",{maximumFractionDigits:0}) }
@@ -156,11 +152,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   }
 
   var filtradas = todas.filter(function(c){
-    var pF = true
-    if(filtro==="activas") pF = !RECHAZADAS_EST.includes(c.estado)&&!['completada','solicitud'].includes(c.estado)
-    else if(filtro==="en_camino") pF = c.estado==='en_camino'
-    else if(filtro==="completada") pF = c.estado==='completada'
-    else if(filtro==="no_procesada") pF = RECHAZADAS_EST.includes(c.estado)
+    var pF = filtro==="todas" ? true : c.estado===filtro
     var q = busqueda.trim().toLowerCase()
     return pF&&(!q||(c.producto&&c.producto.toLowerCase().includes(q))||(c.nro&&c.nro.toLowerCase().includes(q)))
   })
@@ -353,18 +345,32 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
               </div>
             )}
 
-            {/* FILTROS + BUSQUEDA */}
-            <div className="filtros-row zfade" style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
-              {[
-                {key:"todas",   label:"Todas ("+todas.length+")"},
-                {key:"activas", label:"En proceso ("+activas.length+")"},
-                {key:"en_camino",label:"En camino ("+enCamino.length+")"},
-                {key:"completada",label:"Completadas ("+completadas.length+")"},
-                {key:"no_procesada",label:"No procesadas ("+rechazadas.length+")"},
-              ].map(function(f){
-                return <button key={f.key} className={"zfbtn"+(filtro===f.key?" on":"")} onClick={function(){ setFiltro(f.key) }}>{f.label}</button>
-              })}
-              <div style={{flex:1,minWidth:160,position:"relative"}}>
+            {/* FILTROS + BUSQUEDA — idéntico al Tracker */}
+            <div className="zfade" style={{marginBottom:12}}>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                <button className={"zfbtn"+(filtro==="todas"?" on":"")} onClick={function(){ setFiltro("todas") }}>
+                  Todos ({todas.length})
+                </button>
+                {ESTADOS_ORDEN.map(function(k){
+                  var cnt = todas.filter(function(c){ return c.estado===k }).length
+                  if(cnt===0) return null
+                  var col = EST_COLOR[k]||"#64748b"
+                  var lbl = EST_LABEL[k]||k
+                  return (
+                    <button key={k} onClick={function(){ setFiltro(k) }} style={{
+                      background:filtro===k?col+"22":"#f8fafc",
+                      color:filtro===k?col:"#64748b",
+                      border:"1px solid "+(filtro===k?col+"66":"#e2e8f0"),
+                      borderRadius:20,padding:"5px 14px",fontSize:12,cursor:"pointer",
+                      fontWeight:filtro===k?700:400,fontFamily:"inherit",whiteSpace:"nowrap",
+                      transition:"all .15s"
+                    }}>
+                      {lbl} ({cnt})
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{position:"relative"}}>
                 <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:13,color:"#94a3b8"}}>🔍</span>
                 <input value={busqueda} onChange={function(e){ setBusqueda(e.target.value) }} placeholder="Buscar producto o numero..."
                   style={{width:"100%",background:"#fff",border:"1px solid #e2e8f0",borderRadius:20,color:"#0f172a",padding:"8px 16px 8px 34px",fontSize:13,outline:"none",fontFamily:"inherit"}}/>
@@ -384,7 +390,6 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                   var isRech = RECHAZADAS_EST.includes(c.estado)
                   var color = EST_COLOR[c.estado]||"#3b82f6"
                   var bg = EST_BG[c.estado]||"#eff6ff"
-                  var icon = EST_ICON[c.estado]||"📦"
                   var label = EST_LABEL[c.estado]||c.estado
                   var cl = c.calc; var conIva = !!c.con_iva
                   var p1 = cl?(conIva?(cl.p1ClIva||cl.p1Cl||0):(cl.p1Cl||0)):0
@@ -407,7 +412,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                         style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,background:isRech?"#fafafa":"#fff"}}>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:7,flexWrap:"wrap"}}>
-                            <span style={{background:bg,color:color,fontSize:11,fontWeight:700,borderRadius:20,padding:"3px 10px",border:"1px solid "+color+"30"}}>{icon} {label}</span>
+                            <span style={{background:bg,color:color,fontSize:11,fontWeight:700,borderRadius:20,padding:"3px 10px",border:"1px solid "+color+"30"}}>{label}</span>
                             <span style={{fontSize:11,color:"#94a3b8",fontWeight:500}}>{c.nro}</span>
                             {dias!==null&&dias<=30&&(
                               <span style={{background:dias<=7?"#fef2f2":"#eff6ff",color:dias<=7?"#dc2626":"#2563eb",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:"1px solid "+(dias<=7?"#fecaca":"#bfdbfe")}}>
