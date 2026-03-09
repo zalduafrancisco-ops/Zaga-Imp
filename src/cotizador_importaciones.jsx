@@ -1769,7 +1769,7 @@ Número de seguimiento: ${c.nro}`;
                 }
                 const chklDef=getChecklist(c);
                 return(
-                  <div key={c.id} style={{background:"#f1f5f9",borderRadius:12,border:"1px solid #e2e8f0",overflow:"hidden"}}>
+                  <div key={c.id} id={`card-${c.id}`} style={{background:"#f1f5f9",borderRadius:12,border:"1px solid #e2e8f0",overflow:"hidden"}}>
                     <div style={{padding:20,borderLeft:`4px solid ${isPropia?"#3d7fc4":sc}`}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                         <div style={{flex:1}}>
@@ -2437,7 +2437,7 @@ Número de seguimiento: ${c.nro}`;
                           {/* detalle por cotización */}
                           <div style={{marginLeft:92,display:"flex",flexWrap:"wrap",gap:4}}>
                             {lista.map(c=>(
-                              <div key={c.id} style={{background:"#f1f5f9",borderRadius:5,padding:"3px 8px",fontSize:10,color:"#64748b",border:"1px solid #e2e8f0",cursor:"pointer"}} onClick={()=>setOpenId(c.id)}>
+                              <div key={c.id} style={{background:"#f1f5f9",borderRadius:5,padding:"3px 8px",fontSize:10,color:"#64748b",border:"1px solid #e2e8f0",cursor:"pointer"}} onClick={()=>{ setTab("tracker"); setFilterEstado("todos"); setFilterCliente("todos"); setOpenId(c.id); setTimeout(()=>{ const el=document.getElementById(`card-${c.id}`); if(el) el.scrollIntoView({behavior:"smooth",block:"center"}); },300); }} title="Ver en Tracker">
                                 <span style={{color:"#0f172a"}}>{c.producto?.substring(0,22)||(c.tipo==="propia"?"Propia":"—")}</span>
                                 <span style={{color:"#0d9870",marginLeft:4}}>{calcM3(c).toFixed(2)}m³</span>
                               </div>
