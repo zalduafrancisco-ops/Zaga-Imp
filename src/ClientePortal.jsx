@@ -658,9 +658,29 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                     <div style={{fontSize:12,color:"#475569",whiteSpace:"pre-line",lineHeight:1.7}}>{c.variantes}</div>
                                   </div>
                                 )}
-                                {c.notas&&(
-                                  <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0"}}>
-                                    <div style={{fontSize:10,color:"#2563eb",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>📝 Notas</div>
+                                {(()=>{
+                                  var hist = c.notas_historial||[]
+                                  if(hist.length===0&&c.notas_internas) hist=[{texto:c.notas_internas,fecha:"Anterior",autor:"Gestor"}]
+                                  return hist.length>0&&(
+                                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                                      <div style={{fontSize:10,color:"#2a8aaa",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>📝 Notas del proceso</div>
+                                      {hist.map(function(n,i){
+                                        return (
+                                          <div key={i} style={{background:"#f0f9ff",border:"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
+                                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                                              <span style={{fontSize:10,fontWeight:700,color:"#2a8aaa"}}>{n.autor||"Gestor"}</span>
+                                              <span style={{fontSize:10,color:"#94a3b8"}}>{n.fecha}</span>
+                                            </div>
+                                            <div style={{fontSize:12,color:"#0f172a",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.texto}</div>
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  )
+                                })()}
+                                {c.notas&&!(c.notas_historial&&c.notas_historial.length>0)&&!(c.notas_internas)&&(
+                                  <div style={{background:"#f0f9ff",border:"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
+                                    <div style={{fontSize:10,color:"#2a8aaa",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>📝 Notas</div>
                                     <div style={{fontSize:12,color:"#475569",lineHeight:1.7}}>{c.notas}</div>
                                   </div>
                                 )}
