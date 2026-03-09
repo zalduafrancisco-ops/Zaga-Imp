@@ -2642,13 +2642,30 @@ Número de seguimiento: ${c.nro}`;
         {/* ══ CLIENTES ══ */}
         {tab2==="clientes"&&(()=>{
           const clientes=[...new Set(cotizaciones.filter(c=>c.tipo!=="propia"&&c.cliente).map(c=>c.cliente))].sort();
-          const impsCliente=clienteSeleccionado?cotizaciones.filter(c=>c.cliente===clienteSeleccionado&&c.tipo!=="propia"):[];
-          const totUnidades=impsCliente.reduce((s,c)=>s+(Number(c.unidades)||0),0);
-          const totPagado=impsCliente.reduce((s,c)=>s+(c.calc?.totCl||0),0);
-          const tot1er=impsCliente.reduce((s,c)=>s+(c.calc?.p1Cl||0),0);
-          const tot2do=impsCliente.reduce((s,c)=>s+(c.calc?.p2Cl||0),0);
-          const enCurso=impsCliente.filter(c=>PROCESADAS.includes(c.estado)&&c.estado!=="completada").length;
-          const completadas=impsCliente.filter(c=>c.estado==="completada").length;
+          const todasCliente=clienteSeleccionado?cotizaciones.filter(c=>c.cliente===clienteSeleccionado&&c.tipo!=="propia"):[];
+
+          // Estados agrupados para filtro
+          const RECHAZADAS=["rechazada_cliente","anulada","no_procesada"];
+          const [filtroCliente,setFiltroCliente]=React.useState("todas");
+
+          const impsCliente=todasCliente.filter(c=>{
+            if(filtroCliente==="todas") return true;
+            if(filtroCliente==="activas") return !RECHAZADAS.includes(c.estado)&&c.estado!=="completada";
+            if(filtroCliente==="completadas") return c.estado==="completada";
+            if(filtroCliente==="rechazadas") return RECHAZADAS.includes(c.estado);
+            return true;
+          });
+
+          // KPIs sobre TODAS (sin filtro)
+          const totUnidades=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(Number(c.unidades)||0),0);
+          const totPagado=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.totCl||0),0);
+          const tot1er=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.p1Cl||0),0);
+          const tot2do=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.p2Cl||0),0);
+          const enCurso=todasCliente.filter(c=>PROCESADAS.includes(c.estado)&&c.estado!=="completada").length;
+          const completadas=todasCliente.filter(c=>c.estado==="completada").length;
+          const rechazadas=todasCliente.filter(c=>RECHAZADAS.includes(c.estado)).length;
+          const procesadas=todasCliente.filter(c=>PROCESADAS.includes(c.estado)).length;
+          const pctConversion=todasCliente.length>0?Math.round((procesadas/todasCliente.length)*100):0;
           const copyVistaCliente=()=>{ abrirPrint("cliente"); };
           return(
             <div style={{display:"grid",gridTemplateColumns:clienteSeleccionado?"260px 1fr":"300px",gap:20}}>
@@ -2660,14 +2677,24 @@ Número de seguimiento: ${c.nro}`;
                     const imps=cotizaciones.filter(c=>c.cliente===cl&&c.tipo!=="propia");
                     const activas=imps.filter(c=>PROCESADAS.includes(c.estado)&&c.estado!=="completada").length;
                     const comp=imps.filter(c=>c.estado==="completada").length;
+                    const rech=imps.filter(c=>["rechazada_cliente","anulada","no_procesada"].includes(c.estado)).length;
+                    const conv=imps.length>0?Math.round((imps.filter(c=>PROCESADAS.includes(c.estado)).length/imps.length)*100):0;
                     const sel=clienteSeleccionado===cl;
                     return(
-                      <div key={cl} onClick={()=>setClienteSeleccionado(sel?null:cl)} style={{background:sel?"#f0fdf4":"#f8fafc",border:`1px solid ${sel?"#22c55e55":"#e2e8f0"}`,borderRadius:10,padding:"12px 14px",cursor:"pointer",transition:"all .15s"}}>
-                        <div style={{fontWeight:700,fontSize:13,color:sel?"#1aa358":"#0f172a",marginBottom:4}}>👤 {cl}</div>
-                        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                          <span style={{fontSize:11,color:"#64748b"}}>{imps.length} importación{imps.length!==1?"es":""}</span>
+                      <div key={cl} onClick={()=>{setClienteSeleccionado(sel?null:cl);setFiltroCliente("todas");}} style={{background:sel?"#f0fdf4":"#f8fafc",border:`1px solid ${sel?"#22c55e55":"#e2e8f0"}`,borderRadius:10,padding:"12px 14px",cursor:"pointer",transition:"all .15s"}}>
+                        <div style={{fontWeight:700,fontSize:13,color:sel?"#1aa358":"#0f172a",marginBottom:6}}>👤 {cl}</div>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+                          <span style={{fontSize:11,color:"#64748b"}}>{imps.length} cotiz.</span>
                           {activas>0&&<span style={{fontSize:11,color:"#c47830"}}>🚢 {activas} activa{activas!==1?"s":""}</span>}
                           {comp>0&&<span style={{fontSize:11,color:"#0d9870"}}>✅ {comp} completada{comp!==1?"s":""}</span>}
+                          {rech>0&&<span style={{fontSize:11,color:"#94a3b8"}}>✗ {rech} rechazada{rech!==1?"s":""}</span>}
+                        </div>
+                        {/* Mini barra conversión */}
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <div style={{flex:1,height:3,background:"#e2e8f0",borderRadius:4,overflow:"hidden"}}>
+                            <div style={{height:"100%",background:"#1aa358",borderRadius:4,width:`${conv}%`,transition:"width .4s"}}/>
+                          </div>
+                          <span style={{fontSize:10,color:"#64748b",whiteSpace:"nowrap"}}>{conv}% conv.</span>
                         </div>
                       </div>
                     );
@@ -2678,47 +2705,118 @@ Número de seguimiento: ${c.nro}`;
                 <div>
                   <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
                     <div style={{fontWeight:800,fontSize:18,color:"#0f172a",flex:1}}>👤 {clienteSeleccionado}</div>
-                    <button onClick={copyVistaCliente} style={{background:"#1aa358",color:"#05100e",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>
+                    <button onClick={copyVistaCliente} style={{background:"#040c18",color:"#fff",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>
                     <button onClick={()=>setClienteSeleccionado(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:9,padding:"9px 14px",fontSize:13,cursor:"pointer"}}>✕</button>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
-                    {[["Importaciones",impsCliente.length,"#0f172a","📦"],["Total facturado",fmt(totPagado),"#1aa358","💰"],["Unidades totales",fmtN(totUnidades),"#2a8aaa","📊"],["En curso / Completadas",`${enCurso} / ${completadas}`,"#c9a055","📈"]].map(([l,v,col,ic])=>(
-                      <div key={l} style={{background:"#f1f5f9",borderRadius:10,padding:"14px 16px",border:"1px solid #e2e8f0",textAlign:"center"}}>
-                        <div style={{fontSize:20,marginBottom:4}}>{ic}</div>
-                        <div style={{fontSize:10,color:"#64748b",marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>{l}</div>
+
+                  {/* KPIs */}
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:16}} className="kpi-grid">
+                    {[
+                      ["Total cotizadas",todasCliente.length,"#0f172a","📋"],
+                      ["Procesadas",procesadas,"#16a34a","✅"],
+                      ["Completadas",completadas,"#0d9870","🏆"],
+                      ["Rechazadas",rechazadas,"#94a3b8","✗"],
+                      ["Tasa de cierre",`${pctConversion}%`,pctConversion>=60?"#16a34a":pctConversion>=30?"#c47830":"#ef4444","📈"],
+                    ].map(([l,v,col,ic])=>(
+                      <div key={l} style={{background:"#ffffff",borderRadius:10,padding:"14px 12px",border:"1px solid #e2e8f0",textAlign:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
+                        <div style={{fontSize:18,marginBottom:4}}>{ic}</div>
+                        <div style={{fontSize:9,color:"#64748b",marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>{l}</div>
                         <div style={{fontSize:16,fontWeight:800,color:col}}>{v}</div>
                       </div>
                     ))}
                   </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:24}}>
+
+                  {/* Barra de conversión visual */}
+                  <div style={{background:"#ffffff",borderRadius:10,padding:"14px 16px",marginBottom:16,border:"1px solid #e2e8f0"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#64748b",marginBottom:6}}>
+                      <span>Tasa de cierre — de {todasCliente.length} cotizaciones, {procesadas} fueron procesadas</span>
+                      <span style={{fontWeight:700,color:pctConversion>=60?"#16a34a":pctConversion>=30?"#c47830":"#ef4444"}}>{pctConversion}%</span>
+                    </div>
+                    <div style={{height:8,background:"#f1f5f9",borderRadius:6,overflow:"hidden",display:"flex"}}>
+                      <div style={{height:"100%",background:"#1aa358",width:`${todasCliente.length>0?(completadas/todasCliente.length)*100:0}%`,transition:"width .4s"}}/>
+                      <div style={{height:"100%",background:"#60a5fa",width:`${todasCliente.length>0?(enCurso/todasCliente.length)*100:0}%`,transition:"width .4s"}}/>
+                      <div style={{height:"100%",background:"#fde68a",width:`${todasCliente.length>0?((procesadas-completadas-enCurso)/todasCliente.length)*100:0}%`,transition:"width .4s"}}/>
+                      <div style={{height:"100%",background:"#e2e8f0",flex:1}}/>
+                    </div>
+                    <div style={{display:"flex",gap:12,marginTop:6,flexWrap:"wrap"}}>
+                      {[["#1aa358","Completadas",completadas],["#60a5fa","En curso",enCurso],["#e2e8f0","Rechazadas/Anuladas",rechazadas]].map(([col,lb,n])=>(
+                        <div key={lb} style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"#64748b"}}>
+                          <div style={{width:8,height:8,borderRadius:2,background:col,flexShrink:0}}/>
+                          {lb}: <b style={{color:"#334155"}}>{n}</b>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Financiero — solo cotizaciones no rechazadas */}
+                  {totPagado>0&&(
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+                      {[["Total facturado",fmt(totPagado),"#0f172a"],["1er pago",fmt(tot1er),"#16a34a"],["2do pago",fmt(tot2do),"#334155"]].map(([l,v,col])=>(
+                        <div key={l} style={{background:"#f0fdf4",borderRadius:10,padding:"12px 14px",border:"1px solid #bbf7d0",textAlign:"center"}}>
+                          <div style={{fontSize:10,color:"#64748b",marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>{l}</div>
+                          <div style={{fontSize:15,fontWeight:800,color:col}}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* FILTROS */}
+                  <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+                    {[
+                      ["todas",`Todas (${todasCliente.length})`,null],
+                      ["activas",`Activas (${enCurso})`,  "#2563eb"],
+                      ["completadas",`Completadas (${completadas})`,"#16a34a"],
+                      ["rechazadas",`Rechazadas / Anuladas (${rechazadas})`,"#94a3b8"],
+                    ].map(([k,l,col])=>(
+                      <button key={k} onClick={()=>setFiltroCliente(k)} style={{
+                        background:filtroCliente===k?(col||"#0f172a")+"18":"#f8fafc",
+                        color:filtroCliente===k?(col||"#0f172a"):"#64748b",
+                        border:`1px solid ${filtroCliente===k?(col||"#0f172a")+"44":"#e2e8f0"}`,
+                        borderRadius:20,padding:"5px 14px",fontSize:12,cursor:"pointer",fontWeight:filtroCliente===k?700:400
+                      }}>{l}</button>
+                    ))}
+                  </div>
+
+                  {/* LISTA */}
+                  <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
+                    {impsCliente.length===0&&<div style={{textAlign:"center",padding:30,color:"#94a3b8",fontSize:13}}>Sin cotizaciones en esta categoría.</div>}
                     {impsCliente.map(c=>{
                       const sc=EST_COLOR[c.estado]||"#888", sl=EST_LABEL[c.estado]||c.estado;
                       const prog=checkProg(c);
                       const diasLL=c.fecha_llegada_est?Math.ceil((new Date(c.fecha_llegada_est)-new Date())/(1000*60*60*24)):null;
+                      const isRech=RECHAZADAS.includes(c.estado);
                       return(
-                        <div key={c.id} style={{background:"#f1f5f9",borderRadius:10,padding:16,border:"1px solid #e2e8f0",borderLeft:`4px solid ${sc}`}}>
+                        <div key={c.id} style={{background:isRech?"#fafafa":"#ffffff",borderRadius:10,padding:16,border:"1px solid #e2e8f0",borderLeft:`4px solid ${sc}`,opacity:isRech?.7:1}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
-                            <div>
+                            <div style={{flex:1}}>
                               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
-                                <span style={{fontWeight:700,fontSize:14}}>{c.producto}</span>
+                                <span style={{fontWeight:700,fontSize:14,color:isRech?"#94a3b8":"#0f172a"}}>{c.producto}</span>
                                 <span onClick={()=>setPreviewId(c.id)} style={{fontSize:11,color:"#2d78c8",cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted"}}>{c.nro}</span>
                                 <span style={{background:sc+"22",color:sc,border:`1px solid ${sc}44`,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600}}>{sl}</span>
-                                {diasLL!==null&&<span style={{background:"#f9741618",color:"#c47830",border:"1px solid #f9741633",borderRadius:20,padding:"2px 9px",fontSize:11}}>{diasLL>0?`🚢 ${diasLL}d para llegar`:diasLL===0?"¡Llega hoy!":`⚠️ ${Math.abs(diasLL)}d de retraso`}</span>}
+                                {diasLL!==null&&!isRech&&<span style={{background:"#f9741618",color:"#c47830",border:"1px solid #f9741633",borderRadius:20,padding:"2px 9px",fontSize:11}}>{diasLL>0?`🚢 ${diasLL}d`:diasLL===0?"¡Llega hoy!":`⚠️ ${Math.abs(diasLL)}d atraso`}</span>}
                               </div>
-                              <div style={{fontSize:12,color:"#666"}}>📅 Solicitud: {c.fecha_solicitud||"-"}{c.fecha_llegada_est?` · 🏁 Llegada est: ${c.fecha_llegada_est}`:""}</div>
-                              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
-                                <div style={{width:120,height:4,background:"#f1f5f9",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",background:"#1aa358",borderRadius:4,width:`${(prog.done/prog.total)*100}%`}}/></div>
-                                <span style={{fontSize:11,color:"#64748b"}}>{prog.done}/{prog.total} pasos</span>
-                              </div>
-                            </div>
-                            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,minWidth:260}}>
-                              {[["Unidades",fmtN(c.unidades),"#0f172a"],["1er Pago",fmt(c.calc?.p1Cl),"#1aa358"],["2do Pago",fmt(c.calc?.p2Cl),"#334155"]].map(([l,v,col])=>(
-                                <div key={l} style={{background:"#f8fafc",borderRadius:7,padding:"8px 10px",textAlign:"center"}}>
-                                  <div style={{fontSize:10,color:"#444",marginBottom:2}}>{l}</div>
-                                  <div style={{fontSize:12,fontWeight:700,color:col}}>{v}</div>
+                              <div style={{fontSize:12,color:"#64748b"}}>📅 {c.fecha_solicitud||"-"}{c.fecha_llegada_est&&!isRech?` · 🏁 ${c.fecha_llegada_est}`:""}</div>
+                              {!isRech&&(
+                                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
+                                  <div style={{width:100,height:3,background:"#f1f5f9",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",background:sc,borderRadius:4,width:`${(prog.done/prog.total)*100}%`}}/></div>
+                                  <span style={{fontSize:11,color:"#64748b"}}>{prog.done}/{prog.total} pasos</span>
                                 </div>
-                              ))}
+                              )}
+                              {c.motivo_no_procesada&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>Motivo: {c.motivo_no_procesada}</div>}
                             </div>
+                            {!isRech&&c.calc&&(
+                              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,minWidth:240}}>
+                                {[["Unidades",fmtN(c.unidades),"#0f172a"],["1er Pago",fmt(c.calc?.p1Cl),"#16a34a"],["2do Pago",fmt(c.calc?.p2Cl),"#334155"]].map(([l,v,col])=>(
+                                  <div key={l} style={{background:"#f8fafc",borderRadius:7,padding:"7px 8px",textAlign:"center"}}>
+                                    <div style={{fontSize:10,color:"#64748b",marginBottom:2}}>{l}</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:col}}>{v}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {isRech&&(
+                              <div style={{fontSize:12,color:"#94a3b8",alignSelf:"center"}}>{fmtN(c.unidades)} und</div>
+                            )}
                           </div>
                         </div>
                       );
