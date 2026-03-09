@@ -225,6 +225,7 @@ export default function App({ supabase, usuario, onLogout }){
   const [dashTipo,setDashTipo]           = useState("clientes");
   const [dashClienteFiltro,setDashClienteFiltro] = useState("todos");
   const [clienteSeleccionado,setClienteSeleccionado] = useState(null);
+  const [filtroCliente,setFiltroCliente] = useState("todas");
   const [vistaClienteId,setVistaClienteId] = useState(null);
   const [negForm,setNegForm] = useState({});
   const [resumenChina,setResumenChina] = useState(null);
@@ -2646,8 +2647,6 @@ Número de seguimiento: ${c.nro}`;
 
           // Estados agrupados para filtro
           const RECHAZADAS=["rechazada_cliente","anulada","no_procesada"];
-          const [filtroCliente,setFiltroCliente]=React.useState("todas");
-
           const impsCliente=todasCliente.filter(c=>{
             if(filtroCliente==="todas") return true;
             if(filtroCliente==="activas") return !RECHAZADAS.includes(c.estado)&&c.estado!=="completada";
