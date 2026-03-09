@@ -242,6 +242,7 @@ export default function App({ supabase, usuario, onLogout }){
   const [filtroCliente,setFiltroCliente] = useState("todas");
   const [vistaClienteId,setVistaClienteId] = useState(null);
   const [negForm,setNegForm] = useState({});
+  const [notaInput,setNotaInput] = useState({});
   const [resumenChina,setResumenChina] = useState(null);
   const [backupModal,setBackupModal] = useState(null); // null | "export" | "import"
   const [simModal,setSimModal]       = useState(false);
