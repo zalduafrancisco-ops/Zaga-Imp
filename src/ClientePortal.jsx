@@ -269,7 +269,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
 
             {/* ── BANNER CAMBIOS DE ESTADO ── */}
             {alertas.length>0&&!alertaVista&&(
-              <div className="zfade" style={{background:"#040c18",borderRadius:14,padding:"16px 18px",marginBottom:20,border:"1px solid rgba(201,160,85,0.3)"}}>
+              <div style={{background:"#040c18",borderRadius:14,padding:"16px 18px",marginBottom:20,border:"1px solid rgba(201,160,85,0.3)"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:12}}>
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
                     <div style={{width:36,height:36,borderRadius:10,background:"rgba(201,160,85,0.15)",border:"1px solid rgba(201,160,85,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🔔</div>
@@ -306,7 +306,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
             )}
 
             {/* BIENVENIDA */}
-            <div style={{marginBottom:20}} className="zfade">
+            <div style={{marginBottom:20}}>
               <div style={{fontSize:20,fontWeight:700,color:"#0f172a"}}>Hola, {perfil.nombre} 👋</div>
               <div style={{fontSize:13,color:"#64748b",marginTop:4}}>
                 {activas.length>0
@@ -318,7 +318,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
 
             {/* ALERTA PENDIENTES */}
             {pendientesConf.length>0&&(
-              <div className="zfade" style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+              <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:14,padding:"14px 16px",marginBottom:16}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
                   <span style={{fontSize:16}}>🔔</span>
                   <span style={{fontSize:13,fontWeight:700,color:"#92400e"}}>Cotizaciones pendientes de confirmacion</span>
@@ -346,7 +346,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
             {proxLlegada&&(function(){
               var dias = getDias(proxLlegada.fecha_llegada_est)
               return (
-                <div className="arrival-card zfade" style={{background:"#040c18",borderRadius:14,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
+                <div className="arrival-card" style={{background:"#040c18",borderRadius:14,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
                   <div style={{display:"flex",alignItems:"center",gap:14}}>
                     <div style={{width:44,height:44,background:"rgba(201,160,85,0.15)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🚢</div>
                     <div>
@@ -364,7 +364,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
             })()}
 
             {/* KPIs — 5 tiles */}
-            <div className="stats-row zfade" style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:12}}>
+            <div className="stats-row" style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:12}}>
               {[
                 {label:"Cotizadas",value:todas.length,icon:"📋",color:"#2563eb"},
                 {label:"En proceso",value:activas.length,icon:"⚙️",color:"#ea580c"},
@@ -384,7 +384,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
             </div>
 
             {/* BARRA DE CONVERSION */}
-            <div className="zfade" style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px 18px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+            <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px 18px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div style={{fontSize:12,color:"#64748b",fontWeight:600}}>
                   Tasa de conversion — de {todas.length} cotizacion{todas.length!==1?"es":""}, {procesadas.length} {procesadas.length===1?"fue procesada":"fueron procesadas"}
@@ -413,7 +413,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
 
             {/* TOTAL INVERTIDO */}
             {totalInvertido>0&&(
-              <div className="zfade" style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px 18px",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+              <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px 18px",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
                 <div>
                   <div style={{fontSize:12,color:"#64748b",fontWeight:600,marginBottom:2}}>💰 Total invertido con ZAGA</div>
                   <div style={{fontSize:11,color:"#94a3b8"}}>Solo importaciones con 1er pago confirmado</div>
@@ -423,7 +423,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
             )}
 
             {/* FILTROS + BUSQUEDA — idéntico al Tracker */}
-            <div className="zfade" style={{marginBottom:12}}>
+            <div style={{marginBottom:12}}>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
                 <button className={"zfbtn"+(filtro==="todas"?" on":"")} onClick={function(){ setFiltro("todas") }}>
                   Todos ({todas.length})
