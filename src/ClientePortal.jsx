@@ -85,8 +85,8 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   const enProceso = todas.filter(c=>!['completada','solicitud'].includes(c.estado))
   const enCamino = todas.filter(c=>c.estado==='en_camino')
   const completadas = todas.filter(c=>c.estado==='completada')
-  const totalInvertido = todas.reduce((s,c)=>s+(c.calc?(c.con_iva?(c.calc.totClIva||c.calc.totCl||0):(c.calc.totCl||0)):0),0)
-  const pagosPendientes = todas.filter(c=>c.calc&&(!c.checklist?.pago1_cliente||(!c.checklist?.pago2_cliente&&['en_bodega','completada'].includes(c.estado))))
+  const totalInvertido = todas.filter(c=>c.checklist?.pago1_cliente).reduce((s,c)=>s+(c.calc?(c.con_iva?(c.calc.totClIva||c.calc.totCl||0):(c.calc.totCl||0)):0),0)
+  const pendientesConfirmacion = todas.filter(c=>c.calc&&!c.checklist?.pago1_cliente&&!['solicitud','rechazada_cliente','anulada','no_procesada'].includes(c.estado))
   const proximaLlegada = enProceso.filter(c=>c.fecha_llegada_est).sort((a,b)=>new Date(a.fecha_llegada_est)-new Date(b.fecha_llegada_est))[0]
 
   const filtradas = todas.filter(c=>{
@@ -157,13 +157,26 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
             </div>
           </div>
 
-          {/* ALERTA PAGOS */}
-          {pagosPendientes.length>0&&(
-            <div className="anim-in" style={{background:"#1a060318",border:"1px solid #c0392b40",borderRadius:14,padding:"13px 18px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
-              <div style={{fontSize:22}}>⚠️</div>
-              <div>
-                <div style={{fontSize:13,fontWeight:700,color:"#e74c3c",marginBottom:1}}>Tienes pagos pendientes</div>
-                <div style={{fontSize:11,color:"#8a4a3a"}}>{pagosPendientes.map(c=>c.producto).join(" · ")}</div>
+          {/* ALERTA CONFIRMACIONES PENDIENTES */}
+          {pendientesConfirmacion.length>0&&(
+            <div className="anim-in" style={{background:"#0d1a2e",border:"1px solid #c9a05535",borderRadius:14,padding:"14px 18px",marginBottom:16}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                <div style={{fontSize:20}}>🔔</div>
+                <div style={{fontSize:13,fontWeight:700,color:"#c9a055"}}>Cotizaciones pendientes de confirmación</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {pendientesConfirmacion.map(c=>(
+                  <div key={c.id} onClick={()=>setOpenId(openId===c.id?null:c.id)}
+                    style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#08111f",border:"1px solid #c9a05520",borderRadius:10,padding:"10px 14px",cursor:"pointer",transition:"border .2s"}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor="#c9a05550"}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor="#c9a05520"}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{background:"#c9a05520",color:"#c9a055",fontSize:11,fontWeight:800,borderRadius:8,padding:"3px 10px",border:"1px solid #c9a05530"}}>{c.nro}</span>
+                      <span style={{fontSize:12,color:"#8a9aaa"}}>{c.producto}</span>
+                    </div>
+                    <span style={{fontSize:11,color:"#c9a055",fontWeight:600}}>Ver →</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -403,6 +416,30 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                 <div style={{background:"#0d1a25",borderRadius:10,padding:"12px 14px",border:"1px solid #162035"}}>
                                   <div style={{fontSize:10,color:"#6a9fd4",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:5}}>📝 Notas</div>
                                   <div style={{fontSize:12,color:"#6a7a8a",lineHeight:1.7}}>{c.notas}</div>
+                                </div>
+                              )}
+                              {c.negociacion_rondas&&c.negociacion_rondas.length>0&&(
+                                <div style={{background:"#0d1a25",borderRadius:10,padding:"12px 14px",border:"1px solid #b8922e30"}}>
+                                  <div style={{fontSize:10,color:"#b8922e",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>💬 Historial de negociación</div>
+                                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                                    {c.negociacion_rondas.map((r,i)=>(
+                                      <div key={i} style={{background:"#08111f",borderRadius:8,padding:"10px 12px",border:}}>
+                                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:r.nota?6:0,flexWrap:"wrap",gap:6}}>
+                                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                            <span style={{fontSize:10,color:"#4a5a6a"}}>Ronda {i+1} · {r.fecha}</span>
+                                            {r.estado==="aplicada"&&<span style={{fontSize:9,fontWeight:700,color:"#1aa358",background:"#1aa35818",borderRadius:10,padding:"2px 8px",border:"1px solid #1aa35830"}}>✓ Aplicada</span>}
+                                            {r.estado==="rechazada"&&<span style={{fontSize:9,fontWeight:700,color:"#e74c3c",background:"#c0392b18",borderRadius:10,padding:"2px 8px",border:"1px solid #c0392b30"}}>✕ Rechazada</span>}
+                                            {r.estado==="pendiente"&&<span style={{fontSize:9,fontWeight:700,color:"#c9a055",background:"#c9a05518",borderRadius:10,padding:"2px 8px",border:"1px solid #c9a05530"}}>⏳ En revisión</span>}
+                                          </div>
+                                          <div style={{display:"flex",gap:10}}>
+                                            {r.unidades_prop&&<span style={{fontSize:11,color:"#8a9aaa"}}>📦 {r.unidades_prop} und</span>}
+                                            {r.precio_prop&&<span style={{fontSize:11,color:"#c9a055",fontWeight:600}}>Precio propuesto</span>}
+                                          </div>
+                                        </div>
+                                        {r.nota&&<div style={{fontSize:12,color:"#8a9aaa",lineHeight:1.6}}>{r.nota}</div>}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>
