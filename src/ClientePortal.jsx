@@ -626,11 +626,16 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                             {tab==="detalle"&&(
                               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                                 {isRech&&(
-                                  <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"12px 14px",display:"flex",gap:10,alignItems:"flex-start"}}>
-                                    <span style={{fontSize:18}}>❌</span>
-                                    <div>
-                                      <div style={{fontSize:13,fontWeight:700,color:"#dc2626",marginBottom:2}}>{label}</div>
-                                      <div style={{fontSize:12,color:"#7f1d1d"}}>{c.motivo_no_procesada||"Esta cotizacion no fue procesada."}</div>
+                                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                                    {/* Estado */}
+                                    <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"12px 14px",display:"flex",gap:10,alignItems:"center"}}>
+                                      <span style={{fontSize:18}}>❌</span>
+                                      <div style={{fontSize:13,fontWeight:700,color:"#dc2626"}}>{label}</div>
+                                    </div>
+                                    {/* Notas internas — motivo */}
+                                    <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0"}}>
+                                      <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>📝 Notas internas</div>
+                                      <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{c.motivo_no_procesada||"Sin notas registradas."}</div>
                                     </div>
                                   </div>
                                 )}
