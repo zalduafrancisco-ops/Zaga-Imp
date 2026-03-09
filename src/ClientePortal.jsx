@@ -105,6 +105,23 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   var [filtro, setFiltro] = useState("todas")
   var [busqueda, setBusqueda] = useState("")
   var [tabs, setTabs] = useState({})
+  var [alertas, setAlertas] = useState([])      // cambios detectados al cargar
+  var [alertaVista, setAlertaVista] = useState(false)  // banner cerrado?
+
+  var STORAGE_KEY = "zaga_estados_"+perfil.id
+
+  // Leer estados guardados en localStorage
+  var leerEstadosGuardados = function(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}") }catch(e){ return {} }
+  }
+  // Guardar estados actuales en localStorage
+  var guardarEstados = function(lista){
+    try{
+      var snap = {}
+      lista.forEach(function(c){ snap[c.id] = c.estado })
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snap))
+    }catch(e){}
+  }
 
   useEffect(function(){
     cargar()
@@ -115,14 +132,35 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   },[])
 
   var cargar = async function(){
-    var result = await supabase.from('cotizaciones').select('datos').order('created_at',{ascending:false})
-    if(result.data&&!result.error){
-      setCotizaciones(result.data.map(function(r){ return typeof r.datos==='string'?JSON.parse(r.datos):r.datos }))
-    }
+    try{
+      var result = await supabase.from('cotizaciones').select('datos').order('created_at',{ascending:false})
+      if(result.data&&!result.error){
+        var lista = result.data.map(function(r){ return typeof r.datos==='string'?JSON.parse(r.datos):r.datos })
+        setCotizaciones(lista)
+        // Detectar cambios vs última visita
+        var anteriores = leerEstadosGuardados()
+        if(Object.keys(anteriores).length > 0){
+          var cambios = []
+          lista.forEach(function(c){
+            var estadoAntes = anteriores[c.id]
+            if(estadoAntes && estadoAntes !== c.estado){
+              cambios.push({ nro: c.nro, producto: c.producto, antes: estadoAntes, ahora: c.estado })
+            }
+          })
+          if(cambios.length > 0){ setAlertas(cambios); setAlertaVista(false) }
+        }
+        guardarEstados(lista)
+      }
+    }catch(e){ console.warn("Error cargando cotizaciones:", e) }
     setLoading(false)
   }
 
-  var getTab = function(id){ return tabs[id]||"timeline" }
+  var getTab = function(id){
+    if(tabs[id]) return tabs[id]
+    var cot = cotizaciones.find(function(x){ return x.id===id })
+    if(cot && RECHAZADAS_EST.includes(cot.estado)) return "detalle"
+    return "timeline"
+  }
   var setTab = function(id,t){ setTabs(function(p){ var n=Object.assign({},p); n[id]=t; return n }) }
 
   // ── Totales sobre TODAS las cotizaciones ──────────────────────
@@ -152,6 +190,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   }
 
   var filtradas = todas.filter(function(c){
+    if(c.id===openId) return true  // siempre mostrar la card abierta
     var pF = filtro==="todas" ? true : c.estado===filtro
     var q = busqueda.trim().toLowerCase()
     return pF&&(!q||(c.producto&&c.producto.toLowerCase().includes(q))||(c.nro&&c.nro.toLowerCase().includes(q)))
@@ -227,6 +266,44 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
           </div>
         ) : (
           <div>
+
+            {/* ── BANNER CAMBIOS DE ESTADO ── */}
+            {alertas.length>0&&!alertaVista&&(
+              <div className="zfade" style={{background:"#040c18",borderRadius:14,padding:"16px 18px",marginBottom:20,border:"1px solid rgba(201,160,85,0.3)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:36,height:36,borderRadius:10,background:"rgba(201,160,85,0.15)",border:"1px solid rgba(201,160,85,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🔔</div>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:700,color:"#f8fafc"}}>
+                        {alertas.length===1?"1 importacion actualizada":alertas.length+" importaciones actualizadas"}
+                      </div>
+                      <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>Cambios desde tu ultima visita</div>
+                    </div>
+                  </div>
+                  <button onClick={function(){ setAlertaVista(true) }}
+                    style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,color:"#94a3b8",fontSize:12,padding:"4px 12px",cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>
+                    Cerrar
+                  </button>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {alertas.map(function(a,i){
+                    var colAntes = EST_COLOR[a.antes]||"#64748b"
+                    var colAhora = EST_COLOR[a.ahora]||"#64748b"
+                    return (
+                      <div key={i} style={{background:"rgba(255,255,255,0.05)",borderRadius:10,padding:"10px 14px",border:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                        <span style={{background:"rgba(201,160,85,0.15)",color:"#c9a055",fontSize:11,fontWeight:700,borderRadius:6,padding:"2px 9px",flexShrink:0}}>{a.nro}</span>
+                        <span style={{fontSize:12,color:"#e2e8f0",fontWeight:600,flex:1,minWidth:80}}>{a.producto}</span>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                          <span style={{fontSize:11,color:colAntes,background:colAntes+"22",borderRadius:20,padding:"2px 9px",border:"1px solid "+colAntes+"44"}}>{EST_LABEL[a.antes]||a.antes}</span>
+                          <span style={{fontSize:14,color:"#c9a055"}}>→</span>
+                          <span style={{fontSize:11,color:colAhora,background:colAhora+"22",borderRadius:20,padding:"2px 9px",border:"1px solid "+colAhora+"44",fontWeight:700}}>{EST_LABEL[a.ahora]||a.ahora}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* BIENVENIDA */}
             <div style={{marginBottom:20}} className="zfade">
