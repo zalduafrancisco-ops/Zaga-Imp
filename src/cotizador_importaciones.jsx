@@ -63,9 +63,9 @@ const EST_COLOR = {
 };
 const PROCESADAS = ["aceptada","pagada_china","en_camino","en_bodega","completada"];
 
-const defaultForm = {
+const makeDefaultForm = (usuario) => ({
   tipo:"cliente",
-  gestor:"francisco",
+  gestor: usuario?.nombre?.toLowerCase()==="luisa" ? "luisa" : "francisco",
   cliente:"", categoria_cliente:"nuevo", transporte:"maritimo", producto:"", link_alibaba:"",
   fecha_solicitud: new Date().toISOString().split("T")[0],
   unidades:"", precio_china:"", comision_real:"",
@@ -82,7 +82,7 @@ const defaultForm = {
   // propia
   precio_venta_und:"", pct_margen_objetivo:"",
   canales:[], pct_comision_marketplace:0,
-};
+});
 
 // ── Calculations ─────────────────────────────────────────────────
 function calcCliente(d) {
@@ -221,6 +221,7 @@ function CheckItem({label,checked,onChange,disabled}){
 }
 
 export default function App({ supabase, usuario, onLogout }){
+  const defaultForm = makeDefaultForm(usuario);
   const [tab2,setTab]=useState("calc");
   const [form,setForm]                   = useState(defaultForm);
   const [cotizaciones,setCotizaciones]   = useState([]);
