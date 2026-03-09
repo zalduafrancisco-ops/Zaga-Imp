@@ -84,6 +84,24 @@ function RondaNeg(props) {
   )
 }
 
+
+function ScrollTop() {
+  var [visible, setVisible] = useState(false)
+  useEffect(function(){
+    var onScroll = function(){ setVisible(window.scrollY > 300) }
+    window.addEventListener('scroll', onScroll)
+    return function(){ window.removeEventListener('scroll', onScroll) }
+  },[])
+  if(!visible) return null
+  return (
+    <button
+      onClick={function(){ window.scrollTo({top:0,behavior:'smooth'}) }}
+      style={{position:'fixed',bottom:24,right:20,width:44,height:44,borderRadius:'50%',background:'#040c18',border:'2px solid #c9a055',color:'#c9a055',fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 16px rgba(0,0,0,0.2)',zIndex:200,transition:'all .2s',fontWeight:700}}
+      title="Volver arriba"
+    >↑</button>
+  )
+}
+
 export default function ClientePortal({ supabase, perfil, onLogout }) {
   var [cotizaciones, setCotizaciones] = useState([])
   var [loading, setLoading] = useState(true)
@@ -519,6 +537,9 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
             )}
           </div>
         )}
+
+        {/* SCROLL TO TOP */}
+        <ScrollTop/>
 
         <div style={{textAlign:"center",marginTop:48,fontSize:11,color:"#cbd5e1",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
           <img src={LOGO_DARK} alt="ZAGA" style={{height:16,opacity:.3}}/>
