@@ -160,14 +160,14 @@ const monthLabel=k=>{ try{ const [y,m]=k.split("-"); return new Date(y,Number(m)
 
 // ── UI helpers ────────────────────────────────────────────────────
 const ROW=({label,value,accent,big,sub,topLine})=>(
-  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:topLine?"10px 0 7px":"7px 0",borderBottom:"1px solid #22223a",borderTop:topLine?"1px solid #3a3a5a":"none",marginTop:topLine?6:0}}>
-    <span style={{color:sub?"#555":"#999",fontSize:sub?12:13}}>{label}</span>
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:topLine?"10px 0 7px":"7px 0",borderBottom:"1px solid #f1f5f9",borderTop:topLine?"1px solid #e2e8f0":"none",marginTop:topLine?6:0}}>
+    <span style={{color:sub?"#94a3b8":"#64748b",fontSize:sub?12:13}}>{label}</span>
     <span style={{color:accent||(big?"#c9a055":"#0f172a"),fontWeight:big?700:500,fontSize:big?15:13}}>{value}</span>
   </div>
 );
 const BLOCK=({title,accent,children,bg})=>(
-  <div style={{background:bg||"#0c1a2e",borderRadius:12,padding:20,marginBottom:16,border:"1px solid #e2e8f0"}}>
-    <div style={{fontSize:11,color:accent,letterSpacing:2,fontWeight:700,marginBottom:14,textTransform:"uppercase"}}>{title}</div>
+  <div style={{background:bg||"#ffffff",borderRadius:12,padding:20,marginBottom:16,border:"1px solid #e2e8f0",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+    <div style={{fontSize:11,color:accent||"#040c18",letterSpacing:1.5,fontWeight:700,marginBottom:14,textTransform:"uppercase",borderBottom:"1px solid #f1f5f9",paddingBottom:10}}>{title}</div>
     {children}
   </div>
 );
@@ -192,16 +192,16 @@ function NInput({label,field,form,setForm,color,placeholder,note}){
     <div>
       <label style={{display:"block",fontSize:10,color:color||"#777",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>{label}</label>
       <input type="number" value={form[field]??""} placeholder={placeholder||""} onChange={e=>setForm(f=>({...f,[field]:e.target.value}))}
-        style={{width:"100%",background:"#f8fafc",border:`1px solid ${color?color+"44":"#1a2d45"}`,borderRadius:8,color:color||"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+        style={{width:"100%",background:"#f8fafc",border:`1px solid ${color?color+"55":"#e2e8f0"}`,borderRadius:8,color:color||"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
       {note&&<div style={{fontSize:10,color:"#64748b",marginTop:3}}>{note}</div>}
     </div>
   );
 }
 function CheckItem({label,checked,onChange,disabled}){
   return(
-    <div onClick={()=>!disabled&&onChange(!checked)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,cursor:disabled?"default":"pointer",background:checked?"#22c55e11":"#070e1b",border:`1px solid ${checked?"#1aa35833":"#1a2d45"}`,opacity:disabled?.4:1,transition:"all .15s"}}>
+    <div onClick={()=>!disabled&&onChange(!checked)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,cursor:disabled?"default":"pointer",background:checked?"#f0fdf4":"#f8fafc",border:`1px solid ${checked?"#1aa35855":"#e2e8f0"}`,opacity:disabled?.4:1,transition:"all .15s"}}>
       <div style={{width:18,height:18,borderRadius:5,flexShrink:0,background:checked?"#1aa358":"transparent",border:`2px solid ${checked?"#1aa358":"#444"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#05100e",fontWeight:800}}>{checked?"✓":""}</div>
-      <span style={{fontSize:13,color:checked?"#1aa358":"#999"}}>{label}</span>
+      <span style={{fontSize:13,color:checked?"#1aa358":"#475569"}}>{label}</span>
     </div>
   );
 }
@@ -529,12 +529,17 @@ export default function App({ supabase, usuario, onLogout }){
         ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
         ::-webkit-scrollbar-thumb:hover{background:#94a3b8}
         @keyframes spin{to{transform:rotate(360deg)}}
-        @media(max-width:768px){
+        @media(max-width:900px){
           .nav-hdr{flex-wrap:wrap;height:auto !important;padding:10px 0 !important;gap:8px}
           .nav-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
           .nav-tabs button{white-space:nowrap;flex-shrink:0;padding:8px 12px !important}
           .hide-mob{display:none !important}
           .g2{grid-template-columns:1fr !important}
+          .calc-grid{grid-template-columns:1fr !important}
+          .luisa-grid{grid-template-columns:1fr !important}
+          .kpi-grid{grid-template-columns:1fr 1fr !important}
+          .dash-grid{grid-template-columns:1fr !important}
+          .preview-grid{grid-template-columns:1fr !important}
         }
       `}</style>
 
@@ -543,18 +548,18 @@ export default function App({ supabase, usuario, onLogout }){
         <div className="nav-hdr" style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <img src={LOGO_WHITE} alt="ZAGA" style={{height:32,width:"auto",objectFit:"contain"}}/>
-            <div style={{width:1,height:24,background:"#1a2d45",margin:"0 4px"}}/>
+            <div style={{width:1,height:24,background:"#f1f5f9",margin:"0 4px"}}/>
             <div style={{fontSize:9,color:"#c9a05570",letterSpacing:2,textTransform:"uppercase"}}>Gestión de Importaciones</div>
           </div>
           <div style={{display:"flex",gap:8,fontSize:12,alignItems:"center"}}>
-            {[["⏳",cotizaciones.filter(c=>["solicitud","enviada_cliente"].includes(c.estado)).length,"#b8922e","Pendientes"],
+            <span className="stat-chips" style={{display:"flex",gap:6,alignItems:"center"}}>{[["⏳",cotizaciones.filter(c=>["solicitud","enviada_cliente"].includes(c.estado)).length,"#b8922e","Pendientes"],
               ["🚢",cotizaciones.filter(c=>["pagada_china","en_camino"].includes(c.estado)).length,"#c47830","En tránsito"],
               ["✅",cotizaciones.filter(c=>c.estado==="completada").length,"#1aa358","Completadas"],
-            ].map(([ic,n,col,lb])=>n>0&&<div key={lb} style={{background:col+"14",border:`1px solid ${col}33`,borderRadius:20,padding:"3px 12px",color:col,fontSize:11}}>{ic} {n} {lb}</div>)}
-            <div style={{width:1,height:20,background:"#1a2d45",margin:"0 4px"}}/>
+            ].map(([ic,n,col,lb])=>n>0&&<div key={lb} className="hide-mob" style={{background:col+"14",border:`1px solid ${col}33`,borderRadius:20,padding:"3px 12px",color:col,fontSize:11}}>{ic} {n} {lb}</div>)}</span>
+            <div style={{width:1,height:20,background:"#f1f5f9",margin:"0 4px"}}/>
             <button onClick={exportarDatos} title="Exportar backup" style={{background:"transparent",color:"#c9a05580",border:"1px solid #e2e8f0",borderRadius:8,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>⬇ Exportar</button>
             <button onClick={importarDatos} title="Importar datos" style={{background:"transparent",color:"#334155",border:"1px solid #e2e8f0",borderRadius:8,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>⬆ Importar</button>
-            <div style={{width:1,height:20,background:"#1a2d45"}}/>
+            <div style={{width:1,height:20,background:"#f1f5f9"}}/>
             <span style={{fontSize:12,color:"#c9a055",fontWeight:600,background:"rgba(201,160,85,0.1)",borderRadius:20,padding:"4px 12px",border:"1px solid rgba(201,160,85,0.2)"}}>{usuario?.nombre||"Admin"}</span>
             <button onClick={onLogout} style={{background:"transparent",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:8,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>Salir</button>
           </div>
@@ -578,10 +583,10 @@ export default function App({ supabase, usuario, onLogout }){
                 <div style={{fontWeight:700,fontSize:15,color:"#334155"}}>✨ Llenar desde mensaje del cliente</div>
                 <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Pega el WhatsApp, email o texto tal como llegó</div>
               </div>
-              <button onClick={()=>{setIaModal(false);setIaTexto("");}} style={{background:"#1a2d45",color:"#64748b",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
+              <button onClick={()=>{setIaModal(false);setIaTexto("");}} style={{background:"#1a3050",color:"#94a3b8",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
             </div>
             <div style={{padding:"16px 24px",flex:1,overflow:"hidden",display:"flex",flexDirection:"column",gap:12}}>
-              <div style={{fontSize:12,color:"#334155",background:"#f5f3ff",border:"1px solid #ddd6fe",borderRadius:8,padding:"10px 14px"}}>
+              <div style={{fontSize:12,color:"#334155",background:"#faf5ff",border:"1px solid #ddd6fe",borderRadius:8,padding:"10px 14px"}}>
                 💡 No necesitas ordenar nada. Pega el mensaje exactamente como te llegó — con emojis, errores ortográficos, en español o inglés — y la IA extrae lo importante.
               </div>
               <textarea
@@ -594,7 +599,7 @@ export default function App({ supabase, usuario, onLogout }){
               />
             </div>
             <div style={{padding:"16px 24px",borderTop:"1px solid #e2e8f0",display:"flex",gap:8,justifyContent:"flex-end"}}>
-              <button onClick={()=>{setIaModal(false);setIaTexto("");}} style={{background:"#1a2d45",color:"#0f172a",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,cursor:"pointer"}}>Cancelar</button>
+              <button onClick={()=>{setIaModal(false);setIaTexto("");}} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,cursor:"pointer"}}>Cancelar</button>
               <button onClick={handleIaFill} disabled={iaCargando} style={{background:iaCargando?"#1a2d45":"linear-gradient(135deg,#a78bfa,#7c3aed)",color:iaCargando?"#555":"#fff",border:"none",borderRadius:8,padding:"9px 24px",fontSize:13,cursor:iaCargando?"not-allowed":"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:8}}>
                 {iaCargando?<><span style={{display:"inline-block",width:14,height:14,border:"2px solid #555",borderTop:"2px solid #a78bfa",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>Analizando...</>:<>✨ Completar formulario</>}
               </button>
@@ -627,7 +632,7 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{fontWeight:700,fontSize:15,color:"#334155"}}>📋 Resumen para tu contacto en China</div>
                   <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Copia este texto y pégalo en el chat con tu chinita</div>
                 </div>
-                <button onClick={()=>setResumenChina(null)} style={{background:"#1a2d45",color:"#64748b",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
+                <button onClick={()=>setResumenChina(null)} style={{background:"#1a3050",color:"#94a3b8",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
               </div>
               <div style={{padding:"16px 24px",flex:1,overflow:"hidden",display:"flex",flexDirection:"column",gap:12}}>
                 <div style={{fontSize:12,color:"#1aa358",background:"#22c55e11",border:"1px solid #22c55e33",borderRadius:8,padding:"8px 14px"}}>
@@ -642,7 +647,7 @@ Número de seguimiento: ${c.nro}`;
               <div style={{padding:"16px 24px",borderTop:"1px solid #e2e8f0",display:"flex",gap:8,justifyContent:"space-between",alignItems:"center"}}>
                 <div style={{fontSize:11,color:"#64748b"}}>Haz clic en el cuadro → Ctrl+A → Ctrl+C para copiar todo</div>
                 <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{setResumenChina(null);setTab("tracker");}} style={{background:"#1a2d45",color:"#0f172a",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,cursor:"pointer"}}>Ir al Tracker</button>
+                  <button onClick={()=>{setResumenChina(null);setTab("tracker");}} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,cursor:"pointer"}}>Ir al Tracker</button>
                   <button onClick={()=>{setResumenChina(null); const c2=resumenChina; setForm({...defaultForm,...c2}); setEditId(c2.id); setTab("calc");}} style={{background:"linear-gradient(135deg,#c9a055,#8a6a30)",color:"#05100e",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,cursor:"pointer",fontWeight:700}}>✏️ Agregar precio China ahora</button>
                 </div>
               </div>
@@ -664,7 +669,7 @@ Número de seguimiento: ${c.nro}`;
                     :"Pega aquí el texto de tu backup y presiona Importar."}
                 </div>
               </div>
-              <button onClick={()=>setBackupModal(null)} style={{background:"#1a2d45",color:"#64748b",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
+              <button onClick={()=>setBackupModal(null)} style={{background:"#1a3050",color:"#94a3b8",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
             </div>
             <div style={{padding:"16px 24px",flex:1,overflow:"hidden",display:"flex",flexDirection:"column",gap:12}}>
               {backupModal==="export"&&(
@@ -688,7 +693,7 @@ Número de seguimiento: ${c.nro}`;
               />
             </div>
             <div style={{padding:"16px 24px",borderTop:"1px solid #e2e8f0",display:"flex",gap:8,justifyContent:"flex-end"}}>
-              <button onClick={()=>setBackupModal(null)} style={{background:"#1a2d45",color:"#0f172a",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,cursor:"pointer"}}>Cancelar</button>
+              <button onClick={()=>setBackupModal(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,cursor:"pointer"}}>Cancelar</button>
               {backupModal==="import"&&(
                 <button onClick={confirmarImport} style={{background:"#2d78c8",color:"#fff",border:"none",borderRadius:8,padding:"9px 22px",fontSize:13,cursor:"pointer",fontWeight:700}}>⬆️ Importar ahora</button>
               )}
@@ -706,7 +711,7 @@ Número de seguimiento: ${c.nro}`;
             <div style={{fontSize:12,color:"#64748b",background:"#f8fafc",borderRadius:8,padding:"6px 14px",border:"1px solid #e2e8f0"}}>
               💡 Presiona <b style={{color:"#c9a055"}}>Ctrl+P</b> (Windows) o <b style={{color:"#c9a055"}}>⌘+P</b> (Mac) para guardar como PDF
             </div>
-            <button onClick={cerrarPrint} style={{background:"#1a2d45",color:"#0f172a",border:"none",borderRadius:8,padding:"8px 18px",fontSize:13,cursor:"pointer",fontWeight:600}}>✕ Cerrar</button>
+            <button onClick={cerrarPrint} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"8px 18px",fontSize:13,cursor:"pointer",fontWeight:600}}>✕ Cerrar</button>
           </div>
           {/* Contenido del reporte */}
           <div style={{maxWidth:820,margin:"0 auto",padding:"24px 20px"}}>
@@ -725,7 +730,7 @@ Número de seguimiento: ${c.nro}`;
                       ))}
                     </div>
                     <div style={{background:"#f8f9ff",border:"2px solid #1a1a2e22",borderRadius:12,padding:"16px 20px",marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Total importación</div><div style={{fontSize:28,fontWeight:800,color:"#0c1a2e"}}>{fmt(vistaData.calc?.totCl)}</div></div>
+                      <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Total importación</div><div style={{fontSize:28,fontWeight:800,color:"#0f172a"}}>{fmt(vistaData.calc?.totCl)}</div></div>
                       <div style={{textAlign:"right"}}>
                         <div style={{fontSize:12,color:"#64748b",marginBottom:4}}>Estado: <b style={{color:EST_COLOR[vistaData.estado]||"#888"}}>{EST_LABEL[vistaData.estado]||vistaData.estado}</b></div>
                         {vistaData.fecha_llegada_est&&<div style={{fontSize:12,color:"#64748b"}}>Llegada est: <b>{vistaData.fecha_llegada_est}</b></div>}
@@ -848,27 +853,27 @@ Número de seguimiento: ${c.nro}`;
           <div style={{position:"fixed",inset:0,background:"#000c",zIndex:950,overflowY:"auto",padding:"30px 20px"}} onClick={e=>e.target===e.currentTarget&&setPreviewId(null)}>
             <div style={{maxWidth:860,margin:"0 auto",background:"#ffffff",borderRadius:16,border:"1px solid #e2e8f0",overflow:"hidden"}}>
               {/* Header */}
-              <div style={{background:"linear-gradient(135deg,#1a1a2e,#0d1530)",padding:"20px 28px",borderBottom:"1px solid #e2e8f0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div style={{background:"#040c18",padding:"20px 28px",borderBottom:"1px solid #0f1e30",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                 <div>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6,flexWrap:"wrap"}}>
-                    {isPropia?<span style={{background:"#3d7fc422",color:"#3d7fc4",border:"1px solid #8b5cf644",borderRadius:20,padding:"3px 12px",fontSize:12,fontWeight:700}}>🏠 PROPIA</span>:<span style={{fontWeight:800,fontSize:18,color:"#0f172a"}}>{p.cliente}</span>}
-                    <span style={{fontSize:13,color:"#64748b"}}>{p.nro}</span>
+                    {isPropia?<span style={{background:"#3d7fc422",color:"#3d7fc4",border:"1px solid #8b5cf644",borderRadius:20,padding:"3px 12px",fontSize:12,fontWeight:700}}>🏠 PROPIA</span>:<span style={{fontWeight:800,fontSize:18,color:"#ffffff"}}>{p.cliente}</span>}
+                    <span style={{fontSize:13,color:"#94a3b8"}}>{p.nro}</span>
                     <span style={{background:sc+"22",color:sc,border:`1px solid ${sc}44`,borderRadius:20,padding:"3px 12px",fontSize:12,fontWeight:700}}>{sl}</span>
                     {diasLL!==null&&!p.fecha_llegada_real&&<span style={{background:"#f9741618",color:"#c47830",border:"1px solid #f9741633",borderRadius:20,padding:"3px 10px",fontSize:11}}>{diasLL>0?`🚢 ${diasLL}d para llegar`:diasLL===0?"¡Llega hoy!":`⚠️ ${Math.abs(diasLL)}d tarde`}</span>}
                     {p.fecha_llegada_real&&<span style={{background:"#10b98122",color:"#0d9870",border:"1px solid #10b98144",borderRadius:20,padding:"3px 10px",fontSize:11}}>✅ Llegó {p.fecha_llegada_real}</span>}
                   </div>
-                  <div style={{fontSize:15,color:"#64748b",marginBottom:4}}>{p.producto} · <span style={{color:"#0f172a",fontWeight:600}}>{fmtN(p.unidades)} unidades</span></div>
-                  <div style={{display:"flex",gap:16,fontSize:11,color:"#64748b",flexWrap:"wrap"}}>
+                  <div style={{fontSize:14,color:"#94a3b8",marginBottom:4}}>{p.producto} · <span style={{color:"#e2e8f0",fontWeight:600}}>{fmtN(p.unidades)} unidades</span></div>
+                  <div style={{display:"flex",gap:16,fontSize:11,color:"#94a3b8",flexWrap:"wrap"}}>,
                     {p.fecha_solicitud&&<span>📅 Solicitud: {p.fecha_solicitud}</span>}
                     {p.fecha_llegada_est&&<span>🏁 Est: {p.fecha_llegada_est}</span>}
                     {p.sku_china&&<span style={{color:"#b8922e"}}>🏷 SKU China: {p.sku_china}</span>}
                     {p.sku_bodega&&<span style={{color:"#3d7fc4"}}>📦 SKU Bodega: {p.sku_bodega}</span>}
                   </div>
                 </div>
-                <button onClick={()=>setPreviewId(null)} style={{background:"#1a2d45",color:"#64748b",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,cursor:"pointer",marginLeft:12}}>✕ Cerrar</button>
+                <button onClick={()=>setPreviewId(null)} style={{background:"#1a3050",color:"#94a3b8",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,cursor:"pointer",marginLeft:12}}>✕ Cerrar</button>
               </div>
 
-              <div style={{padding:"24px 20px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+              <div style={{padding:"20px",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:16}}>
                 {/* Columna izquierda: Pagos */}
                 <div style={{display:"flex",flexDirection:"column",gap:14}}>
                   {!isPropia&&p.calc&&(
@@ -961,7 +966,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:10}}>
                       📋 Seguimiento — <span style={{color:"#1aa358"}}>{prog.done}/{prog.total} completados</span>
                     </div>
-                    <div style={{height:4,background:"#1a2d45",borderRadius:4,overflow:"hidden",marginBottom:12}}>
+                    <div style={{height:4,background:"#e2e8f0",borderRadius:4,overflow:"hidden",marginBottom:12}}>
                       <div style={{height:"100%",background:isPropia?"#3d7fc4":"#1aa358",borderRadius:4,width:`${(prog.done/prog.total)*100}%`}}/>
                     </div>
                     {[{group:"cotizacion",label:"Cotización",color:"#2a8aaa"},{group:"pagos",label:"Pagos",color:"#1aa358"},{group:"china",label:"China",color:"#b8922e"},{group:"logistica",label:"Logística",color:"#c47830"},{group:"venta",label:"Venta",color:"#3d7fc4"}]
@@ -971,7 +976,7 @@ Número de seguimiento: ${c.nro}`;
                         <div style={{fontSize:10,color,fontWeight:700,marginBottom:5,textTransform:"uppercase",letterSpacing:1}}>{label}</div>
                         {chklDef.filter(d=>d.group===group).map(d=>(
                           <div key={d.key} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",borderRadius:6,marginBottom:3,background:"#f8fafc"}}>
-                            <span style={{fontSize:14,color:p.checklist?.[d.key]?color:"#333"}}>{p.checklist?.[d.key]?"☑":"☐"}</span>
+                            <span style={{fontSize:14,color:p.checklist?.[d.key]?color:"#475569"}}>{p.checklist?.[d.key]?"☑":"☐"}</span>
                             <span style={{fontSize:11,color:p.checklist?.[d.key]?"#0f172a":"#555"}}>{d.label}</span>
                           </div>
                         ))}
@@ -1001,12 +1006,12 @@ Número de seguimiento: ${c.nro}`;
                     </div>
                   )}
                   {p.notas&&<div style={{background:"#f8fafc",borderRadius:8,padding:12,border:"1px solid #e2e8f0"}}><div style={{fontSize:10,color:"#64748b",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Notas cotización</div><div style={{fontSize:12,color:"#64748b"}}>{p.notas}</div></div>}
-                  {p.variantes&&<div style={{background:"#0c1628",borderRadius:8,padding:12,border:"1px solid #a78bfa33"}}><div style={{fontSize:10,color:"#334155",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>🎨 Variantes / Especificaciones</div><div style={{fontSize:12,color:"#0f172a",whiteSpace:"pre-wrap",lineHeight:1.6}}>{p.variantes}</div></div>}
+                  {p.variantes&&<div style={{background:"#f5f3ff",borderRadius:8,padding:12,border:"1px solid #a78bfa33"}}><div style={{fontSize:10,color:"#334155",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>🎨 Variantes / Especificaciones</div><div style={{fontSize:12,color:"#0f172a",whiteSpace:"pre-wrap",lineHeight:1.6}}>{p.variantes}</div></div>}
                   {p.notas_internas&&<div style={{background:"#f8fafc",borderRadius:8,padding:12,border:"1px solid #06b6d433"}}><div style={{fontSize:10,color:"#2a8aaa",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>📌 Notas internas</div><div style={{fontSize:12,color:"#0f172a",whiteSpace:"pre-wrap"}}>{p.notas_internas}</div></div>}
-                  {p.link_alibaba&&<a href={p.link_alibaba} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,background:"#1a2a4a",color:"#2d78c8",border:"1px solid #3b82f633",borderRadius:8,padding:"8px 14px",fontSize:12,textDecoration:"none"}}>🔗 Ver referencia en Alibaba</a>}
-                  {p.motivo_no_procesada&&<div style={{background:"#2e1a1a",borderRadius:8,padding:12,border:"1px solid #ef444433"}}><div style={{fontSize:10,color:"#c0392b",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Motivo no procesada</div><div style={{fontSize:12,color:"#f87171"}}>{p.motivo_no_procesada}</div></div>}
+                  {p.link_alibaba&&<a href={p.link_alibaba} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,background:"#eff6ff",color:"#2d78c8",border:"1px solid #3b82f633",borderRadius:8,padding:"8px 14px",fontSize:12,textDecoration:"none"}}>🔗 Ver referencia en Alibaba</a>}
+                  {p.motivo_no_procesada&&<div style={{background:"#fff1f2",borderRadius:8,padding:12,border:"1px solid #ef444433"}}><div style={{fontSize:10,color:"#c0392b",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Motivo no procesada</div><div style={{fontSize:12,color:"#dc2626"}}>{p.motivo_no_procesada}</div></div>}
                   {(p.negociacion_rondas||[]).length>0&&(
-                    <div style={{background:"#0f1824",borderRadius:10,padding:14,border:"1px solid #f59e0b33"}}>
+                    <div style={{background:"#fffbeb",borderRadius:10,padding:14,border:"1px solid #fde68a"}}>
                       <div style={{fontSize:10,color:"#b8922e",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:10}}>🤝 Historial de Negociación</div>
                       <div style={{display:"flex",flexDirection:"column",gap:7}}>
                         {(p.negociacion_rondas||[]).map((r,i)=>(
@@ -1038,7 +1043,7 @@ Número de seguimiento: ${c.nro}`;
           <div style={{maxWidth:700,margin:"0 auto"}}>
             <div style={{display:"flex",gap:10,marginBottom:12,justifyContent:"flex-end"}}>
               <button onClick={()=>abrirPrint("tracker")} style={{background:"#c9a055",color:"#05100e",border:"none",borderRadius:9,padding:"10px 22px",fontSize:14,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>
-              <button onClick={()=>setVistaId(null)} style={{background:"#1a2d45",color:"#0f172a",border:"none",borderRadius:9,padding:"10px 20px",fontSize:14,cursor:"pointer"}}>✕ Cerrar</button>
+              <button onClick={()=>setVistaId(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:9,padding:"10px 20px",fontSize:14,cursor:"pointer"}}>✕ Cerrar</button>
             </div>
             <div ref={vistaRef} style={{background:"#fff",borderRadius:16,overflow:"hidden",color:"#222",fontFamily:"'Segoe UI',Arial,sans-serif"}}>
               <div style={{background:"#f1f5f9",padding:"28px 36px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -1052,7 +1057,7 @@ Número de seguimiento: ${c.nro}`;
                   ))}
                 </div>
                 <div style={{background:"#f8f9ff",border:"2px solid #1a1a2e22",borderRadius:12,padding:"16px 20px",marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div><div style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Precio por unidad (base)</div><div style={{fontSize:26,fontWeight:800,color:"#0c1a2e"}}>{fmt(vistaData.calc?.pCUnd)}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{vistaData.con_iva?"+ IVA":"Sin IVA"}</div></div>
+                  <div><div style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Precio por unidad (base)</div><div style={{fontSize:26,fontWeight:800,color:"#0f172a"}}>{fmt(vistaData.calc?.pCUnd)}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{vistaData.con_iva?"+ IVA":"Sin IVA"}</div></div>
                   <div style={{textAlign:"right"}}>
                     <div style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Precio final / unidad (todo incluido)</div>
                     <div style={{fontSize:26,fontWeight:800,color:"#0f7040"}}>{fmt(vistaData.calc?.pfUnd)}<span style={{fontSize:13,color:"#64748b",fontWeight:400,marginLeft:4}}>neto</span></div>
@@ -1061,7 +1066,7 @@ Número de seguimiento: ${c.nro}`;
                   </div>
                 </div>
                 <div style={{marginBottom:24}}>
-                  <div style={{fontSize:14,fontWeight:700,marginBottom:14,color:"#0c1a2e"}}>Estructura de Pago</div>
+                  <div style={{fontSize:14,fontWeight:700,marginBottom:14,color:"#0f172a"}}>Estructura de Pago</div>
                   <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:18,marginBottom:12}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontWeight:700,fontSize:15,color:"#0f7040"}}>1er Pago — Al confirmar la orden</span><span style={{fontWeight:800,fontSize:20,color:"#0f7040"}}>{vistaData.con_iva?fmt((vistaData.calc?.p1Cl||0)*1.19):fmt(vistaData.calc?.p1Cl)}</span></div>
                     <div style={{fontSize:12,color:"#666"}}>
@@ -1097,7 +1102,7 @@ Número de seguimiento: ${c.nro}`;
         </div>
       )}
 
-      <div style={{maxWidth:1100,margin:"0 auto",padding:24}}>
+      <div style={{maxWidth:1200,margin:"0 auto",padding:"20px 16px"}}>
 
         {/* ══ CALCULADORA ══ */}
         {tab2==="calc"&&(
@@ -1120,22 +1125,22 @@ Número de seguimiento: ${c.nro}`;
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
               <span style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>Gestionada por</span>
               {[["francisco","👤 Francisco","#2d78c8"],["luisa","👩‍💼 Luisa","#a85590"]].map(([k,l,col])=>(
-                <button key={k} onClick={()=>setForm(p=>({...p,gestor:k}))} style={{background:form.gestor===k?col+"22":"#070e1b",color:form.gestor===k?col:"#555",border:`1px solid ${form.gestor===k?col+"55":"#1a2d45"}`,borderRadius:20,padding:"5px 16px",fontSize:12,cursor:"pointer",fontWeight:form.gestor===k?700:400}}>{l}</button>
+                <button key={k} onClick={()=>setForm(p=>({...p,gestor:k}))} style={{background:form.gestor===k?col+"18":"#f8fafc",color:form.gestor===k?col:"#64748b",border:`1px solid ${form.gestor===k?col+"66":"#e2e8f0"}`,borderRadius:20,padding:"5px 16px",fontSize:12,cursor:"pointer",fontWeight:form.gestor===k?700:400}}>{l}</button>
               ))}
             </div>
 
             {/* BOTÓN IA — solo para cliente */}
             {form.tipo==="cliente"&&(
-              <button onClick={()=>setIaModal(true)} style={{display:"flex",alignItems:"center",gap:10,background:"linear-gradient(135deg,#0a1525,#0f1e38)",border:"1px solid #ddd6fe",borderRadius:12,padding:"12px 20px",cursor:"pointer",marginBottom:20,width:"100%",textAlign:"left"}}>
+              <button onClick={()=>setIaModal(true)} style={{display:"flex",alignItems:"center",gap:10,background:"#040c18",border:"1px solid #c9a05533",borderRadius:12,padding:"12px 20px",cursor:"pointer",marginBottom:20,width:"100%",textAlign:"left"}}>
                 <span style={{fontSize:22}}>✨</span>
                 <div>
-                  <div style={{fontWeight:700,fontSize:13,color:"#334155"}}>Llenar desde mensaje del cliente</div>
-                  <div style={{fontSize:11,color:"#64748b",marginTop:1}}>Pega el WhatsApp, email o texto — la IA completa el formulario automáticamente</div>
+                  <div style={{fontWeight:700,fontSize:13,color:"#3730a3"}}>Llenar desde mensaje del cliente</div>
+                  <div style={{fontSize:11,color:"#6d28d9",marginTop:1}}>Pega el WhatsApp, email o texto — la IA completa el formulario automáticamente</div>
                 </div>
               </button>
             )}
 
-            <div style={{display:"grid",gridTemplateColumns:"360px 1fr",gap:24}}>
+            <div style={{display:"grid",gridTemplateColumns:"minmax(0,360px) 1fr",gap:20}} className="calc-grid">
               {/* INPUTS */}
               <div>
                 <BLOCK title={form.tipo==="propia"?"🏠 Mi importación":"📦 Datos del pedido"} accent={form.tipo==="propia"?"#3d7fc4":"#888"}>
@@ -1148,18 +1153,18 @@ Número de seguimiento: ${c.nro}`;
                           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                             {clientesUnicos.map(cl=>(
                               <button key={cl} onClick={()=>setForm(p=>({...p,cliente:cl,categoria_cliente:cotizaciones.filter(c=>c.cliente===cl).slice(-1)[0]?.categoria_cliente||p.categoria_cliente}))}
-                                style={{background:form.cliente===cl?"#1aa35822":"#070e1b",color:form.cliente===cl?"#1aa358":"#888",border:`1px solid ${form.cliente===cl?"#22c55e55":"#1a2d45"}`,borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontWeight:form.cliente===cl?700:400}}>
+                                style={{background:form.cliente===cl?"#f0fdf4":"#f8fafc",color:form.cliente===cl?"#1aa358":"#64748b",border:`1px solid ${form.cliente===cl?"#22c55e66":"#e2e8f0"}`,borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontWeight:form.cliente===cl?700:400}}>
                                 {cl}
                               </button>
                             ))}
                             <button onClick={()=>setForm(p=>({...p,cliente:""}))}
-                              style={{background:(!form.cliente||!clientesUnicos.includes(form.cliente))?"#6a9fd422":"#070e1b",color:(!form.cliente||!clientesUnicos.includes(form.cliente))?"#6a9fd4":"#555",border:`1px solid ${(!form.cliente||!clientesUnicos.includes(form.cliente))?"#6a9fd444":"#1a2d45"}`,borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontWeight:(!form.cliente||!clientesUnicos.includes(form.cliente))?700:400}}>
+                              style={{background:(!form.cliente||!clientesUnicos.includes(form.cliente))?"#eff6ff":"#f8fafc",color:(!form.cliente||!clientesUnicos.includes(form.cliente))?"#3d7fc4":"#64748b",border:`1px solid ${(!form.cliente||!clientesUnicos.includes(form.cliente))?"#3d7fc455":"#e2e8f0"}`,borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontWeight:(!form.cliente||!clientesUnicos.includes(form.cliente))?700:400}}>
                               ✦ Nuevo cliente
                             </button>
                           </div>
                         </div>
                       )}
-                      <input value={form.cliente||""} onChange={e=>setForm(p=>({...p,cliente:e.target.value}))} placeholder={clientesUnicos.length>0?"Elige arriba o escribe un cliente nuevo":"Nombre del cliente"} style={{width:"100%",background:"#f8fafc",border:`1px solid ${form.cliente&&clientesUnicos.includes(form.cliente)?"#22c55e55":"#1a2d45"}`,borderRadius:8,color:form.cliente&&clientesUnicos.includes(form.cliente)?"#1aa358":"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                      <input value={form.cliente||""} onChange={e=>setForm(p=>({...p,cliente:e.target.value}))} placeholder={clientesUnicos.length>0?"Elige arriba o escribe un cliente nuevo":"Nombre del cliente"} style={{width:"100%",background:"#f8fafc",border:`1px solid ${form.cliente&&clientesUnicos.includes(form.cliente)?"#22c55e66":"#e2e8f0"}`,borderRadius:8,color:form.cliente&&clientesUnicos.includes(form.cliente)?"#1aa358":"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
                     </div>
                   )}
                   {form.tipo==="cliente"&&(
@@ -1167,7 +1172,7 @@ Número de seguimiento: ${c.nro}`;
                       <label style={{display:"block",fontSize:10,color:"#777",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Categoría del cliente</label>
                       <div style={{display:"flex",gap:6}}>
                         {[["nuevo","🆕 Cliente nuevo","#2a8aaa"],["recurrente","🔄 Ya importó antes","#1aa358"],["premium","⭐ Cliente Premium","#c9a055"]].map(([k,l,col])=>(
-                          <button key={k} onClick={()=>setForm(p=>({...p,categoria_cliente:k}))} style={{flex:1,background:form.categoria_cliente===k?col+"22":"#070e1b",color:form.categoria_cliente===k?col:"#555",border:`1px solid ${form.categoria_cliente===k?col+"66":"#1a2d45"}`,borderRadius:8,padding:"7px 6px",fontSize:11,cursor:"pointer",fontWeight:form.categoria_cliente===k?700:400,textAlign:"center"}}>
+                          <button key={k} onClick={()=>setForm(p=>({...p,categoria_cliente:k}))} style={{flex:1,background:form.categoria_cliente===k?col+"18":"#f8fafc",color:form.categoria_cliente===k?col:"#64748b",border:`1px solid ${form.categoria_cliente===k?col+"66":"#e2e8f0"}`,borderRadius:8,padding:"7px 6px",fontSize:11,cursor:"pointer",fontWeight:form.categoria_cliente===k?700:400,textAlign:"center"}}>
                             {l}
                           </button>
                         ))}
@@ -1179,7 +1184,7 @@ Número de seguimiento: ${c.nro}`;
                       <label style={{display:"block",fontSize:10,color:"#777",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Tipo de transporte a cotizar</label>
                       <div style={{display:"flex",gap:6}}>
                         {[["maritimo","🚢 Marítimo","#2a8aaa"],["aereo","✈️ Aéreo","#c47830"],["ambos","🚢✈️ Ambos","#3d7fc4"]].map(([k,l,col])=>(
-                          <button key={k} onClick={()=>setForm(p=>({...p,transporte:k}))} style={{flex:1,background:form.transporte===k?col+"22":"#070e1b",color:form.transporte===k?col:"#555",border:`1px solid ${form.transporte===k?col+"66":"#1a2d45"}`,borderRadius:8,padding:"7px 6px",fontSize:11,cursor:"pointer",fontWeight:form.transporte===k?700:400,textAlign:"center"}}>
+                          <button key={k} onClick={()=>setForm(p=>({...p,transporte:k}))} style={{flex:1,background:form.transporte===k?col+"18":"#f8fafc",color:form.transporte===k?col:"#64748b",border:`1px solid ${form.transporte===k?col+"66":"#e2e8f0"}`,borderRadius:8,padding:"7px 6px",fontSize:11,cursor:"pointer",fontWeight:form.transporte===k?700:400,textAlign:"center"}}>
                             {l}
                           </button>
                         ))}
@@ -1237,7 +1242,7 @@ Número de seguimiento: ${c.nro}`;
                 {form.tipo==="cliente"&&(
                   <BLOCK title="💰 Tu margen ZAGA" accent="#1aa358">
                     {/* Precio final → calcula margen automático */}
-                    <div style={{background:"#0a1a10",borderRadius:9,padding:"12px 14px",marginBottom:14,border:"1px solid #1aa35844"}}>
+                    <div style={{background:"#f0fdf4",borderRadius:9,padding:"12px 14px",marginBottom:14,border:"1px solid #1aa35844"}}>
                       <div style={{fontSize:10,color:"#1aa358",fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>💵 Precio de venta al cliente</div>
                       <div style={{display:"flex",gap:10,alignItems:"flex-end"}}>
                         <div style={{flex:1}}>
@@ -1304,7 +1309,7 @@ Número de seguimiento: ${c.nro}`;
                         {CANALES.map(c=>{
                           const active=(form.canales||[]).includes(c.key);
                           return(
-                            <button key={c.key} onClick={()=>setForm(f=>({...f,canales:active?(f.canales||[]).filter(k=>k!==c.key):[...(f.canales||[]),c.key]}))} style={{background:active?"#3d7fc422":"#070e1b",color:active?"#3d7fc4":"#666",border:`1px solid ${active?"#8b5cf655":"#1a2d45"}`,borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:active?700:400}}>
+                            <button key={c.key} onClick={()=>setForm(f=>({...f,canales:active?(f.canales||[]).filter(k=>k!==c.key):[...(f.canales||[]),c.key]}))} style={{background:active?"#eff6ff":"#f8fafc",color:active?"#3d7fc4":"#64748b",border:`1px solid ${active?"#3d7fc466":"#e2e8f0"}`,borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:active?700:400}}>
                               {c.icon} {c.label}
                             </button>
                           );
@@ -1466,7 +1471,7 @@ Número de seguimiento: ${c.nro}`;
                 {/* PASO 1 — solo cuando no hay precio china aún y no es edición con precios */}
                 {!editId&&form.tipo==="cliente"&&(
                   <div style={{marginBottom:12}}>
-                    <div style={{background:"#0c1628",border:"1px solid #ddd6fe",borderRadius:10,padding:"12px 16px",marginBottom:10}}>
+                    <div style={{background:"#f5f3ff",border:"1px solid #ddd6fe",borderRadius:10,padding:"12px 16px",marginBottom:10}}>
                       <div style={{fontSize:11,color:"#334155",fontWeight:700,marginBottom:4}}>📥 PASO 1 — Registrar solicitud del cliente</div>
                       <div style={{fontSize:11,color:"#64748b",lineHeight:1.5}}>¿China aún no te ha respondido el precio? Guarda la solicitud ahora con el link y las variantes. Cuando China responda, editas y agregas el precio para calcular todo.</div>
                     </div>
@@ -1505,7 +1510,7 @@ Número de seguimiento: ${c.nro}`;
                 onBlur={e=>e.target.style.borderColor="#1a2d45"}
               />
               {searchQuery&&(
-                <button onClick={()=>setSearchQuery("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"#1a2d45",border:"none",color:"#64748b",borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:12}}>✕</button>
+                <button onClick={()=>setSearchQuery("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"#f1f5f9",border:"none",color:"#64748b",borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:12}}>✕</button>
               )}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:20}}>
@@ -1520,7 +1525,7 @@ Número de seguimiento: ${c.nro}`;
                 if(k!=="todos"&&k!=="__propias__"&&cnt===0) return null;
                 return(
                   <button key={k} onClick={()=>setFilterCliente(k)} style={{
-                    background:filterCliente===k?"#1aa35822":"#0c1a2e",
+                    background:filterCliente===k?"#1aa35822":"#f8fafc",
                     color:filterCliente===k?"#1aa358":"#666",
                     border:`1px solid ${filterCliente===k?"#22c55e55":"#1a2d45"}`,
                     borderRadius:20,padding:"5px 14px",fontSize:12,cursor:"pointer",
@@ -1535,9 +1540,9 @@ Número de seguimiento: ${c.nro}`;
                 const cnt=k==="todos"?cotizaciones.length:k==="francisco"?cotizaciones.filter(c=>c.gestor===k||(!c.gestor&&k==="francisco")).length:cotizaciones.filter(c=>c.gestor===k).length;
                 return(
                   <button key={k} onClick={()=>setFilterGestor(k)} style={{
-                    background:filterGestor===k?(col||"#c9a055")+"22":"#0c1a2e",
+                    background:filterGestor===k?(col||"#c9a055")+"22":"#f8fafc",
                     color:filterGestor===k?(col||"#c9a055"):"#666",
-                    border:`1px solid ${filterGestor===k?(col||"#c9a055")+"55":"#1a2d45"}`,
+                    border:`1px solid ${filterGestor===k?(col||"#c9a055")+"55":"#e2e8f0"}`,
                     borderRadius:20,padding:"5px 14px",fontSize:12,cursor:"pointer",
                     fontWeight:filterGestor===k?700:400
                   }}>{l} <span style={{opacity:.6}}>({cnt})</span></button>
@@ -1557,7 +1562,7 @@ Número de seguimiento: ${c.nro}`;
                 });
                 const cnt=k==="todos"?baseParaConteo.length:baseParaConteo.filter(c=>c.estado===k).length;
                 if(k!=="todos"&&cnt===0) return null;
-                return(<button key={k} onClick={()=>setFilterEstado(k)} style={{background:filterEstado===k?(col||"#c9a055")+"22":"#0c1a2e",color:filterEstado===k?(col||"#c9a055"):"#666",border:`1px solid ${filterEstado===k?(col||"#c9a055")+"55":"#1a2d45"}`,borderRadius:20,padding:"5px 14px",fontSize:12,cursor:"pointer"}}>{l} ({cnt})</button>);
+                return(<button key={k} onClick={()=>setFilterEstado(k)} style={{background:filterEstado===k?(col||"#c9a055")+"22":"#f8fafc",color:filterEstado===k?(col||"#c9a055"):"#666",border:`1px solid ${filterEstado===k?(col||"#c9a055")+"55":"#e2e8f0"}`,borderRadius:20,padding:"5px 14px",fontSize:12,cursor:"pointer"}}>{l} ({cnt})</button>);
               })}
             </div>
             {searchQuery&&<div style={{marginBottom:12,fontSize:12,color:"#64748b"}}>
@@ -1734,7 +1739,7 @@ Número de seguimiento: ${c.nro}`;
                           {diasEnTransito!==null&&<div style={{fontSize:11,color:"#b8922e",marginTop:2}}>⏱ En tránsito: {diasEnTransito}d</div>}
                           {c.fecha_llegada_real&&<div style={{fontSize:11,color:"#0d9870",marginTop:2}}>✅ Llegó a bodega: {c.fecha_llegada_real}{tiempoRealTransito!==null?` · ${tiempoRealTransito}d de tránsito`:""}</div>}
                           <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
-                            <div style={{flex:1,height:4,background:"#1a2d45",borderRadius:4,overflow:"hidden",position:"relative"}}>
+                            <div style={{flex:1,height:4,background:"#f1f5f9",borderRadius:4,overflow:"hidden",position:"relative"}}>
                               <div style={{height:"100%",background:`linear-gradient(to right,${EST_COLOR[tlSteps[0]]||"#6a9fd4"},${EST_COLOR[c.estado]||"#1aa358"})`,borderRadius:4,width:(c.estado==="no_procesada"||c.estado==="rechazada_cliente"||c.estado==="anulada")?"0%":`${(tlProg.done/tlProg.total)*100}%`,transition:"width .4s"}}/>
                             </div>
                             <span style={{fontSize:11,color:(c.estado==="no_procesada"||c.estado==="rechazada_cliente"||c.estado==="anulada")?"#c0392b":EST_COLOR[c.estado]||"#555",fontWeight:600,whiteSpace:"nowrap"}}>
@@ -1768,10 +1773,10 @@ Número de seguimiento: ${c.nro}`;
                       <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
                         <button onClick={()=>setPreviewId(c.id)} style={{background:"#c9a05522",color:"#c9a055",border:"1px solid #f5c84244",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>👁 Ver</button>
                         {c.estado==="solicitud"&&<button onClick={()=>setResumenChina(c)} style={{background:"#6a9fd422",color:"#334155",border:"1px solid #ddd6fe",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📋 Resumen China</button>}
-                        <button onClick={()=>setOpenId(isOpen?null:c.id)} style={{background:"#1a2d45",color:"#0f172a",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>{isOpen?"▲ Cerrar":"▼ Gestionar"}</button>
+                        <button onClick={()=>setOpenId(isOpen?null:c.id)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>{isOpen?"▲ Cerrar":"▼ Gestionar"}</button>
                         {!isPropia&&<button onClick={()=>setVistaId(c.id)} style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📄 Vista cliente</button>}
-                        <button onClick={()=>handleEdit(c)} style={{background:"#1a2d45",color:"#0f172a",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>✏️ Editar</button>
-                        <button onClick={()=>handleDelete(c.id)} style={{background:"#2e1a1a",color:"#c0392b",border:"1px solid #ef444433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>🗑</button>
+                        <button onClick={()=>handleEdit(c)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>✏️ Editar</button>
+                        <button onClick={()=>handleDelete(c.id)} style={{background:"#fff1f2",color:"#c0392b",border:"1px solid #ef444433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>🗑</button>
                       </div>
                     </div>
                     {isOpen&&(()=>{
@@ -1844,7 +1849,7 @@ Número de seguimiento: ${c.nro}`;
                               return (
                                 <div key={step.estado} style={{position:"relative",paddingBottom:idx<steps.length-1?20:0}}>
                                   {/* dot */}
-                                  <div onClick={()=>handleEstado(c.id,step.estado)} title={`Ir a: ${step.label}`} style={{position:"absolute",left:-44,top:0,width:32,height:32,borderRadius:"50%",background:isCurrent?step.color+"22":isDone?"#10b98115":"#070e1b",border:`2px solid ${dotColor}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:isDone?14:13,boxShadow:isCurrent?`0 0 14px ${step.color}55`:"none",transition:"all .2s",zIndex:2}}>
+                                  <div onClick={()=>handleEstado(c.id,step.estado)} title={`Ir a: ${step.label}`} style={{position:"absolute",left:-44,top:0,width:32,height:32,borderRadius:"50%",background:isCurrent?step.color+"22":isDone?"#10b98115":"#f8fafc",border:`2px solid ${dotColor}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:isDone?14:13,boxShadow:isCurrent?`0 0 14px ${step.color}55`:"none",transition:"all .2s",zIndex:2}}>
                                     {isDone?<span style={{color:"#0d9870",fontWeight:900}}>✓</span>:<span style={{opacity:isFuture?.35:1}}>{step.icon}</span>}
                                   </div>
 
@@ -1938,13 +1943,13 @@ Número de seguimiento: ${c.nro}`;
                                     <div style={{marginTop:10,marginBottom:4,background:"#120808",borderRadius:10,padding:14,border:"1px solid #c0392b33"}}>
                                       <div style={{fontSize:11,color:"#c0392b",fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>❌ Cliente rechazó la cotización</div>
                                       <div style={{fontSize:12,color:"#64748b",marginBottom:10}}>El cliente decidió no traer el producto. La cotización queda cerrada.</div>
-                                      <button onClick={()=>handleEstado(c.id,"enviada_cliente")} style={{background:"#1a2d45",color:"#64748b",border:"1px solid #3a3a5a",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer"}}>↩ Reabrir cotización</button>
+                                      <button onClick={()=>handleEstado(c.id,"enviada_cliente")} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #3a3a5a",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer"}}>↩ Reabrir cotización</button>
                                     </div>
                                   )}
 
                                   {/* panel negociación - solo cuando es el paso actual */}
                                   {isCurrent&&step.special==="neg"&&(
-                                    <div style={{marginTop:10,marginBottom:4,background:"#0f1824",borderRadius:10,padding:14,border:"1px solid #f59e0b33"}}>
+                                    <div style={{marginTop:10,marginBottom:4,background:"#fffbeb",borderRadius:10,padding:14,border:"1px solid #fde68a"}}>
                                       <div style={{fontSize:11,color:"#b8922e",fontWeight:700,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>🤝 Negociación con China</div>
 
                                       {/* Motivo */}
@@ -1952,7 +1957,7 @@ Número de seguimiento: ${c.nro}`;
                                         <div style={{fontSize:10,color:"#64748b",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Motivo / Razón</div>
                                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                                           {["Precio muy alto","Cliente pidió mejora","Producto no disponible","Sin respuesta","Mejora de precio a China","Aumento de volumen","Otro"].map(m=>(
-                                            <button key={m} onClick={()=>handleMotivo(c.id,m)} style={{background:c.motivo_no_procesada===m?"#c4783033":"#070e1b",color:c.motivo_no_procesada===m?"#c47830":"#666",border:`1px solid ${c.motivo_no_procesada===m?"#c47830":"#1a2d45"}`,borderRadius:7,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{m}</button>
+                                            <button key={m} onClick={()=>handleMotivo(c.id,m)} style={{background:c.motivo_no_procesada===m?"#c4783033":"#f8fafc",color:c.motivo_no_procesada===m?"#c47830":"#666",border:`1px solid ${c.motivo_no_procesada===m?"#c47830":"#1a2d45"}`,borderRadius:7,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{m}</button>
                                           ))}
                                         </div>
                                       </div>
@@ -1990,7 +1995,7 @@ Número de seguimiento: ${c.nro}`;
 
                                       {/* Acciones finales */}
                                       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                                        <button onClick={()=>handleEstado(c.id,"aceptada")} style={{background:"#22c55e18",color:"#1aa358",border:"1px solid #22c55e44",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>✅ Aceptada — continuar</button>
+                                        <button onClick={()=>handleEstado(c.id,"aceptada")} style={{background:"#22c55e18",color:"#1aa358",border:"1px solid #bbf7d0",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>✅ Aceptada — continuar</button>
                                         <button onClick={()=>handleEstado(c.id,"no_procesada")} style={{background:"#c0392b15",color:"#c0392b",border:"1px solid #ef444433",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>❌ Rechazada — cerrar cotización</button>
                                       </div>
                                     </div>
@@ -2008,7 +2013,7 @@ Número de seguimiento: ${c.nro}`;
                                     <div style={{fontSize:13,fontWeight:700,color:"#c0392b"}}>Cotización rechazada / no procesada</div>
                                     {c.motivo_no_procesada&&<div style={{fontSize:11,color:"#64748b",marginTop:3}}>Motivo: {c.motivo_no_procesada}</div>}
                                   </div>
-                                  <button onClick={()=>handleEstado(c.id,"solicitud")} style={{background:"#1a2d45",color:"#64748b",border:"1px solid #3a3a5a",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>↩ Reabrir</button>
+                                  <button onClick={()=>handleEstado(c.id,"solicitud")} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #3a3a5a",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>↩ Reabrir</button>
                                 </div>
                               </div>
                             )}
@@ -2022,7 +2027,7 @@ Número de seguimiento: ${c.nro}`;
                                     <div style={{fontSize:13,fontWeight:700,color:"#c0392b"}}>Anulada — No puede ingresar a Chile</div>
                                     <div style={{fontSize:11,color:"#64748b",marginTop:3}}>El producto fue bloqueado por restricciones de importación.</div>
                                   </div>
-                                  <button onClick={()=>handleEstado(c.id,"respuesta_china")} style={{background:"#1a2d45",color:"#64748b",border:"1px solid #3a3a5a",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>↩ Reabrir</button>
+                                  <button onClick={()=>handleEstado(c.id,"respuesta_china")} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #3a3a5a",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>↩ Reabrir</button>
                                 </div>
                               </div>
                             )}
@@ -2034,7 +2039,7 @@ Número de seguimiento: ${c.nro}`;
                                     <div style={{fontSize:13,fontWeight:700,color:"#c0392b"}}>Rechazada por el cliente</div>
                                     <div style={{fontSize:11,color:"#64748b",marginTop:3}}>El cliente decidió no traer el producto. Cotización cerrada.</div>
                                   </div>
-                                  <button onClick={()=>handleEstado(c.id,"enviada_cliente")} style={{background:"#1a2d45",color:"#64748b",border:"1px solid #3a3a5a",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>↩ Reabrir</button>
+                                  <button onClick={()=>handleEstado(c.id,"enviada_cliente")} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #3a3a5a",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>↩ Reabrir</button>
                                 </div>
                               </div>
                             )}
@@ -2208,7 +2213,7 @@ Número de seguimiento: ${c.nro}`;
               </div>
               <span style={{fontSize:12,color:"#64748b"}}>·</span>
               {[["todas","Todas"],["procesadas","✅ Procesadas"],["no_procesadas","❌ No procesadas"]].map(([k,l])=>(
-                <button key={k} onClick={()=>setDashFilter(k)} style={{background:dashFilter===k?"#c9a05522":"#0c1a2e",color:dashFilter===k?"#c9a055":"#666",border:`1px solid ${dashFilter===k?"#c9a05555":"#1a2d45"}`,borderRadius:20,padding:"6px 16px",fontSize:12,cursor:"pointer",fontWeight:dashFilter===k?700:400}}>{l}</button>
+                <button key={k} onClick={()=>setDashFilter(k)} style={{background:dashFilter===k?"#c9a05522":"#f8fafc",color:dashFilter===k?"#c9a055":"#64748b",border:`1px solid ${dashFilter===k?"#c9a05555":"#e2e8f0"}`,borderRadius:20,padding:"6px 16px",fontSize:12,cursor:"pointer",fontWeight:dashFilter===k?700:400}}>{l}</button>
               ))}
               {dashTipo==="clientes"&&clientesParaDash.length>0&&(
                 <select value={dashClienteFiltro} onChange={e=>setDashClienteFiltro(e.target.value)} style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:20,color:dashClienteFiltro!=="todos"?"#1aa358":"#666",padding:"6px 14px",fontSize:12,cursor:"pointer",outline:"none"}}>
@@ -2377,14 +2382,14 @@ Número de seguimiento: ${c.nro}`;
               const diasMes=hoy.getDate();
 
               return (
-                <div style={{background:"linear-gradient(135deg,#081420,#0c1a2e)",borderRadius:14,padding:20,border:"1px solid #ec489944",marginBottom:20}}>
+                <div style={{background:"#040c18",borderRadius:14,padding:20,border:"1px solid #f9a8d4",marginBottom:20}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
                     <span style={{fontSize:20}}>👩‍💼</span>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,fontSize:14,color:"#a85590"}}>Comisiones Luisa</div>
                       <div style={{fontSize:11,color:"#64748b"}}>20% por 1–5 cierres · 25% por 6+ cierres en el mes · Base: ganancia importación</div>
                     </div>
-                    <button onClick={()=>setSimModal(true)} style={{background:"#a8559018",color:"#a85590",border:"1px solid #ec489944",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700,whiteSpace:"nowrap"}}>🧮 Simulación total</button>
+                    <button onClick={()=>setSimModal(true)} style={{background:"#a8559018",color:"#a85590",border:"1px solid #f9a8d4",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700,whiteSpace:"nowrap"}}>🧮 Simulación total</button>
                   </div>
 
                   {/* Alerta de pago pendiente */}
@@ -2477,7 +2482,7 @@ Número de seguimiento: ${c.nro}`;
                           </div>
                         </div>
                         <div style={{marginBottom:14}}>
-                          <div style={{height:10,background:"#1a2d45",borderRadius:5,overflow:"hidden",position:"relative"}}>
+                          <div style={{height:10,background:"#f1f5f9",borderRadius:5,overflow:"hidden",position:"relative"}}>
                             <div style={{position:"absolute",left:0,top:0,height:"100%",borderRadius:5,width:`${((md.gan1+md.gan2)/(maxBarVal||1))*100}%`,background:"#1aa358",transition:"width .4s"}}/>
                             <div style={{position:"absolute",top:0,height:"100%",borderRadius:"0 5px 5px 0",left:`${((md.gan1+md.gan2)/(maxBarVal||1))*100}%`,width:`${(md.gan2Est/(maxBarVal||1))*100}%`,background:"#b8922e",opacity:0.7,transition:"all .4s"}}/>
                           </div>
@@ -2525,7 +2530,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{fontWeight:700,fontSize:15,color:"#a85590"}}>🧮 Simulación total — Comisiones Luisa</div>
                     <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Todas las cotizaciones asignadas a Luisa con ganancia calculada</div>
                   </div>
-                  <button onClick={()=>setSimModal(false)} style={{background:"#1a2d45",color:"#64748b",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
+                  <button onClick={()=>setSimModal(false)} style={{background:"#1a3050",color:"#94a3b8",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
                 </div>
 
                 {/* Resumen 20% vs 25% */}
@@ -2624,7 +2629,7 @@ Número de seguimiento: ${c.nro}`;
                     const comp=imps.filter(c=>c.estado==="completada").length;
                     const sel=clienteSeleccionado===cl;
                     return(
-                      <div key={cl} onClick={()=>setClienteSeleccionado(sel?null:cl)} style={{background:sel?"#22c55e18":"#0c1a2e",border:`1px solid ${sel?"#22c55e55":"#1a2d45"}`,borderRadius:10,padding:"12px 14px",cursor:"pointer",transition:"all .15s"}}>
+                      <div key={cl} onClick={()=>setClienteSeleccionado(sel?null:cl)} style={{background:sel?"#f0fdf4":"#f8fafc",border:`1px solid ${sel?"#22c55e55":"#e2e8f0"}`,borderRadius:10,padding:"12px 14px",cursor:"pointer",transition:"all .15s"}}>
                         <div style={{fontWeight:700,fontSize:13,color:sel?"#1aa358":"#0f172a",marginBottom:4}}>👤 {cl}</div>
                         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                           <span style={{fontSize:11,color:"#64748b"}}>{imps.length} importación{imps.length!==1?"es":""}</span>
@@ -2641,7 +2646,7 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
                     <div style={{fontWeight:800,fontSize:18,color:"#0f172a",flex:1}}>👤 {clienteSeleccionado}</div>
                     <button onClick={copyVistaCliente} style={{background:"#1aa358",color:"#05100e",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>
-                    <button onClick={()=>setClienteSeleccionado(null)} style={{background:"#1a2d45",color:"#0f172a",border:"none",borderRadius:9,padding:"9px 14px",fontSize:13,cursor:"pointer"}}>✕</button>
+                    <button onClick={()=>setClienteSeleccionado(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:9,padding:"9px 14px",fontSize:13,cursor:"pointer"}}>✕</button>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
                     {[["Importaciones",impsCliente.length,"#0f172a","📦"],["Total facturado",fmt(totPagado),"#1aa358","💰"],["Unidades totales",fmtN(totUnidades),"#2a8aaa","📊"],["En curso / Completadas",`${enCurso} / ${completadas}`,"#c9a055","📈"]].map(([l,v,col,ic])=>(
@@ -2669,7 +2674,7 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                               <div style={{fontSize:12,color:"#666"}}>📅 Solicitud: {c.fecha_solicitud||"-"}{c.fecha_llegada_est?` · 🏁 Llegada est: ${c.fecha_llegada_est}`:""}</div>
                               <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
-                                <div style={{width:120,height:4,background:"#1a2d45",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",background:"#1aa358",borderRadius:4,width:`${(prog.done/prog.total)*100}%`}}/></div>
+                                <div style={{width:120,height:4,background:"#f1f5f9",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",background:"#1aa358",borderRadius:4,width:`${(prog.done/prog.total)*100}%`}}/></div>
                                 <span style={{fontSize:11,color:"#64748b"}}>{prog.done}/{prog.total} pasos</span>
                               </div>
                             </div>
@@ -2800,7 +2805,7 @@ Número de seguimiento: ${c.nro}`;
           return(
             <div>
               {/* HEADER MOTIVACIONAL */}
-              <div style={{background:"linear-gradient(135deg,#1a0a20,#250d30,#1a0a20)",borderRadius:16,padding:"24px 28px",marginBottom:20,border:"1px solid #ec489966",position:"relative",overflow:"hidden"}}>
+              <div style={{background:"#040c18",borderRadius:16,padding:"24px 28px",marginBottom:20,border:"none",position:"relative",overflow:"hidden"}}>
                 <div style={{position:"absolute",right:20,top:10,fontSize:80,opacity:.06}}>👩‍💼</div>
                 <div style={{fontSize:22,fontWeight:800,color:"#a85590",marginBottom:4}}>Hola, Luisa 👋</div>
                 <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>Tu panel de rendimiento · {new Date().toLocaleDateString("es-CL",{month:"long",year:"numeric"})}</div>
@@ -2811,7 +2816,7 @@ Número de seguimiento: ${c.nro}`;
               </div>
 
               {/* KPIs PRINCIPALES */}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
+              <div className="kpi-grid" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
                 {[
                   {icon:"📋",label:"Cotizaciones totales",val:todas.length,col:"#6a9fd4",sub:`${enProceso.length} en proceso`},
                   {icon:"✅",label:"Con 1er pago recibido",val:cerradas.length,col:"#1aa358",sub:`${completadas.length} completadas`},
@@ -2828,10 +2833,10 @@ Número de seguimiento: ${c.nro}`;
               </div>
 
               {/* MES EN CURSO + PROYECCIÓN */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
+              <div className="luisa-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
                 {/* Mes actual */}
-                <div style={{background:"linear-gradient(135deg,#0f0a1a,#190e28)",borderRadius:14,padding:20,border:"1px solid #ec489944"}}>
-                  <div style={{fontSize:11,color:"#a85590",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:14}}>📅 Mes actual — {monthLabel(mesActual)}</div>
+                <div style={{background:"#ffffff",borderRadius:14,padding:20,border:"1px solid #f9a8d4"}}>
+                  <div style={{fontSize:11,color:"#9333ea",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:14}}>📅 Mes actual — {monthLabel(mesActual)}</div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
                     <div style={{display:"flex",justifyContent:"space-between"}}>
                       <span style={{fontSize:12,color:"#64748b"}}>Cierres confirmados</span>
@@ -2856,14 +2861,14 @@ Número de seguimiento: ${c.nro}`;
                       <span>Progreso hacia nivel 25%</span>
                       <span>{mesActualCalc.n}/6 cierres</span>
                     </div>
-                    <div style={{height:8,background:"#0f1e32",borderRadius:4,overflow:"hidden"}}>
+                    <div style={{height:6,background:"#e2e8f0",borderRadius:4,overflow:"hidden"}}>
                       <div style={{height:"100%",background:mesActualCalc.n>=6?"linear-gradient(to right,#f5c842,#f97316)":"linear-gradient(to right,#ec4899,#a855f7)",borderRadius:4,width:`${Math.min(100,(mesActualCalc.n/6)*100)}%`,transition:"width .4s"}}/>
                     </div>
                   </div>
                 </div>
 
                 {/* Proyección con aceptadas pendientes */}
-                <div style={{background:"linear-gradient(135deg,#07130c,#0c1e14)",borderRadius:14,padding:20,border:"1px solid #22c55e44"}}>
+                <div style={{background:"#ffffff",borderRadius:14,padding:20,border:"1px solid #bbf7d0"}}>
                   <div style={{fontSize:11,color:"#1aa358",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:14}}>🔮 Proyección mes actual</div>
                   <div style={{fontSize:11,color:"#64748b",marginBottom:12}}>Incluye {proyPendientes.length} cotización{proyPendientes.length!==1?"es":""} aceptada{proyPendientes.length!==1?"s":""} pendiente{proyPendientes.length!==1?"s":""} de pago</div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -2906,7 +2911,7 @@ Número de seguimiento: ${c.nro}`;
                       const {n,pct,base,com,emp}=calcMes(porMes[m]);
                       const esPendiente=m===mesAnt&&hoy.getDate()<=5;
                       return(
-                        <div key={m} style={{background:esPendiente?"#08121e":"#070e1b",borderRadius:10,padding:"12px 16px",border:`1px solid ${esPendiente?"#c0392b33":"#1a2d45"}`}}>
+                        <div key={m} style={{background:esPendiente?"#08121e":"#f8fafc",borderRadius:10,padding:"12px 16px",border:`1px solid ${esPendiente?"#c0392b33":"#1a2d45"}`}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
                             <div style={{display:"flex",alignItems:"center",gap:10}}>
                               <span style={{fontWeight:700,fontSize:13,textTransform:"capitalize",color:esPendiente?"#c0392b":"#0f172a"}}>{monthLabel(m)}</span>
