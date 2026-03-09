@@ -482,7 +482,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                   var pctPago = pagado1&&pagado2?100:pagado1?30:0
 
                   return (
-                    <div key={c.id} id={"cot-"+c.id} className="zcard zfade" style={{animationDelay:(idx*0.04)+"s",opacity:isRech?0.72:1}}>
+                    <div key={c.id} id={"cot-"+c.id} className="zcard" style={{opacity:isRech?0.72:1}}>
 
                       {/* CARD HEADER */}
                       <div className="cot-header" onClick={function(){ setOpenId(isOpen?null:c.id) }}
