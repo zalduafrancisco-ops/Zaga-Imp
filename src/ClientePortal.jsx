@@ -659,7 +659,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                   </div>
                                 )}
                                 {(()=>{
-                                  var hist = c.notas_historial||[]
+                                  var hist = c.notas_historial?(Array.isArray(c.notas_historial)?c.notas_historial:(typeof c.notas_historial==="string"?JSON.parse(c.notas_historial):[])):[]
                                   if(hist.length===0&&c.notas_internas) hist=[{texto:c.notas_internas,fecha:"Anterior",autor:"Gestor"}]
                                   return hist.length>0&&(
                                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
