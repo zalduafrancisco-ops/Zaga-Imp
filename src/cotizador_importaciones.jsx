@@ -2099,7 +2099,7 @@ Número de seguimiento: ${c.nro}`;
                             <div style={{fontSize:10,color:"#2a8aaa",marginBottom:6,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>📝 Notas internas</div>
                             {/* Historial existente */}
                             {(()=>{
-                              var hist = c.notas_historial||[]
+                              var hist = c.notas_historial?(Array.isArray(c.notas_historial)?c.notas_historial:(typeof c.notas_historial==="string"?JSON.parse(c.notas_historial):[])):[]
                               // Migrar notas_internas legacy a historial si aún no fue migrado
                               if(hist.length===0 && c.notas_internas){
                                 hist = [{texto:c.notas_internas, fecha: c.fecha_solicitud||"Anterior", autor:"Sistema"}]
@@ -2129,7 +2129,7 @@ Número de seguimiento: ${c.nro}`;
                                 if(!texto) return
                                 var histPrev = c.notas_historial||[]
                                 if(histPrev.length===0&&c.notas_internas) histPrev=[{texto:c.notas_internas,fecha:c.fecha_solicitud||"Anterior",autor:"Sistema"}]
-                                var nuevaNota = {texto, fecha:new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"}), autor: perfil?.nombre||"Gestor"}
+                                var nuevaNota = {texto, fecha:new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"}), autor: usuario?.nombre||"Gestor"}
                                 var updated = [...histPrev, nuevaNota]
                                 await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_historial:updated,notas_internas:""}:x))
                                 setNotaInput(p=>({...p,[c.id]:""}))
