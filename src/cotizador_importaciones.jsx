@@ -547,9 +547,9 @@ export default function App({ supabase, usuario, onLogout }){
       <div style={{background:"#040c18",borderBottom:"1px solid #0f1e30",padding:"0 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.3)",position:"sticky",top:0,zIndex:100}}>
         <div className="nav-hdr" style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <img src={LOGO_WHITE} alt="ZAGA" style={{height:32,width:"auto",objectFit:"contain"}}/>
+            <img src={LOGO_WHITE} alt="ZAGA" style={{height:32,width:"auto",objectFit:"contain",filter:"brightness(0) invert(1)"}}/>
             <div style={{width:1,height:24,background:"#f1f5f9",margin:"0 4px"}}/>
-            <div style={{fontSize:9,color:"#c9a05570",letterSpacing:2,textTransform:"uppercase"}}>Gestión de Importaciones</div>
+            <div style={{fontSize:9,color:"#94a3b8",letterSpacing:2,textTransform:"uppercase"}}>Gestión de Importaciones</div>
           </div>
           <div style={{display:"flex",gap:8,fontSize:12,alignItems:"center"}}>
             <span className="stat-chips" style={{display:"flex",gap:6,alignItems:"center"}}>{[["⏳",cotizaciones.filter(c=>["solicitud","enviada_cliente"].includes(c.estado)).length,"#b8922e","Pendientes"],
@@ -557,7 +557,7 @@ export default function App({ supabase, usuario, onLogout }){
               ["✅",cotizaciones.filter(c=>c.estado==="completada").length,"#1aa358","Completadas"],
             ].map(([ic,n,col,lb])=>n>0&&<div key={lb} className="hide-mob" style={{background:col+"14",border:`1px solid ${col}33`,borderRadius:20,padding:"3px 12px",color:col,fontSize:11}}>{ic} {n} {lb}</div>)}</span>
             <div style={{width:1,height:20,background:"#f1f5f9",margin:"0 4px"}}/>
-            <button onClick={exportarDatos} title="Exportar backup" style={{background:"transparent",color:"#c9a05580",border:"1px solid #e2e8f0",borderRadius:8,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>⬇ Exportar</button>
+            <button onClick={exportarDatos} title="Exportar backup" style={{background:"transparent",color:"#94a3b8",border:"1px solid #334155",borderRadius:8,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>⬇ Exportar</button>
             <button onClick={importarDatos} title="Importar datos" style={{background:"transparent",color:"#334155",border:"1px solid #e2e8f0",borderRadius:8,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>⬆ Importar</button>
             <div style={{width:1,height:20,background:"#f1f5f9"}}/>
             <span style={{fontSize:12,color:"#c9a055",fontWeight:600,background:"rgba(201,160,85,0.1)",borderRadius:20,padding:"4px 12px",border:"1px solid rgba(201,160,85,0.2)"}}>{usuario?.nombre||"Admin"}</span>
@@ -566,7 +566,7 @@ export default function App({ supabase, usuario, onLogout }){
         </div>
         <div className="nav-tabs" style={{maxWidth:1200,margin:"0 auto",display:"flex",gap:0}}>
           {[["calc","Calculadora"],["tracker",`Tracker (${cotizaciones.length})`],["dashboard","Dashboard"],["clientes","Clientes"],["luisa","Luisa"]].map(([k,l])=>(
-            <button key={k} onClick={()=>setTab(k)} style={{background:"transparent",color:tab2===k?"#c9a055":"#64748b",border:"none",borderBottom:tab2===k?"2px solid #c9a055":"2px solid transparent",padding:"10px 18px",cursor:"pointer",fontWeight:tab2===k?700:500,fontSize:13,transition:"all .2s",fontFamily:"inherit"}}>{l}</button>
+            <button key={k} onClick={()=>setTab(k)} style={{background:"transparent",color:tab2===k?"#c9a055":"#8b9ab0",border:"none",borderBottom:tab2===k?"2px solid #c9a055":"2px solid transparent",padding:"10px 18px",cursor:"pointer",fontWeight:tab2===k?700:500,fontSize:13,transition:"all .2s",fontFamily:"inherit"}}>{l}</button>
           ))}
         </div>
       </div>
@@ -583,7 +583,7 @@ export default function App({ supabase, usuario, onLogout }){
                 <div style={{fontWeight:700,fontSize:15,color:"#334155"}}>✨ Llenar desde mensaje del cliente</div>
                 <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Pega el WhatsApp, email o texto tal como llegó</div>
               </div>
-              <button onClick={()=>{setIaModal(false);setIaTexto("");}} style={{background:"#1a3050",color:"#94a3b8",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
+              <button onClick={()=>{setIaModal(false);setIaTexto("");}} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
             </div>
             <div style={{padding:"16px 24px",flex:1,overflow:"hidden",display:"flex",flexDirection:"column",gap:12}}>
               <div style={{fontSize:12,color:"#334155",background:"#faf5ff",border:"1px solid #ddd6fe",borderRadius:8,padding:"10px 14px"}}>
@@ -632,7 +632,7 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{fontWeight:700,fontSize:15,color:"#334155"}}>📋 Resumen para tu contacto en China</div>
                   <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Copia este texto y pégalo en el chat con tu chinita</div>
                 </div>
-                <button onClick={()=>setResumenChina(null)} style={{background:"#1a3050",color:"#94a3b8",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
+                <button onClick={()=>setResumenChina(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
               </div>
               <div style={{padding:"16px 24px",flex:1,overflow:"hidden",display:"flex",flexDirection:"column",gap:12}}>
                 <div style={{fontSize:12,color:"#1aa358",background:"#22c55e11",border:"1px solid #22c55e33",borderRadius:8,padding:"8px 14px"}}>
@@ -648,7 +648,7 @@ Número de seguimiento: ${c.nro}`;
                 <div style={{fontSize:11,color:"#64748b"}}>Haz clic en el cuadro → Ctrl+A → Ctrl+C para copiar todo</div>
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={()=>{setResumenChina(null);setTab("tracker");}} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,cursor:"pointer"}}>Ir al Tracker</button>
-                  <button onClick={()=>{setResumenChina(null); const c2=resumenChina; setForm({...defaultForm,...c2}); setEditId(c2.id); setTab("calc");}} style={{background:"linear-gradient(135deg,#c9a055,#8a6a30)",color:"#05100e",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,cursor:"pointer",fontWeight:700}}>✏️ Agregar precio China ahora</button>
+                  <button onClick={()=>{setResumenChina(null); const c2=resumenChina; setForm({...defaultForm,...c2}); setEditId(c2.id); setTab("calc");}} style={{background:"#040c18",color:"#ffffff",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,cursor:"pointer",fontWeight:700}}>✏️ Agregar precio China ahora</button>
                 </div>
               </div>
             </div>
@@ -669,11 +669,11 @@ Número de seguimiento: ${c.nro}`;
                     :"Pega aquí el texto de tu backup y presiona Importar."}
                 </div>
               </div>
-              <button onClick={()=>setBackupModal(null)} style={{background:"#1a3050",color:"#94a3b8",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
+              <button onClick={()=>setBackupModal(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
             </div>
             <div style={{padding:"16px 24px",flex:1,overflow:"hidden",display:"flex",flexDirection:"column",gap:12}}>
               {backupModal==="export"&&(
-                <div style={{fontSize:12,color:"#c9a055",background:"#f5c84211",border:"1px solid #f5c84233",borderRadius:8,padding:"10px 14px"}}>
+                <div style={{fontSize:12,color:"#334155",background:"#fffbeb",border:"1px solid #fde68a",borderRadius:8,padding:"10px 14px"}}>
                   💡 <b>Cómo guardar:</b> Haz clic en el cuadro → Ctrl+A (seleccionar todo) → Ctrl+C (copiar) → abre el Bloc de notas o Notes → pega → guarda como <b>zaga_backup.json</b>
                 </div>
               )}
@@ -707,9 +707,9 @@ Número de seguimiento: ${c.nro}`;
         <div style={{position:"fixed",inset:0,background:"#fff",zIndex:1100,overflowY:"auto",fontFamily:"'Segoe UI',Arial,sans-serif",color:"#222"}}>
           {/* Barra de acción — se oculta al imprimir */}
           <div className="no-print" style={{background:"#f1f5f9",padding:"12px 24px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:10}}>
-            <div style={{flex:1,color:"#c9a055",fontWeight:700,fontSize:14}}>ZAGA Import — Vista para imprimir</div>
+            <div style={{flex:1,color:"#0f172a",fontWeight:700,fontSize:14}}>ZAGA Import — Vista para imprimir</div>
             <div style={{fontSize:12,color:"#64748b",background:"#f8fafc",borderRadius:8,padding:"6px 14px",border:"1px solid #e2e8f0"}}>
-              💡 Presiona <b style={{color:"#c9a055"}}>Ctrl+P</b> (Windows) o <b style={{color:"#c9a055"}}>⌘+P</b> (Mac) para guardar como PDF
+              💡 Presiona <b style={{color:"#0f172a"}}>Ctrl+P</b> (Windows) o <b style={{color:"#0f172a"}}>⌘+P</b> (Mac) para guardar como PDF
             </div>
             <button onClick={cerrarPrint} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"8px 18px",fontSize:13,cursor:"pointer",fontWeight:600}}>✕ Cerrar</button>
           </div>
@@ -825,8 +825,8 @@ Número de seguimiento: ${c.nro}`;
                         <div style={{background:"#f1f5f9",borderRadius:10,padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
                           <span style={{color:"#64748b",fontSize:13,fontWeight:600}}>{imps.length} importación{imps.length!==1?"es":""} · {fmtN(totU)} unidades</span>
                           <div style={{textAlign:"right"}}>
-                            <div style={{color:"#64748b",fontSize:11}}>1er: <span style={{color:"#1aa358",fontWeight:700}}>{fmt(tot1)}</span> · 2do: <span style={{color:"#c9a055",fontWeight:700}}>{fmt(tot2)}</span></div>
-                            <div style={{color:"#c9a055",fontSize:18,fontWeight:800,marginTop:2}}>Total: {fmt(totP)}</div>
+                            <div style={{color:"#64748b",fontSize:11}}>1er: <span style={{color:"#1aa358",fontWeight:700}}>{fmt(tot1)}</span> · 2do: <span style={{color:"#334155",fontWeight:700}}>{fmt(tot2)}</span></div>
+                            <div style={{color:"#334155",fontSize:18,fontWeight:800,marginTop:2}}>Total: {fmt(totP)}</div>
                           </div>
                         </div>
                         <div style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>Generado por ZAGA Import · {todayStr()}</div>
@@ -870,7 +870,7 @@ Número de seguimiento: ${c.nro}`;
                     {p.sku_bodega&&<span style={{color:"#3d7fc4"}}>📦 SKU Bodega: {p.sku_bodega}</span>}
                   </div>
                 </div>
-                <button onClick={()=>setPreviewId(null)} style={{background:"#1a3050",color:"#94a3b8",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,cursor:"pointer",marginLeft:12}}>✕ Cerrar</button>
+                <button onClick={()=>setPreviewId(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,cursor:"pointer",marginLeft:12}}>✕ Cerrar</button>
               </div>
 
               <div style={{padding:"20px",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:16}}>
@@ -1086,7 +1086,7 @@ Número de seguimiento: ${c.nro}`;
                 </div>
                 <div style={{background:"#f1f5f9",borderRadius:10,padding:"16px 20px",marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <span style={{color:"#64748b",fontSize:13}}>TOTAL IMPORTACIÓN</span>
-                  <div style={{textAlign:"right"}}><div style={{color:"#c9a055",fontSize:22,fontWeight:800}}>{vistaData.con_iva?fmt((vistaData.calc?.totCl||0)*1.19):fmt(vistaData.calc?.totCl)}</div><div style={{color:"#64748b",fontSize:11,marginTop:2}}>{fmtN(vistaData.unidades)} unidades · {fmt(vistaData.calc?.pfUnd)} /und total</div></div>
+                  <div style={{textAlign:"right"}}><div style={{color:"#0f172a",fontSize:22,fontWeight:800}}>{vistaData.con_iva?fmt((vistaData.calc?.totCl||0)*1.19):fmt(vistaData.calc?.totCl)}</div><div style={{color:"#64748b",fontSize:11,marginTop:2}}>{fmtN(vistaData.unidades)} unidades · {fmt(vistaData.calc?.pfUnd)} /und total</div></div>
                 </div>
                 <div style={{background:"#f9f9f9",borderRadius:8,padding:14,fontSize:12,color:"#666"}}>
                   <div style={{fontWeight:700,color:"#333",marginBottom:8}}>Consideraciones</div>
@@ -1131,11 +1131,11 @@ Número de seguimiento: ${c.nro}`;
 
             {/* BOTÓN IA — solo para cliente */}
             {form.tipo==="cliente"&&(
-              <button onClick={()=>setIaModal(true)} style={{display:"flex",alignItems:"center",gap:10,background:"#040c18",border:"1px solid #c9a05533",borderRadius:12,padding:"12px 20px",cursor:"pointer",marginBottom:20,width:"100%",textAlign:"left"}}>
+              <button onClick={()=>setIaModal(true)} style={{display:"flex",alignItems:"center",gap:10,background:"#f5f3ff",border:"1px solid #c4b5fd",borderRadius:12,padding:"12px 20px",cursor:"pointer",marginBottom:20,width:"100%",textAlign:"left"}}>
                 <span style={{fontSize:22}}>✨</span>
                 <div>
-                  <div style={{fontWeight:700,fontSize:13,color:"#3730a3"}}>Llenar desde mensaje del cliente</div>
-                  <div style={{fontSize:11,color:"#6d28d9",marginTop:1}}>Pega el WhatsApp, email o texto — la IA completa el formulario automáticamente</div>
+                  <div style={{fontWeight:700,fontSize:13,color:"#4c1d95"}}>Llenar desde mensaje del cliente</div>
+                  <div style={{fontSize:11,color:"#7c3aed",marginTop:1}}>Pega el WhatsApp, email o texto — la IA completa el formulario automáticamente</div>
                 </div>
               </button>
             )}
@@ -1235,7 +1235,7 @@ Número de seguimiento: ${c.nro}`;
                     <NInput label="⚡ Comisión real APP $" field="comision_real" form={form} setForm={setForm} color="#b8922e" placeholder="0" note="Copia de la app"/>
                   </div>
                   {Number(form.comision_real)>0&&Number(form.precio_china)>0&&Number(form.unidades)>0&&(
-                    <div style={{fontSize:11,color:"#666",background:"#f8fafc",borderRadius:7,padding:"6px 10px"}}>Tasa implícita: <span style={{color:"#c9a055"}}>{(Number(form.comision_real)/(Number(form.precio_china)*Number(form.unidades)*(1-Number(form.pct_deposito)/100))*100).toFixed(2)}%</span></div>
+                    <div style={{fontSize:11,color:"#666",background:"#f8fafc",borderRadius:7,padding:"6px 10px"}}>Tasa implícita: <span style={{color:"#334155"}}>{(Number(form.comision_real)/(Number(form.precio_china)*Number(form.unidades)*(1-Number(form.pct_deposito)/100))*100).toFixed(2)}%</span></div>
                   )}
                 </BLOCK>
 
@@ -1270,11 +1270,11 @@ Número de seguimiento: ${c.nro}`;
                       </div>
                       {Number(form.precio_china)>0&&Number(form.precio_venta_cliente)>0&&(
                         <div style={{marginTop:8,fontSize:11,color:"#64748b"}}>
-                          Markup: <span style={{color:"#c9a055",fontWeight:700}}>{(((Number(form.precio_venta_cliente)-Number(form.precio_china))/Number(form.precio_china))*100).toFixed(1)}%</span>
+                          Markup: <span style={{color:"#334155",fontWeight:700}}>{(((Number(form.precio_venta_cliente)-Number(form.precio_china))/Number(form.precio_china))*100).toFixed(1)}%</span>
                           <span style={{margin:"0 8px",color:"#333"}}>·</span>
                           Precio China: <span style={{color:"#334155"}}>{fmt(form.precio_china)}</span>
                           <span style={{margin:"0 8px",color:"#333"}}>·</span>
-                          Diferencia: <span style={{color:"#c9a055"}}>{fmt(Number(form.precio_venta_cliente)-Number(form.precio_china))}</span>
+                          Diferencia: <span style={{color:"#334155"}}>{fmt(Number(form.precio_venta_cliente)-Number(form.precio_china))}</span>
                         </div>
                       )}
                     </div>
@@ -1475,7 +1475,7 @@ Número de seguimiento: ${c.nro}`;
                       <div style={{fontSize:11,color:"#334155",fontWeight:700,marginBottom:4}}>📥 PASO 1 — Registrar solicitud del cliente</div>
                       <div style={{fontSize:11,color:"#64748b",lineHeight:1.5}}>¿China aún no te ha respondido el precio? Guarda la solicitud ahora con el link y las variantes. Cuando China responda, editas y agregas el precio para calcular todo.</div>
                     </div>
-                    <button onClick={handleSaveSolicitud} style={{width:"100%",background:"#0f172a",border:"none",borderRadius:10,padding:12,fontSize:13,fontWeight:700,color:"#ffffff",cursor:"pointer"}}>
+                    <button onClick={handleSaveSolicitud} style={{width:"100%",background:"#ffffff",border:"2px solid #040c18",borderRadius:10,padding:12,fontSize:13,fontWeight:700,color:"#040c18",cursor:"pointer"}}>
                       📥 Guardar Solicitud (sin precio aún) → Generar resumen para China
                     </button>
                   </div>
@@ -1566,7 +1566,7 @@ Número de seguimiento: ${c.nro}`;
               })}
             </div>
             {searchQuery&&<div style={{marginBottom:12,fontSize:12,color:"#64748b"}}>
-              {filtradas.length>0?<span><span style={{color:"#c9a055",fontWeight:700}}>{filtradas.length}</span> resultado{filtradas.length!==1?"s":""} para <span style={{color:"#0f172a"}}>"{searchQuery}"</span></span>:<span style={{color:"#c0392b"}}>Sin resultados para "{searchQuery}"</span>}
+              {filtradas.length>0?<span><span style={{color:"#0f172a",fontWeight:700}}>{filtradas.length}</span> resultado{filtradas.length!==1?"s":""} para <span style={{color:"#0f172a"}}>"{searchQuery}"</span></span>:<span style={{color:"#c0392b"}}>Sin resultados para "{searchQuery}"</span>}
             </div>}
             {filtradas.length===0&&<div style={{textAlign:"center",padding:60,color:"#444"}}><div style={{fontSize:40,marginBottom:12}}>{searchQuery?"🔍":"📦"}</div><div>{searchQuery?`No se encontraron cotizaciones con "${searchQuery}"`:"No hay registros. ¡Empieza en la Calculadora!"}</div></div>}
 
@@ -1633,7 +1633,7 @@ Número de seguimiento: ${c.nro}`;
 
               return(
                 <div style={{marginBottom:20,background:"#fff1f2",border:"1px solid #fecdd3",borderRadius:12,overflow:"hidden"}}>
-                  <div style={{padding:"12px 18px",background:"#1a0a0a",borderBottom:"1px solid #ef444422",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{padding:"12px 18px",background:"#fef2f2",borderBottom:"1px solid #fecdd3",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <span style={{fontSize:16}}>🔔</span>
                       <span style={{fontWeight:700,fontSize:13,color:"#c0392b"}}>Centro de Alertas</span>
@@ -1755,23 +1755,23 @@ Número de seguimiento: ${c.nro}`;
                           </div>
                           <div style={{background:"#f8fafc",borderRadius:8,padding:"8px 10px",textAlign:"center"}}>
                             <div style={{fontSize:10,color:"#64748b",marginBottom:2}}>{isPropia?"Precio venta est.":"ROI"}</div>
-                            <div style={{fontSize:13,fontWeight:700,color:isPropia?"#3d7fc4":"#c9a055"}}>{isPropia?fmt(c.calc?.pvUnd||c.precio_venta_und||0):fmtP(c.calc?.roi)}</div>
+                            <div style={{fontSize:13,fontWeight:700,color:isPropia?"#3d7fc4":"#475569"}}>{isPropia?fmt(c.calc?.pvUnd||c.precio_venta_und||0):fmtP(c.calc?.roi)}</div>
                           </div>
-                          <div style={{background:isPropia?"#1a1030":"#12180a",borderRadius:8,padding:"8px 10px",textAlign:"center",gridColumn:"1/-1",border:`1px solid ${isPropia?"#3d7fc422":"#c9a05522"}`}}>
+                          <div style={{background:isPropia?"#eff6ff":"#fffbeb",borderRadius:8,padding:"8px 10px",textAlign:"center",gridColumn:"1/-1",border:`1px solid ${isPropia?"#bfdbfe":"#fde68a"}`}}>
                             <div style={{fontSize:10,color:"#64748b",marginBottom:2}}>Ganancia estimada</div>
-                            <div style={{fontSize:17,fontWeight:800,color:isPropia?"#3d7fc4":"#c9a055"}}>{fmt(isPropia?(c.calc?.ganDirecto||0):(c.calc?.ganImp||0))}</div>
+                            <div style={{fontSize:17,fontWeight:800,color:isPropia?"#1d4ed8":"#92400e"}}>{fmt(isPropia?(c.calc?.ganDirecto||0):(c.calc?.ganImp||0))}</div>
                           </div>
                         </div>
                       </div>
                       {c.calc&&(
                         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:12}}>
-                        {(isPropia?[["Costo total China",fmt(c.calc.tCh||0),"#2d78c8"],["Costo real/und",fmt(c.calc.cRUnd||0),"#2d78c8"],["Precio venta/und",fmt(c.calc.pvUnd||0),"#3d7fc4"],["Margen bruto",fmtP(c.calc.mgBruto),"#c9a055"]]
+                        {(isPropia?[["Costo total China",fmt(c.calc.tCh||0),"#2d78c8"],["Costo real/und",fmt(c.calc.cRUnd||0),"#2d78c8"],["Precio venta/und",fmt(c.calc.pvUnd||0),"#3d7fc4"],["Margen bruto",fmtP(c.calc.mgBruto),"#475569"]]
                             :[["1er pago cliente",fmt(c.calc.p1Cl||0),"#1aa358"],["2do pago cliente",fmt(c.calc.p2Cl||0),"#1aa358"],["1er pago China",fmt(c.calc.p1Ch||0),"#2d78c8"],["Total pagado China",fmt(c.calc.tCh||0),"#2d78c8"]]
                           ).map(([l,v,col])=>(<div key={l} style={{textAlign:"center"}}><div style={{fontSize:10,color:"#444",marginBottom:2}}>{l}</div><div style={{fontSize:12,fontWeight:600,color:col}}>{v}</div></div>))}
                         </div>
                       )}
                       <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
-                        <button onClick={()=>setPreviewId(c.id)} style={{background:"#c9a05522",color:"#c9a055",border:"1px solid #f5c84244",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>👁 Ver</button>
+                        <button onClick={()=>setPreviewId(c.id)} style={{background:"#f8fafc",color:"#475569",border:"1px solid #e2e8f0",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>👁 Ver</button>
                         {c.estado==="solicitud"&&<button onClick={()=>setResumenChina(c)} style={{background:"#6a9fd422",color:"#334155",border:"1px solid #ddd6fe",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📋 Resumen China</button>}
                         <button onClick={()=>setOpenId(isOpen?null:c.id)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>{isOpen?"▲ Cerrar":"▼ Gestionar"}</button>
                         {!isPropia&&<button onClick={()=>setVistaId(c.id)} style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📄 Vista cliente</button>}
@@ -2251,7 +2251,7 @@ Número de seguimiento: ${c.nro}`;
                 </div>
                 <div>
                   <div style={{fontSize:10,color:"#64748b",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>📈 ROI real</div>
-                  <div style={{fontSize:20,fontWeight:800,color:"#c9a055"}}>{fmtP(totalPagadoChina>0?(totalGananciaReal/totalPagadoChina)*100:0)}</div>
+                  <div style={{fontSize:20,fontWeight:800,color:"#0f172a"}}>{fmtP(totalPagadoChina>0?(totalGananciaReal/totalPagadoChina)*100:0)}</div>
                 </div>
                 {promedioTransito!==null&&<div style={{gridColumn:"1/-1"}}>
                   <div style={{fontSize:10,color:"#64748b",marginBottom:1,textTransform:"uppercase",letterSpacing:1}}>⏱ Tránsito promedio real</div>
@@ -2322,7 +2322,7 @@ Número de seguimiento: ${c.nro}`;
                       return (
                         <div key={mes}>
                           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:4}}>
-                            <div style={{width:80,fontSize:12,fontWeight:700,color:esActual?"#c9a055":esPasado?"#555":"#0f172a",flexShrink:0}}>{label}{esActual&&<span style={{fontSize:9,color:"#c9a055",marginLeft:4}}>← hoy</span>}</div>
+                            <div style={{width:80,fontSize:12,fontWeight:700,color:esActual?"#0f172a":esPasado?"#64748b":"#94a3b8",flexShrink:0}}>{label}{esActual&&<span style={{fontSize:9,color:"#c9a055",marginLeft:4}}>← hoy</span>}</div>
                             <div style={{flex:1,height:28,background:"#f1f5f9",borderRadius:6,overflow:"hidden",position:"relative"}}>
                               <div style={{height:"100%",width:`${pct}%`,background:esActual?"linear-gradient(to right,#c9a055,#f5c842)":"linear-gradient(to right,#0d9870,#1aa358)",borderRadius:6,transition:"width .4s",minWidth:pct>0?4:0}}/>
                               <div style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",fontSize:11,fontWeight:700,color:"#fff",textShadow:"0 1px 3px #000"}}>{m3Mes.toFixed(2)} m³</div>
@@ -2478,7 +2478,7 @@ Número de seguimiento: ${c.nro}`;
                           <div style={{textAlign:"right"}}>
                             <div style={{fontSize:11,color:"#64748b"}}>Cobrado: <span style={{color:"#1aa358",fontWeight:700}}>{fmt(md.gan1+md.gan2)}</span></div>
                             {md.gan2Est>0&&<div style={{fontSize:11,color:"#b8922e"}}>Por cobrar: {fmt(md.gan2Est)}</div>}
-                            <div style={{fontSize:20,fontWeight:800,color:"#c9a055"}}>{fmt(total)}</div>
+                            <div style={{fontSize:20,fontWeight:800,color:"#0f172a"}}>{fmt(total)}</div>
                           </div>
                         </div>
                         <div style={{marginBottom:14}}>
@@ -2530,7 +2530,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{fontWeight:700,fontSize:15,color:"#a85590"}}>🧮 Simulación total — Comisiones Luisa</div>
                     <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Todas las cotizaciones asignadas a Luisa con ganancia calculada</div>
                   </div>
-                  <button onClick={()=>setSimModal(false)} style={{background:"#1a3050",color:"#94a3b8",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
+                  <button onClick={()=>setSimModal(false)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
                 </div>
 
                 {/* Resumen 20% vs 25% */}
@@ -2581,7 +2581,7 @@ Número de seguimiento: ${c.nro}`;
                                 <div style={{fontSize:10,color:"#64748b"}}>{c.producto}</div>
                               </div>
                               <span style={{background:sc2+"22",color:sc2,fontSize:9,fontWeight:700,borderRadius:20,padding:"2px 7px",border:`1px solid ${sc2}33`,textAlign:"center"}}>{EST_LABEL[c.estado]||c.estado}</span>
-                              <span style={{fontSize:13,fontWeight:700,color:"#c9a055",textAlign:"right"}}>{fmt(g)}</span>
+                              <span style={{fontSize:13,fontWeight:700,color:"#0f172a",textAlign:"right"}}>{fmt(g)}</span>
                               <div style={{textAlign:"right"}}>
                                 <div style={{fontSize:11,color:"#2d78c8"}}>{fmt(g*0.20)}</div>
                                 <div style={{fontSize:11,color:"#b8922e"}}>{fmt(g*0.25)}</div>
@@ -2592,7 +2592,7 @@ Número de seguimiento: ${c.nro}`;
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 2fr 1fr 1fr 1fr",gap:8,padding:"10px 10px",marginTop:8,borderTop:"1px solid #e2e8f0"}}>
                         <div style={{gridColumn:"1/4",fontSize:12,fontWeight:700,color:"#64748b"}}>TOTAL ({todas.length} cotizaciones)</div>
-                        <div style={{fontSize:14,fontWeight:800,color:"#c9a055",textAlign:"right"}}>{fmt(totalGan)}</div>
+                        <div style={{fontSize:14,fontWeight:800,color:"#0f172a",textAlign:"right"}}>{fmt(totalGan)}</div>
                         <div style={{textAlign:"right"}}>
                           <div style={{fontSize:12,fontWeight:800,color:"#2d78c8"}}>{fmt(com20)}</div>
                           <div style={{fontSize:12,fontWeight:800,color:"#b8922e"}}>{fmt(com25)}</div>
@@ -2679,7 +2679,7 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                             </div>
                             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,minWidth:260}}>
-                              {[["Unidades",fmtN(c.unidades),"#0f172a"],["1er Pago",fmt(c.calc?.p1Cl),"#1aa358"],["2do Pago",fmt(c.calc?.p2Cl),"#c9a055"]].map(([l,v,col])=>(
+                              {[["Unidades",fmtN(c.unidades),"#0f172a"],["1er Pago",fmt(c.calc?.p1Cl),"#1aa358"],["2do Pago",fmt(c.calc?.p2Cl),"#334155"]].map(([l,v,col])=>(
                                 <div key={l} style={{background:"#f8fafc",borderRadius:7,padding:"8px 10px",textAlign:"center"}}>
                                   <div style={{fontSize:10,color:"#444",marginBottom:2}}>{l}</div>
                                   <div style={{fontSize:12,fontWeight:700,color:col}}>{v}</div>
@@ -2738,8 +2738,8 @@ Número de seguimiento: ${c.nro}`;
                       <div style={{background:"#f1f5f9",borderRadius:10,padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
                         <span style={{color:"#64748b",fontSize:13,fontWeight:600}}>TOTALES — {impsCliente.length} importación{impsCliente.length!==1?"es":""} · {fmtN(totUnidades)} unidades</span>
                         <div style={{textAlign:"right"}}>
-                          <div style={{color:"#64748b",fontSize:11}}>1er pago: <span style={{color:"#1aa358",fontWeight:700}}>{fmt(tot1er)}</span> · 2do pago: <span style={{color:"#c9a055",fontWeight:700}}>{fmt(tot2do)}</span></div>
-                          <div style={{color:"#c9a055",fontSize:18,fontWeight:800,marginTop:2}}>Total: {fmt(totPagado)}</div>
+                          <div style={{color:"#64748b",fontSize:11}}>1er pago: <span style={{color:"#1aa358",fontWeight:700}}>{fmt(tot1er)}</span> · 2do pago: <span style={{color:"#334155",fontWeight:700}}>{fmt(tot2do)}</span></div>
+                          <div style={{color:"#334155",fontSize:18,fontWeight:800,marginTop:2}}>Total: {fmt(totPagado)}</div>
                         </div>
                       </div>
                       <div style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>Generado por ZAGA Import · {todayStr()}</div>
@@ -2974,7 +2974,7 @@ Número de seguimiento: ${c.nro}`;
                           </div>
                           <div style={{textAlign:"right"}}>
                             <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase"}}>Ganancia imp. est.</div>
-                            <div style={{fontSize:15,fontWeight:800,color:"#c9a055"}}>{fmt(c.calc?.ganImp||0)}</div>
+                            <div style={{fontSize:15,fontWeight:800,color:"#0f172a"}}>{fmt(c.calc?.ganImp||0)}</div>
                             <div style={{fontSize:10,color:"#a85590"}}>Tu comisión: {fmt((c.calc?.ganImp||0)*0.20)} – {fmt((c.calc?.ganImp||0)*0.25)}</div>
                           </div>
                         </div>
