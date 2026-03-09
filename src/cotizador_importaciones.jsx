@@ -237,8 +237,46 @@ export default function App({ supabase, usuario, onLogout }){
   const vistaRef                         = useRef(null);
   const vistaClienteRef                  = useRef(null);
 
+  const [cargando,setCargando]=useState(true);
+
+  // ── CARGA INICIAL DESDE SUPABASE ──────────────────────────────
   useEffect(()=>{
-    try{ const r=localStorage.getItem("zaga_v6"); if(r){ const data=JSON.parse(r); cotizacionesRef.current=data; setCotizaciones(data); } }catch(_){}
+    const cargar=async()=>{
+      setCargando(true);
+      try{
+        const {data,error}=await supabase
+          .from("cotizaciones")
+          .select("id,datos")
+          .order("created_at",{ascending:false});
+        if(error) throw error;
+        if(data&&data.length>0){
+          // Datos en Supabase — cargar desde ahí
+          const lista=data.map(r=>r.datos);
+          cotizacionesRef.current=lista;
+          setCotizaciones(lista);
+        } else {
+          // Supabase vacío — intentar migrar desde localStorage
+          const local=localStorage.getItem("zaga_v6");
+          if(local){
+            const lista=JSON.parse(local);
+            if(Array.isArray(lista)&&lista.length>0){
+              // Migrar automáticamente a Supabase
+              const rows=lista.map(c=>({id:c.id,nro:c.nro||"",cliente:c.cliente||"",gestor:c.gestor||"francisco",estado:c.estado||"solicitud",tipo:c.tipo||"cliente",datos:c}));
+              await supabase.from("cotizaciones").upsert(rows,{onConflict:"id"});
+              cotizacionesRef.current=lista;
+              setCotizaciones(lista);
+              showToast(`✓ ${lista.length} cotizaciones migradas a la nube`);
+            }
+          }
+        }
+      }catch(e){
+        // Fallback a localStorage si falla Supabase
+        try{ const r=localStorage.getItem("zaga_v6"); if(r){ const d=JSON.parse(r); cotizacionesRef.current=d; setCotizaciones(d); } }catch(_){}
+        showToast("Error de conexión — usando datos locales","err");
+      }
+      setCargando(false);
+    };
+    cargar();
   },[]);
 
   const exportarDatos=()=>{
@@ -263,7 +301,39 @@ export default function App({ supabase, usuario, onLogout }){
     }catch(e){ showToast("JSON inválido — revisa el texto pegado","err"); }
   };
 
-  const persist=useCallback(async list=>{ cotizacionesRef.current=list; setCotizaciones(list); try{ localStorage.setItem("zaga_v6",JSON.stringify(list)); }catch(_){} },[]);
+  // ── PERSIST: guarda en Supabase + localStorage como backup ────
+  const persist=useCallback(async list=>{
+    cotizacionesRef.current=list;
+    setCotizaciones(list);
+    // Guardar en localStorage como respaldo offline
+    try{ localStorage.setItem("zaga_v6",JSON.stringify(list)); }catch(_){}
+    // Guardar en Supabase
+    try{
+      // IDs actuales en memoria
+      const idsNuevos=new Set(list.map(c=>c.id));
+      // IDs que estaban antes (para detectar eliminaciones)
+      const {data:existentes}=await supabase.from("cotizaciones").select("id");
+      const idsExistentes=(existentes||[]).map(r=>r.id);
+      const idsEliminar=idsExistentes.filter(id=>!idsNuevos.has(id));
+      // Upsert toda la lista
+      if(list.length>0){
+        const rows=list.map(c=>({
+          id:c.id,
+          nro:c.nro||"",
+          cliente:c.cliente||"",
+          gestor:c.gestor||"francisco",
+          estado:c.estado||"solicitud",
+          tipo:c.tipo||"cliente",
+          datos:c
+        }));
+        await supabase.from("cotizaciones").upsert(rows,{onConflict:"id"});
+      }
+      // Eliminar las que ya no existen
+      if(idsEliminar.length>0){
+        await supabase.from("cotizaciones").delete().in("id",idsEliminar);
+      }
+    }catch(e){ console.warn("Supabase sync error:",e); }
+  },[supabase]);
   const showToast=(msg,type="ok")=>{ setToast({msg,type}); setTimeout(()=>setToast(null),2800); };
 
   const calcActual = form.tipo==="propia" ? calcPropia(form) : calcCliente(form);
@@ -607,6 +677,15 @@ export default function App({ supabase, usuario, onLogout }){
           ))}
         </div>
       </div>
+
+      {/* PANTALLA DE CARGA */}
+      {cargando&&(
+        <div style={{position:"fixed",inset:0,background:"#f1f5f9",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+          <div style={{width:40,height:40,border:"3px solid #e2e8f0",borderTop:"3px solid #040c18",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+          <div style={{fontSize:14,color:"#64748b",fontWeight:500}}>Cargando cotizaciones...</div>
+          <div style={{fontSize:12,color:"#94a3b8"}}>Sincronizando con la nube</div>
+        </div>
+      )}
 
       {toast&&<div style={{position:"fixed",top:20,right:20,background:toast.type==="err"?"#c0392b":"#1aa358",color:"#fff",padding:"10px 22px",borderRadius:10,zIndex:999,fontWeight:600,fontSize:13,boxShadow:"0 4px 20px #0009",maxWidth:340,textAlign:"center"}}>{toast.msg}</div>}
       <ScrollTopBtn/>
