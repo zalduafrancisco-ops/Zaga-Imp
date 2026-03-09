@@ -466,7 +466,7 @@ export default function App({ supabase, usuario, onLogout }){
     const passCliente=filterCliente==="todos"||(filterCliente==="__propias__"?c.tipo==="propia":c.cliente===filterCliente);
     const passGestor=filterGestor==="todos"||c.gestor===filterGestor||(filterGestor==="francisco"&&!c.gestor);
     const q=searchQuery.trim().toLowerCase();
-    const passSearch=!q||(c.nro&&c.nro.toString().toLowerCase().includes(q))||(c.cliente&&c.cliente.toLowerCase().includes(q))||(c.producto&&c.producto.toLowerCase().includes(q));
+    const passSearch=!q||(c.nro&&c.nro.toString().toLowerCase().includes(q))||(c.cliente&&c.cliente.toLowerCase().includes(q))||(c.producto&&c.producto.toLowerCase().includes(q))||(c.sku_china&&c.sku_china.toLowerCase().includes(q))||(c.sku_bodega&&c.sku_bodega.toLowerCase().includes(q));
     return passEstado&&passCliente&&passGestor&&passSearch;
   });
 
@@ -1563,7 +1563,7 @@ Número de seguimiento: ${c.nro}`;
               <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:15,color:"#64748b",pointerEvents:"none"}}>🔍</span>
               <input
                 type="text"
-                placeholder="Buscar por nro de cotización, cliente o producto…"
+                placeholder="Buscar por nro, cliente, producto o SKU…"
                 value={searchQuery}
                 onChange={e=>setSearchQuery(e.target.value)}
                 style={{width:"100%",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:10,color:"#0f172a",padding:"11px 40px 11px 40px",fontSize:14,outline:"none",boxSizing:"border-box",transition:"border .2s"}}
