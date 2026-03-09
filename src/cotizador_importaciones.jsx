@@ -1052,7 +1052,18 @@ Número de seguimiento: ${c.nro}`;
                   )}
                   {p.notas&&<div style={{background:"#f8fafc",borderRadius:8,padding:12,border:"1px solid #e2e8f0"}}><div style={{fontSize:10,color:"#64748b",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Notas cotización</div><div style={{fontSize:12,color:"#64748b"}}>{p.notas}</div></div>}
                   {p.variantes&&<div style={{background:"#f5f3ff",borderRadius:8,padding:12,border:"1px solid #a78bfa33"}}><div style={{fontSize:10,color:"#334155",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>🎨 Variantes / Especificaciones</div><div style={{fontSize:12,color:"#0f172a",whiteSpace:"pre-wrap",lineHeight:1.6}}>{p.variantes}</div></div>}
-                  {p.notas_internas&&<div style={{background:"#f8fafc",borderRadius:8,padding:12,border:"1px solid #06b6d433"}}><div style={{fontSize:10,color:"#2a8aaa",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>📌 Notas internas</div><div style={{fontSize:12,color:"#0f172a",whiteSpace:"pre-wrap"}}>{p.notas_internas}</div></div>}
+                  {(()=>{
+                    var hist2 = p.notas_historial||[]
+                    if(hist2.length===0&&p.notas_internas) hist2=[{texto:p.notas_internas,fecha:"",autor:"Gestor"}]
+                    return hist2.length>0&&(
+                      <div style={{background:"#f8fafc",borderRadius:8,padding:12,border:"1px solid #06b6d433"}}>
+                        <div style={{fontSize:10,color:"#2a8aaa",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>📌 Notas internas</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                          {hist2.map(function(n,i){ return <div key={i}><span style={{fontSize:10,color:"#94a3b8"}}>{n.fecha&&n.fecha+" · "}{n.autor} </span><span style={{fontSize:12,color:"#0f172a"}}>{n.texto}</span></div> })}
+                        </div>
+                      </div>
+                    )
+                  })()}
                   {p.link_alibaba&&<a href={p.link_alibaba} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,background:"#eff6ff",color:"#2d78c8",border:"1px solid #3b82f633",borderRadius:8,padding:"8px 14px",fontSize:12,textDecoration:"none"}}>🔗 Ver referencia en Alibaba</a>}
                   {p.motivo_no_procesada&&<div style={{background:"#fff1f2",borderRadius:8,padding:12,border:"1px solid #ef444433"}}><div style={{fontSize:10,color:"#c0392b",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Motivo no procesada</div><div style={{fontSize:12,color:"#dc2626"}}>{p.motivo_no_procesada}</div></div>}
                   {(p.negociacion_rondas||[]).length>0&&(
@@ -1768,7 +1779,11 @@ Número de seguimiento: ${c.nro}`;
                             </div>
                           )}
                           {c.notas&&<div style={{color:"#64748b",fontSize:12}}>📝 {c.notas}</div>}
-                          {c.notas_internas&&<div style={{color:"#2a8aaa",fontSize:11,marginTop:2}}>📌 {c.notas_internas.length>80?c.notas_internas.substring(0,80)+"…":c.notas_internas}</div>}
+                          {(()=>{
+                            var ult = (c.notas_historial&&c.notas_historial.length>0)?c.notas_historial[c.notas_historial.length-1]:null
+                            var txt = ult?ult.texto:(c.notas_internas||null)
+                            return txt&&<div style={{color:"#2a8aaa",fontSize:11,marginTop:2}}>📌 {txt.length>80?txt.substring(0,80)+"…":txt}</div>
+                          })()}
                           {c.link_alibaba&&<a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" style={{color:"#2d78c8",fontSize:11}}>🔗 Referencia</a>}
                           {diasEnTransito!==null&&<div style={{fontSize:11,color:"#b8922e",marginTop:2}}>⏱ En tránsito: {diasEnTransito}d</div>}
                           {c.fecha_llegada_real&&<div style={{fontSize:11,color:"#0d9870",marginTop:2}}>✅ Llegó a bodega: {c.fecha_llegada_real}{tiempoRealTransito!==null?` · ${tiempoRealTransito}d de tránsito`:""}</div>}
@@ -2082,7 +2097,46 @@ Número de seguimiento: ${c.nro}`;
                           {/* ── NOTAS INTERNAS ── */}
                           <div style={{marginTop:20,borderTop:"1px solid #e2e8f0",paddingTop:16}}>
                             <div style={{fontSize:10,color:"#2a8aaa",marginBottom:6,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>📝 Notas internas</div>
-                            <textarea value={c.notas_internas||""} rows={3} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_internas:e.target.value}:x)); }} placeholder="Ej: Confirmar texto en español del packaging · Solicitar muestra antes del despacho · Referencia de color: Pantone 286C..." style={{width:"100%",background:"#f8fafc",border:"1px solid #06b6d433",borderRadius:8,color:"#0f172a",padding:"9px 12px",fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.5}}/>
+                            {/* Historial existente */}
+                            {(()=>{
+                              var hist = c.notas_historial||[]
+                              // Migrar notas_internas legacy a historial si aún no fue migrado
+                              if(hist.length===0 && c.notas_internas){
+                                hist = [{texto:c.notas_internas, fecha: c.fecha_solicitud||"Anterior", autor:"Sistema"}]
+                              }
+                              return hist.length>0&&(
+                                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+                                  {hist.map(function(n,i){
+                                    return (
+                                      <div key={i} style={{background:"#f0f9ff",border:"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
+                                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                                          <span style={{fontSize:10,fontWeight:700,color:"#2a8aaa",textTransform:"uppercase",letterSpacing:0.5}}>📌 {n.autor||"Gestor"}</span>
+                                          <span style={{fontSize:10,color:"#94a3b8"}}>{n.fecha}</span>
+                                        </div>
+                                        <div style={{fontSize:12,color:"#0f172a",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.texto}</div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )
+                            })()}
+                            {/* Agregar nueva nota */}
+                            <div style={{background:"#f8fafc",border:"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
+                              <div style={{fontSize:10,color:"#2a8aaa",marginBottom:6,fontWeight:700,textTransform:"uppercase",letterSpacing:0.5}}>+ Nueva nota</div>
+                              <textarea value={notaInput[c.id]||""} rows={2} onChange={e=>setNotaInput(p=>({...p,[c.id]:e.target.value}))} placeholder="Escribe una nota..." style={{width:"100%",background:"#fff",border:"1px solid #e2e8f0",borderRadius:6,color:"#0f172a",padding:"8px 10px",fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.5}}/>
+                              <button disabled={!(notaInput[c.id]||"").trim()} onClick={async()=>{
+                                var texto = (notaInput[c.id]||"").trim()
+                                if(!texto) return
+                                var histPrev = c.notas_historial||[]
+                                if(histPrev.length===0&&c.notas_internas) histPrev=[{texto:c.notas_internas,fecha:c.fecha_solicitud||"Anterior",autor:"Sistema"}]
+                                var nuevaNota = {texto, fecha:new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"}), autor: perfil?.nombre||"Gestor"}
+                                var updated = [...histPrev, nuevaNota]
+                                await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_historial:updated,notas_internas:""}:x))
+                                setNotaInput(p=>({...p,[c.id]:""}))
+                              }} style={{marginTop:7,background:(notaInput[c.id]||"").trim()?"#040c18":"#e2e8f0",color:(notaInput[c.id]||"").trim()?"#c9a055":"#94a3b8",border:"none",borderRadius:6,padding:"7px 16px",fontSize:11,cursor:(notaInput[c.id]||"").trim()?"pointer":"default",fontWeight:700,transition:"all .2s"}}>
+                                💾 Guardar nota
+                              </button>
+                            </div>
 
                             {/* FACTURA AL CLIENTE */}
                             {c.requiere_factura&&(
