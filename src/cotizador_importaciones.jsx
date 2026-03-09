@@ -544,29 +544,66 @@ export default function App({ supabase, usuario, onLogout }){
       `}</style>
 
       {/* HEADER */}
-      <div style={{background:"#040c18",borderBottom:"1px solid #0f1e30",padding:"0 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.3)",position:"sticky",top:0,zIndex:100}}>
-        <div className="nav-hdr" style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <img src={LOGO_WHITE} alt="ZAGA" style={{height:32,width:"auto",objectFit:"contain",filter:"brightness(0) invert(1)"}}/>
-            <div style={{width:1,height:24,background:"#f1f5f9",margin:"0 4px"}}/>
-            <div style={{fontSize:9,color:"#94a3b8",letterSpacing:2,textTransform:"uppercase"}}>Gestión de Importaciones</div>
+      <div style={{background:"#040c18",position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 0 rgba(255,255,255,0.06)"}}>
+        {/* TOP BAR */}
+        <div className="nav-hdr" style={{maxWidth:1280,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",height:54}}>
+
+          {/* LEFT: Logo + título */}
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            <img
+              src={LOGO_WHITE}
+              alt="ZAGA"
+              style={{height:28,width:"auto",objectFit:"contain",mixBlendMode:"screen"}}
+            />
+            <div style={{width:1,height:18,background:"rgba(255,255,255,0.12)"}}/>
+            <span style={{fontSize:10,color:"rgba(255,255,255,0.4)",letterSpacing:2.5,textTransform:"uppercase",fontWeight:500}}>Gestión de Importaciones</span>
           </div>
-          <div style={{display:"flex",gap:8,fontSize:12,alignItems:"center"}}>
-            <span className="stat-chips" style={{display:"flex",gap:6,alignItems:"center"}}>{[["⏳",cotizaciones.filter(c=>["solicitud","enviada_cliente"].includes(c.estado)).length,"#b8922e","Pendientes"],
-              ["🚢",cotizaciones.filter(c=>["pagada_china","en_camino"].includes(c.estado)).length,"#c47830","En tránsito"],
-              ["✅",cotizaciones.filter(c=>c.estado==="completada").length,"#1aa358","Completadas"],
-            ].map(([ic,n,col,lb])=>n>0&&<div key={lb} className="hide-mob" style={{background:col+"14",border:`1px solid ${col}33`,borderRadius:20,padding:"3px 12px",color:col,fontSize:11}}>{ic} {n} {lb}</div>)}</span>
-            <div style={{width:1,height:20,background:"#f1f5f9",margin:"0 4px"}}/>
-            <button onClick={exportarDatos} title="Exportar backup" style={{background:"transparent",color:"#94a3b8",border:"1px solid #334155",borderRadius:8,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>⬇ Exportar</button>
-            <button onClick={importarDatos} title="Importar datos" style={{background:"transparent",color:"#334155",border:"1px solid #e2e8f0",borderRadius:8,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>⬆ Importar</button>
-            <div style={{width:1,height:20,background:"#f1f5f9"}}/>
-            <span style={{fontSize:12,color:"#c9a055",fontWeight:600,background:"rgba(201,160,85,0.1)",borderRadius:20,padding:"4px 12px",border:"1px solid rgba(201,160,85,0.2)"}}>{usuario?.nombre||"Admin"}</span>
-            <button onClick={onLogout} style={{background:"transparent",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:8,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>Salir</button>
+
+          {/* RIGHT: chips + acciones */}
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <div className="hide-mob" style={{display:"flex",gap:5,alignItems:"center",marginRight:6}}>
+              {[
+                [cotizaciones.filter(c=>["solicitud","enviada_cliente"].includes(c.estado)).length,"Pendientes","#f59e0b"],
+                [cotizaciones.filter(c=>["pagada_china","en_camino"].includes(c.estado)).length,"En tránsito","#60a5fa"],
+                [cotizaciones.filter(c=>c.estado==="completada").length,"Completadas","#34d399"],
+              ].filter(([n])=>n>0).map(([n,lb,col])=>(
+                <div key={lb} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,padding:"3px 10px",color:"rgba(255,255,255,0.75)",fontSize:11,display:"flex",alignItems:"center",gap:5}}>
+                  <span style={{width:6,height:6,borderRadius:"50%",background:col,display:"inline-block",flexShrink:0}}/>
+                  <span style={{fontWeight:600}}>{n}</span>
+                  <span style={{color:"rgba(255,255,255,0.4)"}}>{lb}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{width:1,height:18,background:"rgba(255,255,255,0.1)"}}/>
+
+            <button onClick={exportarDatos} style={{background:"transparent",color:"rgba(255,255,255,0.5)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:500}}>↓ Exportar</button>
+            <button onClick={importarDatos} style={{background:"transparent",color:"rgba(255,255,255,0.5)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:500}}>↑ Importar</button>
+
+            <div style={{width:1,height:18,background:"rgba(255,255,255,0.1)"}}/>
+
+            <div style={{background:"rgba(201,160,85,0.15)",border:"1px solid rgba(201,160,85,0.3)",borderRadius:7,padding:"4px 12px",fontSize:12,fontWeight:600,color:"#c9a055"}}>
+              {usuario?.nombre||"Admin"}
+            </div>
+            <button onClick={onLogout} style={{background:"transparent",color:"rgba(255,255,255,0.4)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,padding:"5px 12px",fontSize:11,cursor:"pointer"}}>Salir</button>
           </div>
         </div>
-        <div className="nav-tabs" style={{maxWidth:1200,margin:"0 auto",display:"flex",gap:0}}>
+
+        {/* NAV TABS */}
+        <div className="nav-tabs" style={{maxWidth:1280,margin:"0 auto",padding:"0 24px",display:"flex",gap:0,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
           {[["calc","Calculadora"],["tracker",`Tracker (${cotizaciones.length})`],["dashboard","Dashboard"],["clientes","Clientes"],["luisa","Luisa"]].map(([k,l])=>(
-            <button key={k} onClick={()=>setTab(k)} style={{background:"transparent",color:tab2===k?"#c9a055":"#8b9ab0",border:"none",borderBottom:tab2===k?"2px solid #c9a055":"2px solid transparent",padding:"10px 18px",cursor:"pointer",fontWeight:tab2===k?700:500,fontSize:13,transition:"all .2s",fontFamily:"inherit"}}>{l}</button>
+            <button key={k} onClick={()=>setTab(k)} style={{
+              background:"transparent",
+              color:tab2===k?"#ffffff":"rgba(255,255,255,0.4)",
+              border:"none",
+              borderBottom:tab2===k?"2px solid #c9a055":"2px solid transparent",
+              padding:"11px 18px",
+              cursor:"pointer",
+              fontWeight:tab2===k?600:400,
+              fontSize:13,
+              transition:"color .2s",
+              fontFamily:"inherit"
+            }}>{l}</button>
           ))}
         </div>
       </div>
