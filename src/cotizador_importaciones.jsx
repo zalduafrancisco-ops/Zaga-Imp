@@ -1610,7 +1610,8 @@ Número de seguimiento: ${c.nro}`;
                 );
               })}
             </div>
-            <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
+            <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap",alignItems:"center"}}>
+              <span style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>📋 Estado</span>
               {[["todos","Todos",null],...Object.entries(EST_LABEL).map(([k,l])=>[k,l,EST_COLOR[k]])].map(([k,l,col])=>{
                 // Base filtrada por cliente + gestor + búsqueda (sin filtro de estado) para conteos precisos
                 const baseParaConteo=cotizaciones.filter(c=>{
