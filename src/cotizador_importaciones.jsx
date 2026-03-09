@@ -206,7 +206,7 @@ function CheckItem({label,checked,onChange,disabled}){
   );
 }
 
-export default function App(){
+export default function App({ supabase, usuario, onLogout }){
   const [tab2,setTab]=useState("calc");
   const [form,setForm]                   = useState(defaultForm);
   const [cotizaciones,setCotizaciones]   = useState([]);
@@ -238,7 +238,7 @@ export default function App(){
   const vistaClienteRef                  = useRef(null);
 
   useEffect(()=>{
-    (async()=>{ try{ const r=await window.storage.get("zaga_v6"); if(r){ const data=JSON.parse(r.value); cotizacionesRef.current=data; setCotizaciones(data); } }catch(_){} })();
+    try{ const r=localStorage.getItem("zaga_v6"); if(r){ const data=JSON.parse(r); cotizacionesRef.current=data; setCotizaciones(data); } }catch(_){}
   },[]);
 
   const exportarDatos=()=>{
@@ -263,7 +263,7 @@ export default function App(){
     }catch(e){ showToast("JSON inválido — revisa el texto pegado","err"); }
   };
 
-  const persist=useCallback(async list=>{ cotizacionesRef.current=list; setCotizaciones(list); try{ await window.storage.set("zaga_v6",JSON.stringify(list)); }catch(_){} },[]);
+  const persist=useCallback(async list=>{ cotizacionesRef.current=list; setCotizaciones(list); try{ localStorage.setItem("zaga_v6",JSON.stringify(list)); }catch(_){} },[]);
   const showToast=(msg,type="ok")=>{ setToast({msg,type}); setTimeout(()=>setToast(null),2800); };
 
   const calcActual = form.tipo==="propia" ? calcPropia(form) : calcCliente(form);
