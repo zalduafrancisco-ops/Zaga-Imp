@@ -596,6 +596,7 @@ export default function App({ supabase, usuario, onLogout }){
           .cot-card-meta{grid-template-columns:1fr 1fr !important}
           .cot-card-row{flex-direction:column !important}
           .cot-card-right{min-width:0 !important;margin-left:0 !important;margin-top:10px !important;grid-template-columns:1fr 1fr !important}
+          .ff-grid{grid-template-columns:1fr !important}
         }
       `}</style>
 
@@ -2233,7 +2234,7 @@ Número de seguimiento: ${c.nro}`;
                           {(c.checklist?.pago_china||c.sku_china)&&(
                             <div style={{marginTop:18,borderTop:"1px solid #e2e8f0",paddingTop:18}}>
                               <div style={{fontSize:10,color:"#c47830",marginBottom:12,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>📦 Post-pago — Bodega & Fulfillment</div>
-                              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                              <div className="ff-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
                                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
                                   <div>
                                     <div style={{fontSize:10,color:"#b8922e",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>🏷 SKU China</div>
