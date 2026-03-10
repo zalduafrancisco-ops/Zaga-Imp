@@ -587,6 +587,8 @@ export default function App({ supabase, usuario, onLogout }){
           .preview-grid{grid-template-columns:1fr !important}
           .clientes-layout{grid-template-columns:1fr !important}
           .clientes-detail{min-width:0 !important}
+          .clientes-list-mob{display:none !important}
+          .clientes-back-btn{display:flex !important}
           .dash-kpi4{grid-template-columns:1fr 1fr !important}
           .dash-kpi5{grid-template-columns:1fr 1fr !important}
           .dash-fin3{grid-template-columns:1fr !important}
@@ -1829,10 +1831,58 @@ Número de seguimiento: ${c.nro}`;
                         </div>
                       </div>
                       {c.calc&&(
-                        <div className="cot-card-meta" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:12}}>
-                        {(isPropia?[["Costo total China",fmt(c.calc.tCh||0),"#2d78c8"],["Costo real/und",fmt(c.calc.cRUnd||0),"#2d78c8"],["Precio venta/und",fmt(c.calc.pvUnd||0),"#3d7fc4"],["Margen bruto",fmtP(c.calc.mgBruto),"#475569"]]
-                            :[["1er pago cliente",fmt(c.calc.p1Cl||0),"#1aa358"],["2do pago cliente",fmt(c.calc.p2Cl||0),"#1aa358"],["1er pago China",fmt(c.calc.p1Ch||0),"#2d78c8"],["Total pagado China",fmt(c.calc.tCh||0),"#2d78c8"]]
-                          ).map(([l,v,col])=>(<div key={l} style={{textAlign:"center"}}><div style={{fontSize:10,color:"#444",marginBottom:2}}>{l}</div><div style={{fontSize:12,fontWeight:600,color:col}}>{v}</div></div>))}
+                        <div className="cot-card-meta" style={{display:"grid",gridTemplateColumns:isPropia?"repeat(4,1fr)":"repeat(3,1fr)",gap:8,background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:12}}>
+                        {isPropia
+                          ? [["Costo total China",fmt(c.calc.tCh||0),"#2d78c8"],["Costo real/und",fmt(c.calc.cRUnd||0),"#2d78c8"],["Precio venta/und",fmt(c.calc.pvUnd||0),"#3d7fc4"],["Margen bruto",fmtP(c.calc.mgBruto),"#475569"]]
+                              .map(([l,v,col])=>(<div key={l} style={{textAlign:"center"}}><div style={{fontSize:10,color:"#444",marginBottom:2}}>{l}</div><div style={{fontSize:12,fontWeight:600,color:col}}>{v}</div></div>))
+                          : (<>
+                              {/* Bloque 1er pago */}
+                              <div style={{background:"#fff",borderRadius:7,padding:"8px 10px",border:"1px solid #e2e8f0"}}>
+                                <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.5,marginBottom:4,fontWeight:600}}>1er Pago</div>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:4}}>
+                                  <div style={{textAlign:"center",flex:1}}>
+                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>Cliente</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:"#1aa358"}}>{fmt(c.calc.p1Cl||0)}</div>
+                                  </div>
+                                  <div style={{width:1,height:24,background:"#e2e8f0"}}/>
+                                  <div style={{textAlign:"center",flex:1}}>
+                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>China</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:"#2d78c8"}}>{fmt(c.calc.p1Ch||0)}</div>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Bloque 2do pago */}
+                              <div style={{background:"#fff",borderRadius:7,padding:"8px 10px",border:"1px solid #e2e8f0"}}>
+                                <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.5,marginBottom:4,fontWeight:600}}>2do Pago</div>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:4}}>
+                                  <div style={{textAlign:"center",flex:1}}>
+                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>Cliente</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:"#1aa358"}}>{fmt(c.calc.p2Cl||0)}</div>
+                                  </div>
+                                  <div style={{width:1,height:24,background:"#e2e8f0"}}/>
+                                  <div style={{textAlign:"center",flex:1}}>
+                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>China</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:"#2d78c8"}}>{fmt(c.calc.p2Ch||0)}</div>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Bloque Total */}
+                              <div style={{background:"#fff",borderRadius:7,padding:"8px 10px",border:"1px solid #e2e8f0"}}>
+                                <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.5,marginBottom:4,fontWeight:600}}>Total</div>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:4}}>
+                                  <div style={{textAlign:"center",flex:1}}>
+                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>Cliente</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:"#1aa358"}}>{fmt(c.calc.totCl||0)}</div>
+                                  </div>
+                                  <div style={{width:1,height:24,background:"#e2e8f0"}}/>
+                                  <div style={{textAlign:"center",flex:1}}>
+                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>China</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:"#2d78c8"}}>{fmt(c.calc.tCh||0)}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </>)
+                        }
                         </div>
                       )}
                       <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
@@ -2738,7 +2788,7 @@ Número de seguimiento: ${c.nro}`;
           const copyVistaCliente=()=>{ abrirPrint("cliente"); };
           return(
             <div className="clientes-layout" style={{display:"grid",gridTemplateColumns:clienteSeleccionado?"260px 1fr":"300px",gap:20}}>
-              <div>
+              <div className={clienteSeleccionado?"clientes-list-mob":""}>
                 <div style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:12}}>Clientes ({clientes.length})</div>
                 {clientes.length===0&&<div style={{textAlign:"center",padding:40,color:"#444",fontSize:13}}>Sin clientes aún.<br/>Crea cotizaciones de tipo cliente.</div>}
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -2782,6 +2832,10 @@ Número de seguimiento: ${c.nro}`;
               </div>
               {clienteSeleccionado&&(
                 <div>
+                  {/* Botón volver — solo mobile */}
+                  <button className="clientes-back-btn" onClick={()=>setClienteSeleccionado(null)} style={{display:"none",alignItems:"center",gap:6,background:"none",border:"none",color:"#64748b",fontSize:13,cursor:"pointer",marginBottom:12,padding:0,fontWeight:600}}>
+                    ← Volver a clientes
+                  </button>
                   <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
                     <div style={{fontWeight:800,fontSize:18,color:"#0f172a",flex:1}}>👤 {clienteSeleccionado}</div>
                     <button onClick={copyVistaCliente} style={{background:"#040c18",color:"#fff",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>
