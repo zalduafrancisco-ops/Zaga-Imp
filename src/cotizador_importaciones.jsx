@@ -2830,6 +2830,83 @@ Número de seguimiento: ${c.nro}`;
                     </div>
                   )}
 
+                  {/* ── ACCESO APP ── */}
+                  {(()=>{
+                    const tienePrimerPago = todasCliente.some(c=>c.checklist?.pago1_cliente);
+                    const appEmail = todasCliente.find(c=>c.app_email)?.app_email || "";
+                    const appPass  = todasCliente.find(c=>c.app_pass)?.app_pass  || "";
+                    const tieneAcceso = !!appEmail;
+                    const persistApp = async(field,val)=>{
+                      const updated = cotizacionesRef.current.map(c=>
+                        c.cliente===clienteSeleccionado&&c.tipo!=="propia" ? {...c,[field]:val} : c
+                      );
+                      await persist(updated);
+                    };
+                    if(!tienePrimerPago && !tieneAcceso) return null;
+                    return (
+                      <div style={{marginBottom:16,borderRadius:12,border:`2px solid ${tieneAcceso?"#22c55e44":"#ef444455"}`,overflow:"hidden"}}>
+                        {/* Header */}
+                        <div style={{background:tieneAcceso?"#f0fdf4":"#fff1f2",padding:"10px 16px",display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{fontSize:16}}>{tieneAcceso?"🔐":"🔴"}</span>
+                          <span style={{fontWeight:700,fontSize:13,color:tieneAcceso?"#16a34a":"#c0392b",flex:1}}>
+                            {tieneAcceso?"Acceso a la app configurado":"⚠️ Acceso a la app pendiente"}
+                          </span>
+                          {tienePrimerPago&&!tieneAcceso&&(
+                            <span style={{background:"#ef444420",color:"#c0392b",fontSize:10,fontWeight:700,borderRadius:20,padding:"3px 10px",border:"1px solid #ef444455"}}>
+                              1er pago ✓ — crear usuario
+                            </span>
+                          )}
+                          {tieneAcceso&&(
+                            <span style={{background:"#22c55e20",color:"#16a34a",fontSize:10,fontWeight:700,borderRadius:20,padding:"3px 10px",border:"1px solid #22c55e44"}}>
+                              Activo
+                            </span>
+                          )}
+                        </div>
+                        {/* Body */}
+                        <div style={{background:"#fff",padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
+                          {/* Email */}
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <span style={{fontSize:11,color:"#64748b",width:60,flexShrink:0}}>📧 Email</span>
+                            <input
+                              value={appEmail}
+                              onChange={e=>persistApp("app_email",e.target.value)}
+                              placeholder="email@cliente.com"
+                              style={{flex:1,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:7,padding:"7px 10px",fontSize:12,color:"#0f172a",outline:"none"}}
+                            />
+                            {appEmail&&(
+                              <button onClick={()=>{navigator.clipboard.writeText(appEmail);showToast("Email copiado ✓");}}
+                                style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:7,padding:"7px 10px",fontSize:11,cursor:"pointer",color:"#475569",whiteSpace:"nowrap"}}>
+                                📋 Copiar
+                              </button>
+                            )}
+                          </div>
+                          {/* Contraseña */}
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <span style={{fontSize:11,color:"#64748b",width:60,flexShrink:0}}>🔑 Clave</span>
+                            <input
+                              value={appPass}
+                              onChange={e=>persistApp("app_pass",e.target.value)}
+                              placeholder="Contraseña del cliente"
+                              style={{flex:1,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:7,padding:"7px 10px",fontSize:12,color:"#0f172a",outline:"none"}}
+                            />
+                            {appPass&&(
+                              <button onClick={()=>{navigator.clipboard.writeText(appPass);showToast("Contraseña copiada ✓");}}
+                                style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:7,padding:"7px 10px",fontSize:11,cursor:"pointer",color:"#475569",whiteSpace:"nowrap"}}>
+                                📋 Copiar
+                              </button>
+                            )}
+                          </div>
+                          {appEmail&&appPass&&(
+                            <button onClick={()=>{navigator.clipboard.writeText(`Email: ${appEmail}\nContraseña: ${appPass}`);showToast("Credenciales copiadas ✓");}}
+                              style={{background:"#040c18",color:"#c9a055",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700,alignSelf:"flex-start"}}>
+                              📤 Copiar todo para enviar al cliente
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* FILTROS */}
                   <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
                     {[
