@@ -1549,11 +1549,6 @@ Número de seguimiento: ${c.nro}`;
         {/* ══ TRACKER ══ */}
         {tab2==="tracker"&&(
           <div>
-            {/* BOTÓN FLOTANTE SUBIR */}
-            <button onClick={()=>window.scrollTo({top:0,behavior:"smooth"})} title="Volver al inicio" style={{position:"fixed",bottom:28,right:28,zIndex:800,width:44,height:44,borderRadius:"50%",background:"#040c18",border:"2px solid #c9a055",color:"#c9a055",fontSize:20,cursor:"pointer",boxShadow:"0 4px 16px rgba(0,0,0,0.15)",display:"flex",alignItems:"center",justifyContent:"center",transition:"transform .15s"}}
-              onMouseEnter={e=>e.currentTarget.style.transform="scale(1.12)"}
-              onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}
-            >↑</button>
             {/* BUSCADOR */}
             <div style={{position:"relative",marginBottom:16}}>
               <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:15,color:"#64748b",pointerEvents:"none"}}>🔍</span>
