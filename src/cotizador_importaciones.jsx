@@ -2749,9 +2749,19 @@ Número de seguimiento: ${c.nro}`;
                     const rech=imps.filter(c=>["rechazada_cliente","anulada","no_procesada"].includes(c.estado)).length;
                     const conv=imps.length>0?Math.round((imps.filter(c=>PROCESADAS.includes(c.estado)).length/imps.length)*100):0;
                     const sel=clienteSeleccionado===cl;
+                    const tienePrimerPago=imps.some(c=>c.checklist?.pago1_cliente);
+                    const tieneAcceso=imps.some(c=>c.app_email);
                     return(
                       <div key={cl} onClick={()=>{setClienteSeleccionado(sel?null:cl);setFiltroCliente("todas");}} style={{background:sel?"#f0fdf4":"#f8fafc",border:`1px solid ${sel?"#22c55e55":"#e2e8f0"}`,borderRadius:10,padding:"12px 14px",cursor:"pointer",transition:"all .15s"}}>
-                        <div style={{fontWeight:700,fontSize:13,color:sel?"#1aa358":"#0f172a",marginBottom:6}}>👤 {cl}</div>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                          <span style={{fontWeight:700,fontSize:13,color:sel?"#1aa358":"#0f172a",flex:1}}>👤 {cl}</span>
+                          {tieneAcceso
+                            ? <span style={{fontSize:9,fontWeight:700,color:"#16a34a",background:"#f0fdf4",border:"1px solid #22c55e44",borderRadius:20,padding:"2px 8px",whiteSpace:"nowrap"}}>🔐 App activa</span>
+                            : tienePrimerPago
+                              ? <span style={{fontSize:9,fontWeight:700,color:"#c0392b",background:"#fff1f2",border:"1px solid #ef444444",borderRadius:20,padding:"2px 8px",whiteSpace:"nowrap"}}>⚠️ Sin acceso</span>
+                              : null
+                          }
+                        </div>
                         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
                           <span style={{fontSize:11,color:"#64748b"}}>{imps.length} cotiz.</span>
                           {activas>0&&<span style={{fontSize:11,color:"#c47830"}}>🚢 {activas} activa{activas!==1?"s":""}</span>}
