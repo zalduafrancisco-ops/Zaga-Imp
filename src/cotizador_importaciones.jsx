@@ -585,6 +585,14 @@ export default function App({ supabase, usuario, onLogout }){
           .kpi-grid{grid-template-columns:1fr 1fr !important}
           .dash-grid{grid-template-columns:1fr !important}
           .preview-grid{grid-template-columns:1fr !important}
+          .clientes-layout{grid-template-columns:1fr !important}
+          .clientes-detail{min-width:0 !important}
+          .dash-kpi4{grid-template-columns:1fr 1fr !important}
+          .dash-kpi5{grid-template-columns:1fr 1fr !important}
+          .dash-fin3{grid-template-columns:1fr !important}
+          .cot-card-meta{grid-template-columns:1fr 1fr !important}
+          .cot-card-row{flex-direction:column !important}
+          .cot-card-right{min-width:0 !important;margin-left:0 !important;margin-top:10px !important;grid-template-columns:1fr 1fr !important}
         }
       `}</style>
 
@@ -1762,7 +1770,7 @@ Número de seguimiento: ${c.nro}`;
                 return(
                   <div key={c.id} id={`card-${c.id}`} style={{background:"#f1f5f9",borderRadius:12,border:"1px solid #e2e8f0",overflow:"hidden"}}>
                     <div style={{padding:20,borderLeft:`4px solid ${isPropia?"#3d7fc4":sc}`}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                      <div className="cot-card-row" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                         <div style={{flex:1}}>
                           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
                             {isPropia?<span style={{background:"#3d7fc422",color:"#3d7fc4",border:"1px solid #8b5cf644",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>🏠 PROPIA</span>:<span style={{fontWeight:700,fontSize:15}}>{c.cliente}</span>}
@@ -1805,7 +1813,7 @@ Número de seguimiento: ${c.nro}`;
                             <span style={{fontSize:10,color:"#333",whiteSpace:"nowrap"}}>({prog.done}/{prog.total} ✓)</span>
                           </div>
                         </div>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,minWidth:220,marginLeft:16}}>
+                        <div className="cot-card-right" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,minWidth:220,marginLeft:16}}>
                           <div style={{background:"#f8fafc",borderRadius:8,padding:"8px 10px",textAlign:"center"}}>
                             <div style={{fontSize:10,color:"#64748b",marginBottom:2}}>{isPropia?"Costo real/und":"Precio/und cliente"}</div>
                             <div style={{fontSize:13,fontWeight:700,color:isPropia?"#2d78c8":"#1aa358"}}>{fmt(isPropia?c.calc?.cRUnd:c.calc?.pCUnd)}</div>
@@ -1821,7 +1829,7 @@ Número de seguimiento: ${c.nro}`;
                         </div>
                       </div>
                       {c.calc&&(
-                        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:12}}>
+                        <div className="cot-card-meta" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:12}}>
                         {(isPropia?[["Costo total China",fmt(c.calc.tCh||0),"#2d78c8"],["Costo real/und",fmt(c.calc.cRUnd||0),"#2d78c8"],["Precio venta/und",fmt(c.calc.pvUnd||0),"#3d7fc4"],["Margen bruto",fmtP(c.calc.mgBruto),"#475569"]]
                             :[["1er pago cliente",fmt(c.calc.p1Cl||0),"#1aa358"],["2do pago cliente",fmt(c.calc.p2Cl||0),"#1aa358"],["1er pago China",fmt(c.calc.p1Ch||0),"#2d78c8"],["Total pagado China",fmt(c.calc.tCh||0),"#2d78c8"]]
                           ).map(([l,v,col])=>(<div key={l} style={{textAlign:"center"}}><div style={{fontSize:10,color:"#444",marginBottom:2}}>{l}</div><div style={{fontSize:12,fontWeight:600,color:col}}>{v}</div></div>))}
@@ -2320,7 +2328,7 @@ Número de seguimiento: ${c.nro}`;
             </div>
 
             {/* KPIs */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}}>
+            <div className="dash-kpi4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}}>
               <div style={{background:"#f1f5f9",borderRadius:12,padding:"16px 18px",border:"1px solid #e2e8f0"}}>
                 <div style={{fontSize:18,marginBottom:4}}>🇨🇳</div>
                 <div style={{fontSize:10,color:"#64748b",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Pagado a China (real)</div>
@@ -2729,7 +2737,7 @@ Número de seguimiento: ${c.nro}`;
           const pctConversion=todasCliente.length>0?Math.round((procesadas/todasCliente.length)*100):0;
           const copyVistaCliente=()=>{ abrirPrint("cliente"); };
           return(
-            <div style={{display:"grid",gridTemplateColumns:clienteSeleccionado?"260px 1fr":"300px",gap:20}}>
+            <div className="clientes-layout" style={{display:"grid",gridTemplateColumns:clienteSeleccionado?"260px 1fr":"300px",gap:20}}>
               <div>
                 <div style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:12}}>Clientes ({clientes.length})</div>
                 {clientes.length===0&&<div style={{textAlign:"center",padding:40,color:"#444",fontSize:13}}>Sin clientes aún.<br/>Crea cotizaciones de tipo cliente.</div>}
@@ -2781,7 +2789,7 @@ Número de seguimiento: ${c.nro}`;
                   </div>
 
                   {/* KPIs */}
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:16}} className="kpi-grid">
+                  <div className="kpi-grid dash-kpi5" style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:16}}>
                     {[
                       ["Total cotizadas",todasCliente.length,"#0f172a","📋"],
                       ["Procesadas",procesadas,"#16a34a","✅"],
@@ -2821,7 +2829,7 @@ Número de seguimiento: ${c.nro}`;
 
                   {/* Financiero — solo cotizaciones no rechazadas */}
                   {totPagado>0&&(
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+                    <div className="dash-fin3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
                       {[["Total facturado",fmt(totPagado),"#0f172a"],["1er pago",fmt(tot1er),"#16a34a"],["2do pago",fmt(tot2do),"#334155"]].map(([l,v,col])=>(
                         <div key={l} style={{background:"#f0fdf4",borderRadius:10,padding:"12px 14px",border:"1px solid #bbf7d0",textAlign:"center"}}>
                           <div style={{fontSize:10,color:"#64748b",marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>{l}</div>
