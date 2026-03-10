@@ -2817,6 +2817,7 @@ Número de seguimiento: ${c.nro}`;
                       <div key={cl} onClick={()=>{setClienteSeleccionado(sel?null:cl);setFiltroCliente("todas");}} style={{background:sel?"#f0fdf4":"#f8fafc",border:`1px solid ${sel?"#22c55e55":"#e2e8f0"}`,borderRadius:10,padding:"12px 14px",cursor:"pointer",transition:"all .15s"}}>
                         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
                           <span style={{fontWeight:700,fontSize:13,color:sel?"#1aa358":"#0f172a",flex:1}}>👤 {cl}</span>
+                          {CLIENTE_IDS[cl]&&<span style={{fontSize:10,fontWeight:700,color:"#c9a055",background:"#c9a05518",border:"1px solid #c9a05533",borderRadius:20,padding:"1px 8px",marginLeft:4}}>{CLIENTE_IDS[cl]}</span>}
                           {tieneAcceso
                             ? <span style={{fontSize:9,fontWeight:700,color:"#16a34a",background:"#f0fdf4",border:"1px solid #22c55e44",borderRadius:20,padding:"2px 8px",whiteSpace:"nowrap"}}>🔐 App activa</span>
                             : tienePrimerPago
@@ -2849,7 +2850,7 @@ Número de seguimiento: ${c.nro}`;
                     ← Volver a clientes
                   </button>
                   <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
-                    <div style={{fontWeight:800,fontSize:18,color:"#0f172a",flex:1}}>👤 {clienteSeleccionado}</div>
+                    <div style={{fontWeight:800,fontSize:18,color:"#0f172a",flex:1,display:"flex",alignItems:"center",gap:10}}>👤 {clienteSeleccionado}{CLIENTE_IDS[clienteSeleccionado]&&<span style={{fontSize:12,fontWeight:700,color:"#c9a055",background:"#c9a05518",border:"1px solid #c9a05533",borderRadius:20,padding:"2px 10px"}}>{CLIENTE_IDS[clienteSeleccionado]}</span>}</div>
                     <button onClick={copyVistaCliente} style={{background:"#040c18",color:"#fff",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>
                     <button onClick={()=>setClienteSeleccionado(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:9,padding:"9px 14px",fontSize:13,cursor:"pointer"}}>✕</button>
                   </div>
