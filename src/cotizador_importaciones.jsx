@@ -7,7 +7,6 @@ const PCT_COM_CLIENTE = 0.065;
 const CHECKLIST_CLIENTE = [
   { key:"enviado_china",     label:"Enviado a China",                group:"cotizacion" },
   { key:"respuesta_china",   label:"Respuesta de China recibida",    group:"cotizacion" },
-  { key:"cot_enviada",       label:"Cotización enviada al cliente",  group:"cotizacion" },
   { key:"cliente_acepto",    label:"Cliente aceptó",                 group:"cotizacion" },
   { key:"pago1_cliente",     label:"1er pago recibido del cliente",  group:"pagos" },
   { key:"factura1",          label:"Factura 1er pago emitida",       group:"pagos" },
@@ -1851,7 +1850,7 @@ Número de seguimiento: ${c.nro}`;
                         {estado:"solicitud",       icon:"📥",label:"Solicitud recibida",           color:"#334155",checks:[]},
                         {estado:"enviado_china",   icon:"📨",label:"Enviado a China",               color:"#2a8aaa",checks:[]},
                         {estado:"respuesta_china", icon:"🇨🇳",label:"Respuesta recibida de China",  color:"#b8922e",checks:[],special:"respuesta"},
-                        {estado:"enviada_cliente", icon:"📤",label:"Enviada al cliente",             color:"#2d78c8",checks:["cot_enviada"],special:"decision"},
+                        {estado:"enviada_cliente", icon:"📤",label:"Enviada al cliente",             color:"#2d78c8",checks:[],special:"decision"},
                         {estado:"re_testeando",    icon:"🔄",label:"Re-testeando",                  color:"#334155",checks:[],special:"retesteando"},
                         {estado:"en_negociacion",  icon:"🤝",label:"En negociación",                color:"#c47830",checks:[],special:"neg"},
                         {estado:"rechazada_cliente",icon:"❌",label:"Rechazada por el cliente",     color:"#c0392b",checks:[],special:"rechazada"},
