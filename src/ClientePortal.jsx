@@ -503,6 +503,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                             {c.transporte&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>{c.transporte==='aereo'?'✈️ Aereo':c.transporte==='ambos'?'🚢✈️ Ambos':'🚢 Maritimo'}</span>}
                             {c.fecha_solicitud&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>📅 {fmtDate(c.fecha_solicitud)}</span>}
                             {isRech&&c.motivo_no_procesada&&<span style={{fontSize:11,color:"#94a3b8",background:"#fef2f2",borderRadius:6,padding:"2px 8px",border:"1px solid #fecaca"}}>Motivo: {c.motivo_no_procesada}</span>}
+                            {c.link_alibaba&&<a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:"#2d78c8",background:"#eff6ff",borderRadius:6,padding:"2px 8px",border:"1px solid #bfdbfe",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:4}}>🔗 Ver referencia</a>}
                           </div>
                         </div>
 
@@ -659,7 +660,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                   </div>
                                 )}
                                 {(()=>{
-                                  var hist = c.notas_historial?(Array.isArray(c.notas_historial)?c.notas_historial:(typeof c.notas_historial==="string"?JSON.parse(c.notas_historial):[])):[]
+                                  var hist = []; try{ if(Array.isArray(c.notas_historial)) hist=c.notas_historial; else if(typeof c.notas_historial==="string"&&c.notas_historial) hist=JSON.parse(c.notas_historial); }catch(e){ hist=[]; }
                                   if(hist.length===0&&c.notas_internas) hist=[{texto:c.notas_internas,fecha:"Anterior",autor:"Gestor"}]
                                   return hist.length>0&&(
                                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
