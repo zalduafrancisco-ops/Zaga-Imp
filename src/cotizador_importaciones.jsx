@@ -247,6 +247,7 @@ export default function App({ supabase, usuario, onLogout }){
   const [vistaClienteId,setVistaClienteId] = useState(null);
   const [negForm,setNegForm] = useState({});
   const [notaInput,setNotaInput] = useState({});
+  const [notaOculta,setNotaOculta] = useState({});
   const [resumenChina,setResumenChina] = useState(null);
   const [backupModal,setBackupModal] = useState(null); // null | "export" | "import"
   const [simModal,setSimModal]       = useState(false);
@@ -2185,13 +2186,17 @@ Número de seguimiento: ${c.nro}`;
                               return hist.length>0&&(
                                 <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
                                   {hist.map(function(n,i){
+                                    var esOculta = n.oculta===true;
                                     return (
-                                      <div key={i} style={{background:"#f0f9ff",border:"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
+                                      <div key={i} style={{background:esOculta?"#1e0a2e":"#f0f9ff",border:esOculta?"1px solid #7c3aed55":"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
                                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-                                          <span style={{fontSize:10,fontWeight:700,color:"#2a8aaa",textTransform:"uppercase",letterSpacing:0.5}}>📌 {n.autor||"Gestor"}</span>
-                                          <span style={{fontSize:10,color:"#94a3b8"}}>{n.fecha}</span>
+                                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                            <span style={{fontSize:10,fontWeight:700,color:esOculta?"#a78bfa":"#2a8aaa",textTransform:"uppercase",letterSpacing:0.5}}>📌 {n.autor||"Gestor"}</span>
+                                            {esOculta&&<span style={{fontSize:9,fontWeight:700,color:"#c9a055",background:"#3b0764",border:"1px solid #7c3aed55",borderRadius:4,padding:"1px 6px",letterSpacing:0.5,textTransform:"uppercase"}}>🔒 Solo admins</span>}
+                                          </div>
+                                          <span style={{fontSize:10,color:esOculta?"#7c3aed99":"#94a3b8"}}>{n.fecha}</span>
                                         </div>
-                                        <div style={{fontSize:12,color:"#0f172a",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.texto}</div>
+                                        <div style={{fontSize:12,color:esOculta?"#e2d9f3":"#0f172a",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.texto}</div>
                                       </div>
                                     )
                                   })}
@@ -2202,16 +2207,22 @@ Número de seguimiento: ${c.nro}`;
                             <div style={{background:"#f8fafc",border:"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
                               <div style={{fontSize:10,color:"#2a8aaa",marginBottom:6,fontWeight:700,textTransform:"uppercase",letterSpacing:0.5}}>+ Nueva nota</div>
                               <textarea value={notaInput[c.id]||""} rows={2} onChange={e=>setNotaInput(p=>({...p,[c.id]:e.target.value}))} placeholder="Escribe una nota..." style={{width:"100%",background:"#fff",border:"1px solid #e2e8f0",borderRadius:6,color:"#0f172a",padding:"8px 10px",fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.5}}/>
+                              {/* Checkbox nota oculta */}
+                              <div onClick={()=>setNotaOculta(p=>({...p,[c.id]:!p[c.id]}))} style={{display:"flex",alignItems:"center",gap:7,marginTop:8,cursor:"pointer",userSelect:"none",width:"fit-content"}}>
+                                <div style={{width:16,height:16,borderRadius:4,flexShrink:0,background:notaOculta[c.id]?"#7c3aed":"#fff",border:`2px solid ${notaOculta[c.id]?"#7c3aed":"#cbd5e1"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:900,transition:"all .15s"}}>{notaOculta[c.id]?"✓":""}</div>
+                                <span style={{fontSize:11,color:notaOculta[c.id]?"#7c3aed":"#64748b",fontWeight:notaOculta[c.id]?700:400,transition:"all .15s"}}>🔒 Nota oculta — solo administradores</span>
+                              </div>
                               <button disabled={!(notaInput[c.id]||"").trim()} onClick={async()=>{
                                 var texto = (notaInput[c.id]||"").trim()
                                 if(!texto) return
                                 var histPrev = c.notas_historial||[]
                                 if(histPrev.length===0&&c.notas_internas) histPrev=[{texto:c.notas_internas,fecha:c.fecha_solicitud||"Anterior",autor:"Sistema"}]
-                                var nuevaNota = {texto, fecha:new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"}), autor: usuario?.nombre||"Gestor"}
+                                var nuevaNota = {texto, fecha:new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"}), autor: usuario?.nombre||"Gestor", oculta: notaOculta[c.id]||false}
                                 var updated = [...histPrev, nuevaNota]
                                 await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_historial:updated,notas_internas:""}:x))
                                 setNotaInput(p=>({...p,[c.id]:""}))
-                              }} style={{marginTop:7,background:(notaInput[c.id]||"").trim()?"#040c18":"#e2e8f0",color:(notaInput[c.id]||"").trim()?"#c9a055":"#94a3b8",border:"none",borderRadius:6,padding:"7px 16px",fontSize:11,cursor:(notaInput[c.id]||"").trim()?"pointer":"default",fontWeight:700,transition:"all .2s"}}>
+                                setNotaOculta(p=>({...p,[c.id]:false}))
+                              }} style={{marginTop:8,background:(notaInput[c.id]||"").trim()?"#040c18":"#e2e8f0",color:(notaInput[c.id]||"").trim()?"#c9a055":"#94a3b8",border:"none",borderRadius:6,padding:"7px 16px",fontSize:11,cursor:(notaInput[c.id]||"").trim()?"pointer":"default",fontWeight:700,transition:"all .2s"}}>
                                 💾 Guardar nota
                               </button>
                             </div>
@@ -2817,7 +2828,6 @@ Número de seguimiento: ${c.nro}`;
                       <div key={cl} onClick={()=>{setClienteSeleccionado(sel?null:cl);setFiltroCliente("todas");}} style={{background:sel?"#f0fdf4":"#f8fafc",border:`1px solid ${sel?"#22c55e55":"#e2e8f0"}`,borderRadius:10,padding:"12px 14px",cursor:"pointer",transition:"all .15s"}}>
                         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
                           <span style={{fontWeight:700,fontSize:13,color:sel?"#1aa358":"#0f172a",flex:1}}>👤 {cl}</span>
-                          {CLIENTE_IDS[cl]&&<span style={{fontSize:10,fontWeight:700,color:"#c9a055",background:"#c9a05518",border:"1px solid #c9a05533",borderRadius:20,padding:"1px 8px",marginLeft:4}}>{CLIENTE_IDS[cl]}</span>}
                           {tieneAcceso
                             ? <span style={{fontSize:9,fontWeight:700,color:"#16a34a",background:"#f0fdf4",border:"1px solid #22c55e44",borderRadius:20,padding:"2px 8px",whiteSpace:"nowrap"}}>🔐 App activa</span>
                             : tienePrimerPago
@@ -2850,7 +2860,7 @@ Número de seguimiento: ${c.nro}`;
                     ← Volver a clientes
                   </button>
                   <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
-                    <div style={{fontWeight:800,fontSize:18,color:"#0f172a",flex:1,display:"flex",alignItems:"center",gap:10}}>👤 {clienteSeleccionado}{CLIENTE_IDS[clienteSeleccionado]&&<span style={{fontSize:12,fontWeight:700,color:"#c9a055",background:"#c9a05518",border:"1px solid #c9a05533",borderRadius:20,padding:"2px 10px"}}>{CLIENTE_IDS[clienteSeleccionado]}</span>}</div>
+                    <div style={{fontWeight:800,fontSize:18,color:"#0f172a",flex:1}}>👤 {clienteSeleccionado}</div>
                     <button onClick={copyVistaCliente} style={{background:"#040c18",color:"#fff",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>
                     <button onClick={()=>setClienteSeleccionado(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:9,padding:"9px 14px",fontSize:13,cursor:"pointer"}}>✕</button>
                   </div>
