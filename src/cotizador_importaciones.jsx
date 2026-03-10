@@ -1354,11 +1354,11 @@ Número de seguimiento: ${c.nro}`;
                     </div>
                     <div style={{borderTop:"1px solid #e2e8f0",paddingTop:12}}>
                       <div style={{fontSize:11,color:"#c47830",marginBottom:8,fontWeight:600}}>📋 Certificado especial (CDA u otro)</div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:8}}>
                         <NInput label="Costo China $" field="cda" form={form} setForm={setForm} color="#c47830" placeholder="0"/>
                         <NInput label="Cobrado cliente $" field="cda_cl" form={form} setForm={setForm} color="#1aa358" placeholder="0"/>
-                        <div><label style={{display:"block",fontSize:10,color:"#777",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Descripción</label><input value={form.cda_descripcion||""} placeholder="Ej: CDA, SAG..." onChange={e=>setForm(p=>({...p,cda_descripcion:e.target.value}))} style={{width:"100%",background:"#f8fafc",border:"1px solid #f9741633",borderRadius:8,color:"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
                       </div>
+                      <div><label style={{display:"block",fontSize:10,color:"#777",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Descripción</label><input value={form.cda_descripcion||""} placeholder="Ej: CDA, SAG..." onChange={e=>setForm(p=>({...p,cda_descripcion:e.target.value}))} style={{width:"100%",background:"#f8fafc",border:"1px solid #f9741633",borderRadius:8,color:"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
                     </div>
                   </BLOCK>
                 )}
@@ -1404,6 +1404,7 @@ Número de seguimiento: ${c.nro}`;
                   <ROW label={`Depósito ${form.pct_deposito}%`} value={fmt(calcActual.dCh)} sub/>
                   <ROW label={`Préstamo ${100-Number(form.pct_deposito)}%`} value={fmt(calcActual.prCh)} sub/>
                   <ROW label="Comisión real según APP" value={fmt(calcActual.comR)} accent="#b8922e"/>
+                  {Number(form.cda)>0&&<ROW label={`${form.cda_descripcion||"Certificado especial"}`} value={fmt(calcActual.cda)} accent="#c47830"/>}
                   <div style={{height:6}}/>
                   <PAYBOX label="1er PAGO a China" amount={fmt(calcActual.p1Ch)} color="#2d78c8" detail={`Depósito ${fmt(calcActual.dCh)} + Comisión ${fmt(calcActual.comR)}${Number(form.cda)>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cda)}`:""} (sin IVA)`}/>
                   <PAYBOX label="2do PAGO a China" amount={fmt(calcActual.p2Ch)} color="#2d78c8" detail={form.requiere_factura?`Saldo ${fmt(calcActual.prCh)} + IVA 19% ${fmt(calcActual.ivaChina)}`:"Saldo al recibir la mercancía"}/>
@@ -1420,11 +1421,7 @@ Número de seguimiento: ${c.nro}`;
                     <ROW label="Total importación" value={fmt(calcActual.tCl)}/>
                     <ROW label={`Depósito ${form.pct_deposito}%`} value={fmt(calcActual.dCl)} sub/>
                     <ROW label={`Comisión préstamo ${form.pct_com_prestamo||6.5}%`} value={fmt(calcActual.comCl)} accent="#b8922e"/>
-                    {(Number(form.cda)>0||Number(form.cda_cl)>0)&&<>
-                      <ROW label={`${form.cda_descripcion||"Certificado"} — costo China`} value={fmt(calcActual.cda)} accent="#c47830"/>
-                      {Number(form.cda_cl)>0&&Number(form.cda_cl)!==Number(form.cda)&&<ROW label={`${form.cda_descripcion||"Certificado"} — cobrado cliente`} value={fmt(calcActual.cdaCl)} accent="#1aa358"/>}
-                      {Number(form.cda_cl)>0&&Number(form.cda_cl)!==Number(form.cda)&&<ROW label={`Ganancia ${form.cda_descripcion||"Certificado"}`} value={fmt(calcActual.ganCda)} accent={calcActual.ganCda>=0?"#1aa358":"#c0392b"}/>}
-                    </>}
+                    {(Number(form.cda_cl)||Number(form.cda))>0&&<ROW label={form.cda_descripcion||"Certificado especial"} value={fmt(calcActual.cdaCl)} accent="#c47830"/>}
                     <ROW label={`Servicio ZAGA ${form.pct_servicio}%`} value={fmt(calcActual.serv)} accent="#1aa358" sub/>
                     {form.con_iva&&<ROW label="IVA 19% (cobrado al cliente)" value={fmt(calcActual.ivaCliente)} accent="#1aa358" sub/>}
                     <div style={{height:6}}/>
