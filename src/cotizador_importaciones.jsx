@@ -3,14 +3,7 @@ import LOGO_WHITE from "./logo-white.png";
 import LOGO_DARK  from "./logo-dark.png";
 
 const PCT_COM_CLIENTE = 0.065;
-const CLIENTE_IDS = {
-  "Brian":             "CLI-001",
-  "Benjamin Rojas":    "CLI-002",
-  "Benjamin Soto":     "CLI-003",
-  "Ignacio Fierro":    "CLI-004",
-  "Leonardo Carrasco": "CLI-005",
-  "Robinson":          "CLI-006",
-};
+// Los clientes se obtienen dinámicamente desde las cotizaciones guardadas (clientesUnicos)
 const CHECKLIST_CLIENTE = [
   { key:"enviado_china",     label:"Enviado a China",                group:"cotizacion" },
   { key:"respuesta_china",   label:"Respuesta de China recibida",    group:"cotizacion" },
