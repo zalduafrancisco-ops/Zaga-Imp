@@ -1297,10 +1297,6 @@ Número de seguimiento: ${c.nro}`;
                     <label style={{display:"block",fontSize:10,color:"#777",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Link referencia</label>
                     <input value={form.link_alibaba||""} onChange={e=>setForm(p=>({...p,link_alibaba:e.target.value}))} placeholder="https://..." style={{width:"100%",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:8,color:"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
                   </div>
-                  <div style={{marginBottom:12}}>
-                    <label style={{display:"block",fontSize:10,color:"#b8922e",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>🏷 SKU China</label>
-                    <input value={form.sku_china||""} onChange={e=>setForm(p=>({...p,sku_china:e.target.value}))} placeholder="Ej: CN-20394-A" style={{width:"100%",background:"#f8fafc",border:"1px solid #f59e0b44",borderRadius:8,color:"#b8922e",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
-                  </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
                     <div>
                       <label style={{display:"block",fontSize:10,color:"#777",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Fecha</label>
