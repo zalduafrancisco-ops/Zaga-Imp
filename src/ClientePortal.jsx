@@ -7,7 +7,7 @@ const EST_LABEL = {
   solicitud:"📥 Solicitud recibida", enviado_china:"📨 Enviado a China",
   respuesta_china:"🇨🇳 Respuesta de China recibida",
   enviada_cliente:"Enviada al cliente", re_testeando:"🔄 Re-testeando",
-  en_negociacion:"En negociacion", aceptada:"Aceptada",
+  en_negociacion:"En negociación", aceptada:"Aceptada",
   pagada_china:"Pagada / Importando", en_camino:"En camino",
   en_bodega:"Disponible para retirar", completada:"Completada",
   rechazada_cliente:"❌ Rechazada", no_procesada:"No procesada", anulada:"🚫 Anulada",
@@ -71,6 +71,15 @@ const TIMELINE_MAX_POR_ESTADO = {
   en_camino:7,  // paso 7 = En camino 🚢 — tope correcto para este estado
   en_bodega:9,
   completada:10,
+}
+
+// Mapeo directo estado → índice en TIMELINE (para resaltar el paso activo correctamente)
+// No depende del checklist — siempre refleja el estado real del admin
+const ESTADO_A_TIMELINE = {
+  solicitud:-1, enviado_china:0, respuesta_china:1,
+  enviada_cliente:1, re_testeando:1, en_negociacion:1,
+  aceptada:2, pagada_china:4, en_camino:7,
+  en_bodega:9, completada:-1,  // en_bodega = ya llegó → paso activo es 2do pago (9)
 }
 
 const fmt = function(n){ return (!n&&n!==0)?"-":Number(n).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}) }
@@ -500,12 +509,30 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                   var tab = getTab(c.id)
                   var pctPago = pagado1&&pagado2?100:pagado1?30:0
 
-                  // ── FIX ESTADOS: cap del timeline según c.estado real ──────────────
-                  // Evita que un checklist "sucio" adelante el paso visible al cliente
+                  // ── PASO ACTIVO: desde estado + checklist para estados con sub-pasos ─
                   var _maxPaso = (TIMELINE_MAX_POR_ESTADO[c.estado]!==undefined) ? TIMELINE_MAX_POR_ESTADO[c.estado] : 10
-                  var pasoActual = c.estado==="completada" ? -1 : TIMELINE.findIndex(function(t,_i){
-                    return _i > _maxPaso || !(c.checklist&&c.checklist[t.key])
-                  })
+                  var pasoActual = (function(){
+                    // pagada_china: si 1er pago aún no recibido → mostrar step 3 (1er pago)
+                    //               si 1er pago recibido → mostrar step 4 en adelante según checklist
+                    if(c.estado==="pagada_china"){
+                      if(!c.checklist||!c.checklist.pago1_cliente) return 3  // 1er pago pendiente
+                      // avanzar hasta el primer sub-check no marcado (tope: step 6 ctrl_calidad)
+                      var subKeys = ["pago_china","en_produccion","ctrl_calidad"]
+                      var subIdxs = [4, 5, 6]
+                      for(var _i=0;_i<subKeys.length;_i++){
+                        if(!c.checklist[subKeys[_i]]) return subIdxs[_i]
+                      }
+                      return 6  // todos marcados, tope en ctrl_calidad
+                    }
+                    // en_bodega: ya llegó a Chile → paso activo es 2do pago (9)
+                    // si el 2do pago ya está cobrado, mostrar "Completado" (10)
+                    if(c.estado==="en_bodega"){
+                      if(c.checklist&&c.checklist.pago2_cliente) return 10
+                      return 9
+                    }
+                    // Todos los demás estados: mapeo directo
+                    return (ESTADO_A_TIMELINE[c.estado]!==undefined) ? ESTADO_A_TIMELINE[c.estado] : -1
+                  })()
                   // ─────────────────────────────────────────────────────────────────
 
                   return (
