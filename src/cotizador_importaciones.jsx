@@ -406,7 +406,7 @@ export default function App({ supabase, usuario, onLogout }){
     }));
   };
 
-  const handleMotivo=async(id,motivo)=>{ await persist(cotizaciones.map(c=>c.id===id?{...c,motivo_no_procesada:motivo,estado:"no_procesada"}:c)); };
+  const handleMotivo=async(id,motivo)=>{ await persist(cotizaciones.map(c=>c.id===id?{...c,motivo_no_procesada:motivo}:c)); };
   const handleEdit=(c)=>{ setForm({...defaultForm,...c}); setEditId(c.id); setTab("calc"); };
   const handleDelete=async id=>{ await persist(cotizaciones.filter(c=>c.id!==id)); showToast("Eliminada"); };
 
