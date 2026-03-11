@@ -2193,13 +2193,13 @@ Número de seguimiento: ${c.nro}`;
                                     if(editando){
                                       // ── MODO EDICIÓN ──
                                       return (
-                                        <div key={i} style={{background:editando.oculta?"#1e0a2e":"#fffbeb",border:editando.oculta?"1px solid #7c3aed":"1px solid #f59e0b55",borderRadius:8,padding:"10px 12px"}}>
-                                          <div style={{fontSize:10,color:editando.oculta?"#a78bfa":"#b8922e",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>✏️ Editando nota — {n.autor||"Gestor"}</div>
-                                          <textarea value={editando.texto} rows={3} onChange={e=>setNotaEditando(p=>({...p,[editKey]:{...p[editKey],texto:e.target.value}}))} style={{width:"100%",background:editando.oculta?"#2d1047":"#fff",border:`1px solid ${editando.oculta?"#7c3aed55":"#e2e8f0"}`,borderRadius:6,color:editando.oculta?"#e2d9f3":"#0f172a",padding:"8px 10px",fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.5}}/>
+                                        <div key={i} style={{background:editando.oculta?"#080f1e":"#fffbeb",border:editando.oculta?"1px solid rgba(201,160,85,0.3)":"1px solid #f59e0b55",borderRadius:8,padding:"10px 12px"}}>
+                                          <div style={{fontSize:10,color:editando.oculta?"#c9a055":"#b8922e",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>✏️ Editando nota — {n.autor||"Gestor"}</div>
+                                          <textarea value={editando.texto} rows={3} onChange={e=>setNotaEditando(p=>({...p,[editKey]:{...p[editKey],texto:e.target.value}}))} style={{width:"100%",background:editando.oculta?"#0c1629":"#fff",border:`1px solid ${editando.oculta?"rgba(201,160,85,0.2)":"#e2e8f0"}`,borderRadius:6,color:editando.oculta?"#cbd5e1":"#0f172a",padding:"8px 10px",fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.5}}/>
                                           {/* Checkbox oculta en edición */}
                                           <div onClick={()=>setNotaEditando(p=>({...p,[editKey]:{...p[editKey],oculta:!p[editKey].oculta}}))} style={{display:"flex",alignItems:"center",gap:7,marginTop:8,cursor:"pointer",userSelect:"none",width:"fit-content"}}>
-                                            <div style={{width:16,height:16,borderRadius:4,flexShrink:0,background:editando.oculta?"#7c3aed":"#fff",border:`2px solid ${editando.oculta?"#7c3aed":"#cbd5e1"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:900,transition:"all .15s"}}>{editando.oculta?"✓":""}</div>
-                                            <span style={{fontSize:11,color:editando.oculta?"#7c3aed":"#64748b",fontWeight:editando.oculta?700:400,transition:"all .15s"}}>🔒 Nota oculta — solo administradores</span>
+                                            <div style={{width:16,height:16,borderRadius:4,flexShrink:0,background:editando.oculta?"#c9a055":"#fff",border:`2px solid ${editando.oculta?"#c9a055":"#cbd5e1"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:editando.oculta?"#040c18":"#fff",fontWeight:900,transition:"all .15s"}}>{editando.oculta?"✓":""}</div>
+                                            <span style={{fontSize:11,color:editando.oculta?"#c9a055":"#64748b",fontWeight:editando.oculta?700:400,transition:"all .15s"}}>🔒 Nota oculta — solo administradores</span>
                                           </div>
                                           <div style={{display:"flex",gap:6,marginTop:8}}>
                                             <button disabled={!editando.texto.trim()} onClick={async()=>{
@@ -2220,19 +2220,19 @@ Número de seguimiento: ${c.nro}`;
                                       )
                                     }
                                     return (
-                                      <div key={i} style={{background:esOculta?"#1e0a2e":"#f0f9ff",border:esOculta?"1px solid #7c3aed55":"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
+                                      <div key={i} style={{background:esOculta?"#080f1e":"#f0f9ff",border:esOculta?"1px solid rgba(201,160,85,0.25)":"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
                                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
                                           <div style={{display:"flex",alignItems:"center",gap:6}}>
-                                            <span style={{fontSize:10,fontWeight:700,color:esOculta?"#a78bfa":"#2a8aaa",textTransform:"uppercase",letterSpacing:0.5}}>📌 {n.autor||"Gestor"}</span>
-                                            {esOculta&&<span style={{fontSize:9,fontWeight:700,color:"#c9a055",background:"#3b0764",border:"1px solid #7c3aed55",borderRadius:4,padding:"1px 6px",letterSpacing:0.5,textTransform:"uppercase"}}>🔒 Solo admins</span>}
-                                            {n.editado&&<span style={{fontSize:9,color:esOculta?"#7c3aed99":"#94a3b8",fontStyle:"italic"}}>(editado {n.editado})</span>}
+                                            <span style={{fontSize:10,fontWeight:700,color:esOculta?"#94a3b8":"#2a8aaa",textTransform:"uppercase",letterSpacing:0.5}}>📌 {n.autor||"Gestor"}</span>
+                                            {esOculta&&<span style={{fontSize:9,fontWeight:700,color:"#c9a055",background:"rgba(201,160,85,0.12)",border:"1px solid rgba(201,160,85,0.3)",borderRadius:4,padding:"1px 6px",letterSpacing:0.5,textTransform:"uppercase"}}>🔒 Solo admins</span>}
+                                            {n.editado&&<span style={{fontSize:9,color:esOculta?"#475569":"#94a3b8",fontStyle:"italic"}}>(editado {n.editado})</span>}
                                           </div>
                                           <div style={{display:"flex",alignItems:"center",gap:6}}>
-                                            <span style={{fontSize:10,color:esOculta?"#7c3aed99":"#94a3b8"}}>{n.fecha}</span>
-                                            <button onClick={()=>setNotaEditando(p=>({...p,[editKey]:{texto:n.texto,oculta:n.oculta===true}}))} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:12,padding:"1px 4px",color:esOculta?"#a78bfa":"#64748b",opacity:0.7}} title="Editar nota">✏️</button>
+                                            <span style={{fontSize:10,color:esOculta?"#475569":"#94a3b8"}}>{n.fecha}</span>
+                                            <button onClick={()=>setNotaEditando(p=>({...p,[editKey]:{texto:n.texto,oculta:n.oculta===true}}))} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:12,padding:"1px 4px",color:esOculta?"#64748b":"#64748b",opacity:0.7}} title="Editar nota">✏️</button>
                                           </div>
                                         </div>
-                                        <div style={{fontSize:12,color:esOculta?"#e2d9f3":"#0f172a",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.texto}</div>
+                                        <div style={{fontSize:12,color:esOculta?"#94a3b8":"#0f172a",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.texto}</div>
                                       </div>
                                     )
                                   })}
@@ -2245,8 +2245,8 @@ Número de seguimiento: ${c.nro}`;
                               <textarea value={notaInput[c.id]||""} rows={2} onChange={e=>setNotaInput(p=>({...p,[c.id]:e.target.value}))} placeholder="Escribe una nota..." style={{width:"100%",background:"#fff",border:"1px solid #e2e8f0",borderRadius:6,color:"#0f172a",padding:"8px 10px",fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.5}}/>
                               {/* Checkbox nota oculta */}
                               <div onClick={()=>setNotaOculta(p=>({...p,[c.id]:!p[c.id]}))} style={{display:"flex",alignItems:"center",gap:7,marginTop:8,cursor:"pointer",userSelect:"none",width:"fit-content"}}>
-                                <div style={{width:16,height:16,borderRadius:4,flexShrink:0,background:notaOculta[c.id]?"#7c3aed":"#fff",border:`2px solid ${notaOculta[c.id]?"#7c3aed":"#cbd5e1"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:900,transition:"all .15s"}}>{notaOculta[c.id]?"✓":""}</div>
-                                <span style={{fontSize:11,color:notaOculta[c.id]?"#7c3aed":"#64748b",fontWeight:notaOculta[c.id]?700:400,transition:"all .15s"}}>🔒 Nota oculta — solo administradores</span>
+                                <div style={{width:16,height:16,borderRadius:4,flexShrink:0,background:notaOculta[c.id]?"#c9a055":"#fff",border:`2px solid ${notaOculta[c.id]?"#c9a055":"#cbd5e1"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:notaOculta[c.id]?"#040c18":"#fff",fontWeight:900,transition:"all .15s"}}>{notaOculta[c.id]?"✓":""}</div>
+                                <span style={{fontSize:11,color:notaOculta[c.id]?"#c9a055":"#64748b",fontWeight:notaOculta[c.id]?700:400,transition:"all .15s"}}>🔒 Nota oculta — solo administradores</span>
                               </div>
                               <button disabled={!(notaInput[c.id]||"").trim()} onClick={async()=>{
                                 var texto = (notaInput[c.id]||"").trim()
