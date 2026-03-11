@@ -1151,12 +1151,13 @@ Número de seguimiento: ${c.nro}`;
               <button onClick={()=>setVistaId(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:9,padding:"10px 20px",fontSize:14,cursor:"pointer"}}>✕ Cerrar</button>
             </div>
             <div ref={vistaRef} style={{background:"#fff",borderRadius:16,overflow:"hidden",color:"#222",fontFamily:"'Segoe UI',Arial,sans-serif"}}>
-              <div style={{background:"#f1f5f9",padding:"28px 36px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div style={{display:"flex",alignItems:"center",gap:12}}>
-                  <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:32,width:"auto",objectFit:"contain"}}/>
-                  <div style={{fontSize:11,color:"#94a3b8",letterSpacing:2,textTransform:"uppercase",fontWeight:500}}>Cotización de Importación</div>
+              <div style={{background:"#ffffff",padding:"20px 36px 14px 36px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"2px solid #f0f0f0"}}>
+                <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:48,width:"auto",objectFit:"contain"}}/>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{vistaData.nro}</div>
+                  <div style={{fontSize:11,color:"#94a3b8",letterSpacing:1,textTransform:"uppercase",marginTop:2}}>Cotización de Importación</div>
+                  <div style={{fontSize:12,color:"#64748b",marginTop:2}}>{todayStr()}</div>
                 </div>
-                <div style={{textAlign:"right"}}><div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{vistaData.nro}</div><div style={{fontSize:12,color:"#64748b"}}>{todayStr()}</div></div>
               </div>
               <div style={{padding:"28px 36px"}}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:24,paddingBottom:20,borderBottom:"2px solid #f0f0f0"}}>
@@ -1344,6 +1345,88 @@ Número de seguimiento: ${c.nro}`;
                     {Number(form.comision_real)>0&&Number(form.precio_china)>0&&Number(form.unidades)>0&&(
                       <div style={{fontSize:11,color:"#666",background:"#f8fafc",borderRadius:7,padding:"6px 10px"}}>Tasa implícita: <span style={{color:"#334155"}}>{(Number(form.comision_real)/(Number(form.precio_china)*Number(form.unidades)*(1-Number(form.pct_deposito)/100))*100).toFixed(2)}%</span></div>
                     )}
+
+                    {/* ── DIMENSIONES (solo al editar) ── */}
+                    {editId&&(()=>{
+                      const dimTipo=form.dim_tipo||"caja";
+                      const esCaja=dimTipo==="caja";
+                      const undCaja=Number(form.dim_und_caja)||0;
+                      const unidades=Number(form.unidades)||0;
+                      const nCajas=esCaja&&undCaja>0?Math.ceil(unidades/undCaja):0;
+                      const m3Val=Number(form.dim_m3)||0;
+                      const m3Total=esCaja?(m3Val*nCajas).toFixed(2):(m3Val*unidades).toFixed(2);
+                      return (
+                        <div style={{marginTop:14,borderTop:"1px dashed #2d78c833",paddingTop:14}}>
+                          <div style={{fontSize:10,color:"#2d78c8",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>📐 Dimensiones del producto</div>
+
+                          {/* SKU China */}
+                          <div style={{marginBottom:10}}>
+                            <label style={{display:"block",fontSize:10,color:"#b8922e",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>🏷 SKU China</label>
+                            <input value={form.sku_china||""} onChange={e=>setForm(p=>({...p,sku_china:e.target.value}))} placeholder="Ej: CN-20394-A" style={{width:"100%",background:"#f8fafc",border:"1px solid #f59e0b44",borderRadius:7,color:"#b8922e",padding:"7px 10px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                          </div>
+
+                          {/* Toggle caja/unidad */}
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                            <span style={{fontSize:10,color:"#64748b"}}>Medir por:</span>
+                            <div style={{display:"flex",background:"#f1f5f9",borderRadius:7,padding:2,gap:2}}>
+                              {[["caja","📦 Caja"],["unidad","🔹 Unidad"]].map(([val,lbl])=>(
+                                <button key={val} onClick={()=>setForm(p=>({...p,dim_tipo:val}))} style={{background:dimTipo===val?"#2d78c8":"transparent",color:dimTipo===val?"#fff":"#64748b",border:"none",borderRadius:5,padding:"4px 12px",fontSize:10,cursor:"pointer",fontWeight:dimTipo===val?700:400}}>{lbl}</button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Und por caja */}
+                          {esCaja&&(
+                            <div style={{background:"#fffbeb",borderRadius:7,padding:"8px 10px",marginBottom:10,border:"1px solid #fde68a"}}>
+                              <div style={{fontSize:9,color:"#b8922e",marginBottom:4,fontWeight:700}}>Unidades por caja cerrada</div>
+                              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                <input type="number" value={form.dim_und_caja||""} onChange={e=>setForm(p=>({...p,dim_und_caja:e.target.value}))} placeholder="Ej: 12" style={{width:80,background:"#f8fafc",border:"1px solid #f59e0b55",borderRadius:6,color:"#b8922e",padding:"6px 10px",fontSize:14,outline:"none",fontWeight:800}}/>
+                                <span style={{fontSize:11,color:"#64748b"}}>und/caja</span>
+                                {undCaja>0&&unidades>0&&<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,color:"#0d9870"}}>{nCajas} cajas necesarias</span>}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* L × A × H */}
+                          <div style={{fontSize:9,color:"#64748b",marginBottom:6}}>{esCaja?"Medidas de la caja cerrada (cm)":"Medidas por unidad de producto (cm)"}</div>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
+                            {[["dim_largo","Largo"],["dim_ancho","Ancho"],["dim_alto","Alto"]].map(([field,label])=>(
+                              <div key={field}>
+                                <div style={{fontSize:9,color:"#64748b",marginBottom:3}}>{label} (cm)</div>
+                                <input type="number" value={form[field]||""} onChange={e=>{
+                                  const v=e.target.value;
+                                  const l=field==="dim_largo"?v:form.dim_largo||0;
+                                  const an=field==="dim_ancho"?v:form.dim_ancho||0;
+                                  const al=field==="dim_alto"?v:form.dim_alto||0;
+                                  const m3=l&&an&&al?((Number(l)*Number(an)*Number(al))/1000000).toFixed(4):"";
+                                  setForm(p=>({...p,[field]:v,dim_m3:m3||p.dim_m3}));
+                                }} placeholder="0" style={{width:"100%",background:"#f1f5f9",border:"1px solid #2d78c833",borderRadius:6,color:"#2d78c8",padding:"6px 8px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Resultados m³ */}
+                          {m3Val>0&&(
+                            <div style={{display:"grid",gridTemplateColumns:esCaja?"1fr 1fr 1fr":"1fr 1fr",gap:6}}>
+                              <div>
+                                <div style={{fontSize:9,color:"#64748b",marginBottom:3}}>{esCaja?"M³ por caja":"M³ por unidad"}</div>
+                                <div style={{background:"#f8fafc",border:"1px solid #2d78c833",borderRadius:6,color:"#2d78c8",padding:"6px 8px",fontSize:12,fontWeight:700}}>{m3Val} m³</div>
+                              </div>
+                              {esCaja&&undCaja>0&&(
+                                <div>
+                                  <div style={{fontSize:9,color:"#64748b",marginBottom:3}}>M³ por unidad</div>
+                                  <div style={{background:"#f8fafc",border:"1px solid #2d78c833",borderRadius:6,color:"#334155",padding:"6px 8px",fontSize:12,fontWeight:700}}>{(m3Val/undCaja).toFixed(5)} m³</div>
+                                </div>
+                              )}
+                              <div>
+                                <div style={{fontSize:9,color:"#64748b",marginBottom:3}}>M³ total carga</div>
+                                <div style={{background:"#f0fdf4",border:"1px solid #1aa35844",borderRadius:6,color:"#1aa358",padding:"6px 8px",fontSize:14,fontWeight:800,textAlign:"center"}}>{m3Total} m³</div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </BLOCK>
                 )}
 
