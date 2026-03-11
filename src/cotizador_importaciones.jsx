@@ -236,6 +236,8 @@ export default function App({ supabase, usuario, onLogout }){
   const [dashTipo,setDashTipo]           = useState("clientes");
   const [dashClienteFiltro,setDashClienteFiltro] = useState("todos");
   const [clienteSeleccionado,setClienteSeleccionado] = useState(null);
+  const [renombrando,setRenombrando]             = useState(false);
+  const [nuevoNombreCliente,setNuevoNombreCliente] = useState("");
   const [filtroCliente,setFiltroCliente] = useState("todas");
   const [vistaClienteId,setVistaClienteId] = useState(null);
   const [negForm,setNegForm] = useState({});
@@ -349,6 +351,8 @@ export default function App({ supabase, usuario, onLogout }){
   const showToast=(msg,type="ok")=>{ setToast({msg,type}); setTimeout(()=>setToast(null),2800); };
 
   const calcActual = form.tipo==="propia" ? calcPropia(form) : calcCliente(form);
+  // Paso 1 = nueva solicitud sin precio China aún → ocultar bloques financieros
+  const esPaso1 = !editId && !Number(form.precio_china);
 
   const handleSave=async()=>{
     if(!form.producto){ showToast("Ingresa el producto","err"); return; }
@@ -406,6 +410,16 @@ export default function App({ supabase, usuario, onLogout }){
   const handleEdit=(c)=>{ setForm({...defaultForm,...c}); setEditId(c.id); setTab("calc"); };
   const handleDelete=async id=>{ await persist(cotizaciones.filter(c=>c.id!==id)); showToast("Eliminada"); };
 
+
+  const handleRenameCliente=async(nombreViejo,nombreNuevo)=>{
+    if(!nombreNuevo.trim()||nombreNuevo.trim()===nombreViejo) return;
+    const nuevo=nombreNuevo.trim();
+    await persist(cotizaciones.map(c=>c.cliente===nombreViejo?{...c,cliente:nuevo}:c));
+    setClienteSeleccionado(nuevo);
+    setRenombrando(false);
+    setNuevoNombreCliente("");
+    showToast(`Cliente renombrado a "${nuevo}" ✓`);
+  };
 
   const handleSaveSolicitud=async()=>{
     if(!form.producto){ showToast("Ingresa el nombre del producto","err"); return; }
@@ -778,7 +792,7 @@ Número de seguimiento: ${c.nro}`;
         <div style={{position:"fixed",inset:0,background:"#fff",zIndex:1100,overflowY:"auto",fontFamily:"'Segoe UI',Arial,sans-serif",color:"#222"}}>
           {/* Barra de acción — se oculta al imprimir */}
           <div className="no-print" style={{background:"#f1f5f9",padding:"12px 24px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:10}}>
-            <div style={{flex:1,color:"#0f172a",fontWeight:700,fontSize:14}}>ZAGA Import — Vista para imprimir</div>
+            <div style={{flex:1,color:"#0f172a",fontWeight:700,fontSize:14}}>ZAGA IMP — Vista para imprimir</div>
             <div style={{fontSize:12,color:"#64748b",background:"#f8fafc",borderRadius:8,padding:"6px 14px",border:"1px solid #e2e8f0"}}>
               💡 Presiona <b style={{color:"#0f172a"}}>Ctrl+P</b> (Windows) o <b style={{color:"#0f172a"}}>⌘+P</b> (Mac) para guardar como PDF
             </div>
@@ -790,7 +804,13 @@ Número de seguimiento: ${c.nro}`;
               <div>
                 {/* Header */}
                 <div style={{background:"#040c18",padding:"20px 32px",display:"flex",justifyContent:"space-between",alignItems:"center",borderRadius:"12px 12px 0 0"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:12}}><img src={LOGO_WHITE} alt="ZAGA" style={{height:26}}/><div style={{fontSize:10,color:"#c9a05570",letterSpacing:2,textTransform:"uppercase"}}>Cotización de Importación</div></div>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <img src={LOGO_WHITE} alt="ZAGA IMP" style={{height:28,width:"auto",objectFit:"contain"}}/>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:700,color:"#c9a055"}}>ZAGA IMP</div>
+                      <div style={{fontSize:9,color:"#c9a05570",letterSpacing:2,textTransform:"uppercase"}}>Cotización de Importación</div>
+                    </div>
+                  </div>
                   <div style={{textAlign:"right"}}><div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{vistaData.nro}</div><div style={{fontSize:12,color:"#64748b"}}>{todayStr()}</div></div>
                 </div>
                 <div style={{border:"2px solid #1a1a2e22",borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden",background:"#fff"}}>
@@ -836,7 +856,7 @@ Número de seguimiento: ${c.nro}`;
                       </div>
                       <div style={{height:8,background:"#e5e7eb",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",background:"#1aa358",borderRadius:4,width:`${(prog.done/prog.total)*100}%`}}/></div>
                     </div>);})()}
-                    <div style={{marginTop:24,paddingTop:16,borderTop:"1px solid #f0f0f0",textAlign:"center",fontSize:11,color:"#64748b"}}>Generado por ZAGA Import · {todayStr()}</div>
+                    <div style={{marginTop:24,paddingTop:16,borderTop:"1px solid #f0f0f0",textAlign:"center",fontSize:11,color:"#64748b"}}>Generado por ZAGA IMP · {todayStr()}</div>
                   </div>
                 </div>
               </div>
@@ -844,7 +864,10 @@ Número de seguimiento: ${c.nro}`;
             {printModal==="cliente"&&clienteSeleccionado&&(
               <div ref={vistaClienteRef}>
                 <div style={{background:"#f1f5f9",padding:"24px 32px",display:"flex",justifyContent:"space-between",alignItems:"center",borderRadius:"12px 12px 0 0"}}>
-                  <div><div style={{fontSize:20,fontWeight:800,color:"#c9a055"}}>ZAGA Import</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>Estado de Importaciones</div></div>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:28,width:"auto",objectFit:"contain"}}/>
+                    <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Estado de Importaciones</div>
+                  </div>
                   <div style={{textAlign:"right"}}><div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{clienteSeleccionado}</div><div style={{fontSize:11,color:"#64748b"}}>{todayStr()}</div></div>
                 </div>
                 <div style={{border:"2px solid #1a1a2e22",borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden",background:"#fff"}}>
@@ -900,7 +923,7 @@ Número de seguimiento: ${c.nro}`;
                             <div style={{color:"#334155",fontSize:18,fontWeight:800,marginTop:2}}>Total: {fmt(totP)}</div>
                           </div>
                         </div>
-                        <div style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>Generado por ZAGA Import · {todayStr()}</div>
+                        <div style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>Generado por ZAGA IMP · {todayStr()}</div>
                       </div>
                     </>);
                   })()}
@@ -1129,7 +1152,10 @@ Número de seguimiento: ${c.nro}`;
             </div>
             <div ref={vistaRef} style={{background:"#fff",borderRadius:16,overflow:"hidden",color:"#222",fontFamily:"'Segoe UI',Arial,sans-serif"}}>
               <div style={{background:"#f1f5f9",padding:"28px 36px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div><div style={{fontSize:22,fontWeight:800,color:"#c9a055"}}>ZAGA Import</div><div style={{fontSize:12,color:"#64748b",marginTop:2}}>Cotización de Importación</div></div>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:32,width:"auto",objectFit:"contain"}}/>
+                  <div style={{fontSize:11,color:"#94a3b8",letterSpacing:2,textTransform:"uppercase",fontWeight:500}}>Cotización de Importación</div>
+                </div>
                 <div style={{textAlign:"right"}}><div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{vistaData.nro}</div><div style={{fontSize:12,color:"#64748b"}}>{todayStr()}</div></div>
               </div>
               <div style={{padding:"28px 36px"}}>
@@ -1190,10 +1216,6 @@ Número de seguimiento: ${c.nro}`;
         {tab2==="calc"&&(
           <div>
             {editId&&<div style={{background:"#f5c84218",border:"1px solid #f5c84244",borderRadius:10,padding:"10px 16px",marginBottom:20,fontSize:13,color:"#c9a055"}}>✏️ Editando · <button onClick={()=>{setEditId(null);setForm(defaultForm);}} style={{background:"none",border:"none",color:"#c9a055",cursor:"pointer",textDecoration:"underline"}}>Cancelar</button></div>}
-
-            {/* esPaso1: nueva solicitud sin precio China → colapsar bloques financieros */}
-            {(()=>{
-            const esPaso1 = !editId && !Number(form.precio_china);
 
             {/* TIPO TOGGLE */}
             <div style={{display:"flex",gap:8,marginBottom:16,background:"#f1f5f9",borderRadius:12,padding:6,border:"1px solid #e2e8f0",width:"fit-content"}}>
@@ -1576,7 +1598,7 @@ Número de seguimiento: ${c.nro}`;
               </div>
             </div>
           </div>
-          )})()}
+          </div>
         )}
 
         {/* ══ TRACKER ══ */}
@@ -2905,9 +2927,26 @@ Número de seguimiento: ${c.nro}`;
                     ← Volver a clientes
                   </button>
                   <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
-                    <div style={{fontWeight:800,fontSize:18,color:"#0f172a",flex:1}}>👤 {clienteSeleccionado}</div>
-                    <button onClick={copyVistaCliente} style={{background:"#040c18",color:"#fff",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>
-                    <button onClick={()=>setClienteSeleccionado(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:9,padding:"9px 14px",fontSize:13,cursor:"pointer"}}>✕</button>
+                    {renombrando ? (
+                      <div style={{display:"flex",gap:6,flex:1,alignItems:"center"}}>
+                        <input
+                          autoFocus
+                          value={nuevoNombreCliente}
+                          onChange={e=>setNuevoNombreCliente(e.target.value)}
+                          onKeyDown={e=>{if(e.key==="Enter") handleRenameCliente(clienteSeleccionado,nuevoNombreCliente); if(e.key==="Escape"){setRenombrando(false);setNuevoNombreCliente("");}}}
+                          style={{flex:1,background:"#fff",border:"2px solid #c9a055",borderRadius:8,padding:"7px 12px",fontSize:16,fontWeight:700,color:"#0f172a",outline:"none"}}
+                        />
+                        <button onClick={()=>handleRenameCliente(clienteSeleccionado,nuevoNombreCliente)} style={{background:"#1aa358",color:"#fff",border:"none",borderRadius:8,padding:"7px 16px",fontSize:13,fontWeight:700,cursor:"pointer"}}>✓ Guardar</button>
+                        <button onClick={()=>{setRenombrando(false);setNuevoNombreCliente("");}} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 12px",fontSize:13,cursor:"pointer"}}>Cancelar</button>
+                      </div>
+                    ) : (
+                      <div style={{display:"flex",alignItems:"center",gap:8,flex:1}}>
+                        <div style={{fontWeight:800,fontSize:18,color:"#0f172a"}}>👤 {clienteSeleccionado}</div>
+                        <button onClick={()=>{setRenombrando(true);setNuevoNombreCliente(clienteSeleccionado);}} title="Renombrar cliente" style={{background:"#f8fafc",color:"#94a3b8",border:"1px solid #e2e8f0",borderRadius:7,padding:"4px 9px",fontSize:12,cursor:"pointer"}}>✏️</button>
+                      </div>
+                    )}
+                    {!renombrando&&<button onClick={copyVistaCliente} style={{background:"#040c18",color:"#fff",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>}
+                    {!renombrando&&<button onClick={()=>setClienteSeleccionado(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:9,padding:"9px 14px",fontSize:13,cursor:"pointer"}}>✕</button>}
                   </div>
 
                   {/* KPIs */}
@@ -3103,7 +3142,10 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:10}}>📄 Vista para enviar al cliente</div>
                   <div ref={vistaClienteRef} style={{background:"#fff",borderRadius:16,overflow:"hidden",color:"#222",fontFamily:"'Segoe UI',Arial,sans-serif",border:"1px solid #e5e7eb"}}>
                     <div style={{background:"#f1f5f9",padding:"24px 32px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <div><div style={{fontSize:20,fontWeight:800,color:"#c9a055"}}>ZAGA Import</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>Estado de Importaciones</div></div>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:28,width:"auto",objectFit:"contain"}}/>
+                    <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Estado de Importaciones</div>
+                  </div>
                       <div style={{textAlign:"right"}}><div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{clienteSeleccionado}</div><div style={{fontSize:11,color:"#64748b"}}>{todayStr()}</div></div>
                     </div>
                     <div style={{padding:"20px 32px",borderBottom:"2px solid #f0f0f0",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
@@ -3151,7 +3193,7 @@ Número de seguimiento: ${c.nro}`;
                           <div style={{color:"#334155",fontSize:18,fontWeight:800,marginTop:2}}>Total: {fmt(totPagado)}</div>
                         </div>
                       </div>
-                      <div style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>Generado por ZAGA Import · {todayStr()}</div>
+                      <div style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>Generado por ZAGA IMP · {todayStr()}</div>
                     </div>
                   </div>
                 </div>
