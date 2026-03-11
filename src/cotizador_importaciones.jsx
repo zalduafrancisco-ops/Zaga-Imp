@@ -1587,7 +1587,7 @@ Número de seguimiento: ${c.nro}`;
                       <div style={{fontSize:11,color:"#64748b",lineHeight:1.5}}>¿China aún no te ha respondido el precio? Guarda la solicitud ahora con el link y las variantes. Cuando China responda, editas y agregas el precio para calcular todo.</div>
                     </div>
                     <button onClick={handleSaveSolicitud} style={{width:"100%",background:"#ffffff",border:"2px solid #040c18",borderRadius:10,padding:12,fontSize:13,fontWeight:700,color:"#040c18",cursor:"pointer"}}>
-                      📥 Guardar Solicitud (sin precio aún) → Generar resumen para China
+                      📥 Guardar Solicitud (sin precio) - Genera resumen para China
                     </button>
                   </div>
                 )}
@@ -1597,7 +1597,6 @@ Número de seguimiento: ${c.nro}`;
                 </button>
               </div>
             </div>
-          </div>
           </div>
         )}
 
