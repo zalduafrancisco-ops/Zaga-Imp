@@ -248,6 +248,7 @@ export default function App({ supabase, usuario, onLogout }){
   const [negForm,setNegForm] = useState({});
   const [notaInput,setNotaInput] = useState({});
   const [notaOculta,setNotaOculta] = useState({});
+  const [notaEditando,setNotaEditando] = useState({}); // key: "cotId_i" → {texto, oculta}
   const [resumenChina,setResumenChina] = useState(null);
   const [backupModal,setBackupModal] = useState(null); // null | "export" | "import"
   const [simModal,setSimModal]       = useState(false);
@@ -2187,14 +2188,49 @@ Número de seguimiento: ${c.nro}`;
                                 <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
                                   {hist.map(function(n,i){
                                     var esOculta = n.oculta===true;
+                                    var editKey = c.id+"_"+i;
+                                    var editando = notaEditando[editKey];
+                                    if(editando){
+                                      // ── MODO EDICIÓN ──
+                                      return (
+                                        <div key={i} style={{background:editando.oculta?"#1e0a2e":"#fffbeb",border:editando.oculta?"1px solid #7c3aed":"1px solid #f59e0b55",borderRadius:8,padding:"10px 12px"}}>
+                                          <div style={{fontSize:10,color:editando.oculta?"#a78bfa":"#b8922e",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>✏️ Editando nota — {n.autor||"Gestor"}</div>
+                                          <textarea value={editando.texto} rows={3} onChange={e=>setNotaEditando(p=>({...p,[editKey]:{...p[editKey],texto:e.target.value}}))} style={{width:"100%",background:editando.oculta?"#2d1047":"#fff",border:`1px solid ${editando.oculta?"#7c3aed55":"#e2e8f0"}`,borderRadius:6,color:editando.oculta?"#e2d9f3":"#0f172a",padding:"8px 10px",fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.5}}/>
+                                          {/* Checkbox oculta en edición */}
+                                          <div onClick={()=>setNotaEditando(p=>({...p,[editKey]:{...p[editKey],oculta:!p[editKey].oculta}}))} style={{display:"flex",alignItems:"center",gap:7,marginTop:8,cursor:"pointer",userSelect:"none",width:"fit-content"}}>
+                                            <div style={{width:16,height:16,borderRadius:4,flexShrink:0,background:editando.oculta?"#7c3aed":"#fff",border:`2px solid ${editando.oculta?"#7c3aed":"#cbd5e1"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:900,transition:"all .15s"}}>{editando.oculta?"✓":""}</div>
+                                            <span style={{fontSize:11,color:editando.oculta?"#7c3aed":"#64748b",fontWeight:editando.oculta?700:400,transition:"all .15s"}}>🔒 Nota oculta — solo administradores</span>
+                                          </div>
+                                          <div style={{display:"flex",gap:6,marginTop:8}}>
+                                            <button disabled={!editando.texto.trim()} onClick={async()=>{
+                                              if(!editando.texto.trim()) return;
+                                              var hist2=[]; try{ if(Array.isArray(c.notas_historial)) hist2=[...c.notas_historial]; else if(typeof c.notas_historial==="string"&&c.notas_historial) hist2=JSON.parse(c.notas_historial); }catch(e){ hist2=[]; }
+                                              if(hist2.length===0&&c.notas_internas) hist2=[{texto:c.notas_internas,fecha:c.fecha_solicitud||"Anterior",autor:"Sistema"}];
+                                              hist2[i]={...hist2[i],texto:editando.texto.trim(),oculta:editando.oculta,editado:new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"})};
+                                              await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_historial:hist2,notas_internas:""}:x));
+                                              setNotaEditando(p=>{var np={...p};delete np[editKey];return np;});
+                                            }} style={{background:editando.texto.trim()?"#040c18":"#e2e8f0",color:editando.texto.trim()?"#c9a055":"#94a3b8",border:"none",borderRadius:6,padding:"6px 14px",fontSize:11,cursor:editando.texto.trim()?"pointer":"default",fontWeight:700}}>
+                                              💾 Guardar cambios
+                                            </button>
+                                            <button onClick={()=>setNotaEditando(p=>{var np={...p};delete np[editKey];return np;})} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:6,padding:"6px 14px",fontSize:11,cursor:"pointer",fontWeight:600}}>
+                                              Cancelar
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )
+                                    }
                                     return (
                                       <div key={i} style={{background:esOculta?"#1e0a2e":"#f0f9ff",border:esOculta?"1px solid #7c3aed55":"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
                                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
                                           <div style={{display:"flex",alignItems:"center",gap:6}}>
                                             <span style={{fontSize:10,fontWeight:700,color:esOculta?"#a78bfa":"#2a8aaa",textTransform:"uppercase",letterSpacing:0.5}}>📌 {n.autor||"Gestor"}</span>
                                             {esOculta&&<span style={{fontSize:9,fontWeight:700,color:"#c9a055",background:"#3b0764",border:"1px solid #7c3aed55",borderRadius:4,padding:"1px 6px",letterSpacing:0.5,textTransform:"uppercase"}}>🔒 Solo admins</span>}
+                                            {n.editado&&<span style={{fontSize:9,color:esOculta?"#7c3aed99":"#94a3b8",fontStyle:"italic"}}>(editado {n.editado})</span>}
                                           </div>
-                                          <span style={{fontSize:10,color:esOculta?"#7c3aed99":"#94a3b8"}}>{n.fecha}</span>
+                                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                            <span style={{fontSize:10,color:esOculta?"#7c3aed99":"#94a3b8"}}>{n.fecha}</span>
+                                            <button onClick={()=>setNotaEditando(p=>({...p,[editKey]:{texto:n.texto,oculta:n.oculta===true}}))} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:12,padding:"1px 4px",color:esOculta?"#a78bfa":"#64748b",opacity:0.7}} title="Editar nota">✏️</button>
+                                          </div>
                                         </div>
                                         <div style={{fontSize:12,color:esOculta?"#e2d9f3":"#0f172a",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.texto}</div>
                                       </div>
