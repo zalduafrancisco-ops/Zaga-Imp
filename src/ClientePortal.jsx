@@ -58,6 +58,21 @@ const RECHAZADAS_EST = ["rechazada_cliente","no_procesada","anulada"]
 const PROCESADAS_EST = ["aceptada","pagada_china","en_camino","en_bodega","completada"]
 const ESTADOS_ORDEN = ["solicitud","enviado_china","respuesta_china","enviada_cliente","re_testeando","en_negociacion","aceptada","pagada_china","en_camino","en_bodega","completada","rechazada_cliente","no_procesada","anulada"]
 
+// ── Mapa: estado → índice máximo visible en el TIMELINE (red de seguridad) ──
+const TIMELINE_MAX_POR_ESTADO = {
+  solicitud:-1,
+  enviado_china:0,
+  respuesta_china:1,
+  enviada_cliente:1,
+  re_testeando:1,
+  en_negociacion:1,
+  aceptada:2,
+  pagada_china:6,
+  en_camino:8,
+  en_bodega:9,
+  completada:10,
+}
+
 const fmt = function(n){ return (!n&&n!==0)?"-":Number(n).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}) }
 const fmtN = function(n){ return Number(n).toLocaleString("es-CL",{maximumFractionDigits:0}) }
 const fmtDate = function(d){ try{ return new Date(d+'T12:00:00').toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}) }catch(e){ return d } }
@@ -422,7 +437,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
               </div>
             )}
 
-            {/* FILTROS + BUSQUEDA — idéntico al Tracker */}
+            {/* FILTROS + BUSQUEDA */}
             <div style={{marginBottom:12}}>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
                 <button className={"zfbtn"+(filtro==="todas"?" on":"")} onClick={function(){ setFiltro("todas") }}>
@@ -477,9 +492,16 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                   var done = CHECKLIST_FULL.filter(function(d){ return c.checklist&&c.checklist[d.key] }).length
                   var pct = Math.round((done/CHECKLIST_FULL.length)*100)
                   var dias = (c.fecha_llegada_est&&!isRech&&!['completada','en_bodega'].includes(c.estado))?getDias(c.fecha_llegada_est):null
-                  var pasoActual = TIMELINE.findIndex(function(t){ return !(c.checklist&&c.checklist[t.key]) })
                   var tab = getTab(c.id)
                   var pctPago = pagado1&&pagado2?100:pagado1?30:0
+
+                  // ── FIX ESTADOS: cap del timeline según c.estado real ──────────────
+                  // Evita que un checklist "sucio" adelante el paso visible al cliente
+                  var _maxPaso = (TIMELINE_MAX_POR_ESTADO[c.estado]!==undefined) ? TIMELINE_MAX_POR_ESTADO[c.estado] : 10
+                  var pasoActual = c.estado==="completada" ? -1 : TIMELINE.findIndex(function(t,_i){
+                    return _i > _maxPaso || !(c.checklist&&c.checklist[t.key])
+                  })
+                  // ─────────────────────────────────────────────────────────────────
 
                   return (
                     <div key={c.id} id={"cot-"+c.id} className="zcard" style={{opacity:isRech?0.72:1}}>
@@ -541,7 +563,8 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                 <div style={{overflowX:"auto",paddingBottom:8}}>
                                   <div style={{display:"flex",alignItems:"flex-start",minWidth:"max-content",padding:"4px 2px"}}>
                                     {TIMELINE.map(function(step,i){
-                                      var checked = c.checklist&&c.checklist[step.key]
+                                      // FIX: checked solo si el checklist está marcado Y el índice no supera el máximo del estado
+                                      var checked = (c.checklist&&c.checklist[step.key]) && (i<=_maxPaso)
                                       var isCurrent = i===pasoActual&&pasoActual>=0
                                       var circBorder = checked?"#16a34a":isCurrent?color:"#e2e8f0"
                                       var circBg = checked?"#f0fdf4":isCurrent?bg:"#f8fafc"
@@ -628,12 +651,10 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                                 {isRech&&(
                                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                                    {/* Estado */}
                                     <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"12px 14px",display:"flex",gap:10,alignItems:"center"}}>
                                       <span style={{fontSize:18}}>❌</span>
                                       <div style={{fontSize:13,fontWeight:700,color:"#dc2626"}}>{label}</div>
                                     </div>
-                                    {/* Notas internas — motivo */}
                                     <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0"}}>
                                       <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>📝 Notas internas</div>
                                       <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{c.motivo_no_procesada||"Sin notas registradas."}</div>
@@ -662,7 +683,6 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                 {(()=>{
                                   var hist = []; try{ if(Array.isArray(c.notas_historial)) hist=c.notas_historial; else if(typeof c.notas_historial==="string"&&c.notas_historial) hist=JSON.parse(c.notas_historial); }catch(e){ hist=[]; }
                                   if(hist.length===0&&c.notas_internas) hist=[{texto:c.notas_internas,fecha:"Anterior",autor:"Gestor"}]
-                                  // Filtrar notas ocultas — solo visibles para administradores
                                   hist = hist.filter(function(n){ return n.oculta!==true })
                                   return hist.length>0&&(
                                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
