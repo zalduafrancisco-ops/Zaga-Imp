@@ -662,6 +662,8 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                 {(()=>{
                                   var hist = []; try{ if(Array.isArray(c.notas_historial)) hist=c.notas_historial; else if(typeof c.notas_historial==="string"&&c.notas_historial) hist=JSON.parse(c.notas_historial); }catch(e){ hist=[]; }
                                   if(hist.length===0&&c.notas_internas) hist=[{texto:c.notas_internas,fecha:"Anterior",autor:"Gestor"}]
+                                  // Filtrar notas ocultas — solo visibles para administradores
+                                  hist = hist.filter(function(n){ return n.oculta!==true })
                                   return hist.length>0&&(
                                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
                                       <div style={{fontSize:10,color:"#2a8aaa",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>📝 Notas del proceso</div>
@@ -669,7 +671,10 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                         return (
                                           <div key={i} style={{background:"#f0f9ff",border:"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
                                             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                                              <span style={{fontSize:10,fontWeight:700,color:"#2a8aaa"}}>{n.autor||"Gestor"}</span>
+                                              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                                <span style={{fontSize:10,fontWeight:700,color:"#2a8aaa"}}>{n.autor||"Gestor"}</span>
+                                                {n.editado&&<span style={{fontSize:9,color:"#94a3b8",fontStyle:"italic"}}>(editado)</span>}
+                                              </div>
                                               <span style={{fontSize:10,color:"#94a3b8"}}>{n.fecha}</span>
                                             </div>
                                             <div style={{fontSize:12,color:"#0f172a",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.texto}</div>
