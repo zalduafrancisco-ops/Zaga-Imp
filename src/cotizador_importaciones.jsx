@@ -1191,6 +1191,10 @@ Número de seguimiento: ${c.nro}`;
           <div>
             {editId&&<div style={{background:"#f5c84218",border:"1px solid #f5c84244",borderRadius:10,padding:"10px 16px",marginBottom:20,fontSize:13,color:"#c9a055"}}>✏️ Editando · <button onClick={()=>{setEditId(null);setForm(defaultForm);}} style={{background:"none",border:"none",color:"#c9a055",cursor:"pointer",textDecoration:"underline"}}>Cancelar</button></div>}
 
+            {/* esPaso1: nueva solicitud sin precio China → colapsar bloques financieros */}
+            {(()=>{
+            const esPaso1 = !editId && !Number(form.precio_china);
+
             {/* TIPO TOGGLE */}
             <div style={{display:"flex",gap:8,marginBottom:16,background:"#f1f5f9",borderRadius:12,padding:6,border:"1px solid #e2e8f0",width:"fit-content"}}>
               {[["cliente","👥 Importación para Cliente","#1aa358"],["propia","🏠 Importación Propia","#3d7fc4"]].map(([k,l,col])=>(
@@ -1211,7 +1215,7 @@ Número de seguimiento: ${c.nro}`;
               ))}
             </div>
 
-            <div style={{display:"grid",gridTemplateColumns:"minmax(0,360px) 1fr",gap:20}} className="calc-grid">
+            <div style={{display:"grid",gridTemplateColumns:esPaso1?"minmax(0,520px)":"minmax(0,360px) 1fr",gap:20}} className="calc-grid">
               {/* INPUTS */}
               <div>
                 <BLOCK title={form.tipo==="propia"?"🏠 Mi importación":"📦 Datos del pedido"} accent={form.tipo==="propia"?"#3d7fc4":"#888"}>
@@ -1298,19 +1302,30 @@ Número de seguimiento: ${c.nro}`;
                   </div>
                 </BLOCK>
 
-                <BLOCK title="🇨🇳 Cotización China" accent="#2d78c8">
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                {/* En Paso 1 (nueva sin precio): mostrar solo Unidades con hint */}
+                {esPaso1 ? (
+                  <div style={{background:"#f8fafc",borderRadius:12,padding:"14px 16px",marginBottom:12,border:"1px solid #e2e8f0"}}>
+                    <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>📦 Unidades a cotizar</div>
                     <NInput label="Unidades" field="unidades" form={form} setForm={setForm} placeholder="0"/>
-                    <NInput label="Precio China / Unid $" field="precio_china" form={form} setForm={setForm} placeholder="0"/>
-                    <NInput label="% Depósito" field="pct_deposito" form={form} setForm={setForm} note="Ej: 30 = 30%"/>
-                    <NInput label="⚡ Comisión real APP $" field="comision_real" form={form} setForm={setForm} color="#b8922e" placeholder="0" note="Copia de la app"/>
+                    <div style={{marginTop:10,fontSize:11,color:"#94a3b8",background:"#f1f5f9",borderRadius:8,padding:"8px 12px",border:"1px dashed #cbd5e1"}}>
+                      💡 Cuando China responda, edita esta cotización desde el Tracker para ingresar el precio y calcular todo.
+                    </div>
                   </div>
-                  {Number(form.comision_real)>0&&Number(form.precio_china)>0&&Number(form.unidades)>0&&(
-                    <div style={{fontSize:11,color:"#666",background:"#f8fafc",borderRadius:7,padding:"6px 10px"}}>Tasa implícita: <span style={{color:"#334155"}}>{(Number(form.comision_real)/(Number(form.precio_china)*Number(form.unidades)*(1-Number(form.pct_deposito)/100))*100).toFixed(2)}%</span></div>
-                  )}
-                </BLOCK>
+                ) : (
+                  <BLOCK title="🇨🇳 Cotización China" accent="#2d78c8">
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                      <NInput label="Unidades" field="unidades" form={form} setForm={setForm} placeholder="0"/>
+                      <NInput label="Precio China / Unid $" field="precio_china" form={form} setForm={setForm} placeholder="0"/>
+                      <NInput label="% Depósito" field="pct_deposito" form={form} setForm={setForm} note="Ej: 30 = 30%"/>
+                      <NInput label="⚡ Comisión real APP $" field="comision_real" form={form} setForm={setForm} color="#b8922e" placeholder="0" note="Copia de la app"/>
+                    </div>
+                    {Number(form.comision_real)>0&&Number(form.precio_china)>0&&Number(form.unidades)>0&&(
+                      <div style={{fontSize:11,color:"#666",background:"#f8fafc",borderRadius:7,padding:"6px 10px"}}>Tasa implícita: <span style={{color:"#334155"}}>{(Number(form.comision_real)/(Number(form.precio_china)*Number(form.unidades)*(1-Number(form.pct_deposito)/100))*100).toFixed(2)}%</span></div>
+                    )}
+                  </BLOCK>
+                )}
 
-                {form.tipo==="cliente"&&(
+                {form.tipo==="cliente"&&!esPaso1&&(
                   <BLOCK title="💰 Tu margen ZAGA" accent="#1aa358">
                     {/* Precio final → calcula margen automático */}
                     <div style={{background:"#f0fdf4",borderRadius:9,padding:"12px 14px",marginBottom:14,border:"1px solid #1aa35844"}}>
@@ -1366,7 +1381,7 @@ Número de seguimiento: ${c.nro}`;
                   </BLOCK>
                 )}
 
-                {form.tipo==="propia"&&(
+                {form.tipo==="propia"&&!esPaso1&&(
                   <BLOCK title="📈 Estimación de Venta" accent="#3d7fc4">
                     <div style={{fontSize:11,color:"#3d7fc4",marginBottom:12,background:"#8b5cf611",borderRadius:7,padding:"6px 10px",border:"1px solid #8b5cf622"}}>
                       No se cobran servicios adicionales. Solo costo China más tu ganancia estimada de venta.
@@ -1396,7 +1411,7 @@ Número de seguimiento: ${c.nro}`;
               </div>
 
               {/* RESULTADOS */}
-              <div>
+              <div style={{display:esPaso1?"none":"block"}}>
                 {/* TABLA 1: CHINA — siempre igual */}
                 <BLOCK title="🧾 Tabla 1 — Cotización China (Costo Real)" accent="#2d78c8">
                   <ROW label="Unidades" value={fmtN(form.unidades||0)}/>
@@ -1543,7 +1558,7 @@ Número de seguimiento: ${c.nro}`;
                 )}
 
                 {/* PASO 1 — solo cuando no hay precio china aún y no es edición con precios */}
-                {!editId&&form.tipo==="cliente"&&(
+                {esPaso1&&form.tipo==="cliente"&&(
                   <div style={{marginBottom:12}}>
                     <div style={{background:"#f5f3ff",border:"1px solid #ddd6fe",borderRadius:10,padding:"12px 16px",marginBottom:10}}>
                       <div style={{fontSize:11,color:"#334155",fontWeight:700,marginBottom:4}}>📥 PASO 1 — Registrar solicitud del cliente</div>
@@ -1561,6 +1576,7 @@ Número de seguimiento: ${c.nro}`;
               </div>
             </div>
           </div>
+          )})()}
         )}
 
         {/* ══ TRACKER ══ */}
