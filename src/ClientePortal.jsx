@@ -34,7 +34,7 @@ const TIMELINE = [
   {key:"pago_china",label:"Pagado",icon:"🏦"},
   {key:"en_produccion",label:"Produccion",icon:"🏭"},
   {key:"ctrl_calidad",label:"Calidad",icon:"🔍"},
-  {key:"despachado",label:"Despachado",icon:"🚀"},
+  {key:"despachado",label:"En camino",icon:"🚢"},
   {key:"llego_chile",label:"En Chile",icon:"🛬"},
   {key:"pago2_cliente",label:"2do pago",icon:"💳"},
   {key:"retirado_bodega",label:"Completado",icon:"🏁"},
@@ -49,7 +49,7 @@ const CHECKLIST_FULL = [
   {key:"en_produccion",label:"En proceso de produccion",icon:"🏭"},
   {key:"almacen_china",label:"En almacen China",icon:"📦"},
   {key:"ctrl_calidad",label:"Control de calidad aprobado",icon:"🔍"},
-  {key:"despachado",label:"Despachado desde China",icon:"🚀"},
+  {key:"despachado",label:"En camino (embarcado desde China)",icon:"🚢"},
   {key:"llego_chile",label:"Llego a Chile",icon:"🛬"},
   {key:"pago2_cliente",label:"2do pago recibido",icon:"💳"},
   {key:"retirado_bodega",label:"Importacion completada",icon:"🏁"},
@@ -68,7 +68,7 @@ const TIMELINE_MAX_POR_ESTADO = {
   en_negociacion:1,
   aceptada:2,
   pagada_china:6,
-  en_camino:8,
+  en_camino:7,  // paso 7 = En camino 🚢 — tope correcto para este estado
   en_bodega:9,
   completada:10,
 }
