@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import LOGO_WHITE from "./logo-white.png"
 import LOGO_DARK from "./logo-dark.png"
 
@@ -122,6 +122,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   var [tabs, setTabs] = useState({})
   var [alertas, setAlertas] = useState([])      // cambios detectados al cargar
   var [alertaVista, setAlertaVista] = useState(false)  // banner cerrado?
+  var fetchIdRef = useRef(0)  // contador para evitar race conditions en cargas simultáneas
 
   var STORAGE_KEY = "zaga_estados_"+perfil.id
 
@@ -147,12 +148,16 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   },[])
 
   var cargar = async function(){
+    // Cada llamada obtiene un ID unico. Si llega una respuesta tardia de una
+    // llamada anterior (race condition), la ignoramos y solo aplicamos la mas reciente.
+    var miId = ++fetchIdRef.current
     try{
       var result = await supabase.from('cotizaciones').select('datos').order('created_at',{ascending:false})
+      if(miId !== fetchIdRef.current) return  // llego tarde, hay una carga mas reciente en curso
       if(result.data&&!result.error){
         var lista = result.data.map(function(r){ return typeof r.datos==='string'?JSON.parse(r.datos):r.datos })
         setCotizaciones(lista)
-        // Detectar cambios vs última visita
+        // Detectar cambios vs ultima visita
         var anteriores = leerEstadosGuardados()
         if(Object.keys(anteriores).length > 0){
           var cambios = []
@@ -167,7 +172,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
         guardarEstados(lista)
       }
     }catch(e){ console.warn("Error cargando cotizaciones:", e) }
-    setLoading(false)
+    if(miId === fetchIdRef.current) setLoading(false)
   }
 
   var getTab = function(id){
