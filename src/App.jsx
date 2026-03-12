@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import Login from './Login'
 import Cotizador from './cotizador_importaciones'
 import ClientePortal from './ClientePortal'
+import PortalChina from './PortalChina'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -59,6 +60,11 @@ export default function App() {
   // Cliente → Portal de seguimiento
   if (perfil.rol === 'cliente') return (
     <ClientePortal supabase={supabase} perfil={perfil} onLogout={handleLogout} />
+  )
+
+  // Agente China → Portal bilingüe de cotizaciones
+  if (perfil.rol === 'agente_china') return (
+    <PortalChina supabase={supabase} onLogout={handleLogout} />
   )
 
   // Admin (Francisco o Luisa) → Cotizador completo
