@@ -264,14 +264,17 @@ export default function App({ supabase, usuario, onLogout }){
           .order("created_at",{ascending:false});
         if(error) throw error;
         if(data&&data.length>0){
+          // Datos en Supabase — cargar desde ahí
           const lista=data.map(r=>r.datos);
           cotizacionesRef.current=lista;
           setCotizaciones(lista);
         } else {
+          // Supabase vacío — intentar migrar desde localStorage
           const local=localStorage.getItem("zaga_v6");
           if(local){
             const lista=JSON.parse(local);
             if(Array.isArray(lista)&&lista.length>0){
+              // Migrar automáticamente a Supabase
               const rows=lista.map(c=>({id:c.id,nro:c.nro||"",cliente:c.cliente||"",gestor:c.gestor||"francisco",estado:c.estado||"solicitud",tipo:c.tipo||"cliente",datos:c}));
               await supabase.from("cotizaciones").upsert(rows,{onConflict:"id"});
               cotizacionesRef.current=lista;
@@ -281,35 +284,13 @@ export default function App({ supabase, usuario, onLogout }){
           }
         }
       }catch(e){
+        // Fallback a localStorage si falla Supabase
         try{ const r=localStorage.getItem("zaga_v6"); if(r){ const d=JSON.parse(r); cotizacionesRef.current=d; setCotizaciones(d); } }catch(_){}
         showToast("Error de conexión — usando datos locales","err");
       }
       setCargando(false);
     };
     cargar();
-    // ── REAL-TIME: detectar cambios del agente China (notas) ──
-    const channel=supabase.channel("zaga-cotizador-admin-v1")
-      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"cotizaciones"},async(payload)=>{
-        const {data}=await supabase.from("cotizaciones").select("id,datos").eq("id",payload.new.id).single();
-        if(data){
-          const nd=data.datos;
-          const prevList=cotizacionesRef.current;
-          const prev=prevList.find(x=>x.id===nd.id);
-          // Alerta si llegó nota china nueva
-          if(nd?.nota_china_nueva&&Array.isArray(nd?.notas_china_historial)&&nd.notas_china_historial.length>0){
-            const prevNotas=prev?.notas_china_historial||[];
-            if(nd.notas_china_historial.length>prevNotas.length){
-              showToast(`🇨🇳 El agente China dejó una nota en "${nd.nro||nd.producto||"cotización"}"`, "ok");
-            }
-          }
-          const updated=prevList.map(x=>x.id===nd.id?nd:x);
-          cotizacionesRef.current=updated;
-          setCotizaciones(updated);
-          try{ localStorage.setItem("zaga_v6",JSON.stringify(updated)); }catch(_){}
-        }
-      })
-      .subscribe();
-    return ()=>{ supabase.removeChannel(channel); };
   },[]);
 
   const exportarDatos=()=>{
@@ -1528,6 +1509,19 @@ Número de seguimiento: ${c.nro}`;
                     )}
                   </BLOCK>
                 )}
+
+                {/* BOTÓN GUARDAR — Paso 1 (sin precio China) */}
+                {esPaso1&&(
+                  <div style={{marginTop:16}}>
+                    <div style={{background:"#f5f3ff",border:"1px solid #ddd6fe",borderRadius:10,padding:"12px 16px",marginBottom:10}}>
+                      <div style={{fontSize:11,color:"#334155",fontWeight:700,marginBottom:4}}>📥 PASO 1 — Registrar solicitud del cliente</div>
+                      <div style={{fontSize:11,color:"#64748b",lineHeight:1.5}}>¿China aún no te ha respondido el precio? Guarda la solicitud ahora con el link y las variantes. Cuando China responda, editas y agregas el precio para calcular todo.</div>
+                    </div>
+                    <button onClick={handleSaveSolicitud} style={{width:"100%",background:"#040c18",border:"none",borderRadius:10,padding:14,fontSize:15,fontWeight:700,color:"#fff",cursor:"pointer"}}>
+                      📥 Guardar Solicitud (sin precio)
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* RESULTADOS */}
@@ -1677,19 +1671,6 @@ Número de seguimiento: ${c.nro}`;
                   </div>
                 )}
 
-                {/* PASO 1 — solo cuando no hay precio china aún y no es edición con precios */}
-                {esPaso1&&form.tipo==="cliente"&&(
-                  <div style={{marginBottom:12}}>
-                    <div style={{background:"#f5f3ff",border:"1px solid #ddd6fe",borderRadius:10,padding:"12px 16px",marginBottom:10}}>
-                      <div style={{fontSize:11,color:"#334155",fontWeight:700,marginBottom:4}}>📥 PASO 1 — Registrar solicitud del cliente</div>
-                      <div style={{fontSize:11,color:"#64748b",lineHeight:1.5}}>¿China aún no te ha respondido el precio? Guarda la solicitud ahora con el link y las variantes. Cuando China responda, editas y agregas el precio para calcular todo.</div>
-                    </div>
-                    <button onClick={handleSaveSolicitud} style={{width:"100%",background:"#ffffff",border:"2px solid #040c18",borderRadius:10,padding:12,fontSize:13,fontWeight:700,color:"#040c18",cursor:"pointer"}}>
-                      📥 Guardar Solicitud (sin precio) - Genera resumen para China
-                    </button>
-                  </div>
-                )}
-
                 <button onClick={handleSave} style={{width:"100%",background:"#040c18",border:"none",borderRadius:10,padding:14,fontSize:15,fontWeight:700,color:"#fff",cursor:"pointer"}}>
                   {editId?"💾 Actualizar cotización completa":"✅ Guardar cotización con precios"}
                 </button>
@@ -1812,9 +1793,8 @@ Número de seguimiento: ${c.nro}`;
                 }
 
                 // 6. Negociación con propuestas pendientes > 5 días
-                const ESTADOS_TERMINALES=["completada","rechazada_cliente","anulada","no_procesada"];
                 const pendientes=(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente");
-                if(pendientes.length>0&&c.estado==="en_negociacion"){
+                if(pendientes.length>0){
                   const ultima=pendientes[pendientes.length-1];
                   const diasNeg=Math.round((hoy-new Date(ultima.fecha))/(1000*60*60*24));
                   if(diasNeg>5) alertas.push({nivel:"info",ico:"🤝",titulo:`${c.nro} — ${c.producto}`,msg:`Propuesta de negociación enviada hace ${diasNeg} días sin respuesta de China`,id:c.id,accion:"gestionar"});
@@ -1828,13 +1808,6 @@ Número de seguimiento: ${c.nro}`;
                 if(tienePrimerPago&&activa&&(sinDimensiones||sinCajas)){
                   const que=sinDimensiones?"dimensiones (L×A×H)":"unidades por caja";
                   alertas.push({nivel:"info",ico:"📐",titulo:`${c.nro} — ${c.cliente||c.producto}`,msg:`Pago recibido pero sin ${que} — proyección M³ incompleta`,id:c.id,accion:"dimensiones"});
-                }
-
-                // 8. Nota nueva del agente China sin leer
-                if(c.nota_china_nueva&&Array.isArray(c.notas_china_historial)&&c.notas_china_historial.length>0){
-                  const ultima=c.notas_china_historial[c.notas_china_historial.length-1];
-                  const preview=ultima?.texto?.length>70?ultima.texto.slice(0,70)+"...":ultima?.texto||"";
-                  alertas.push({nivel:"critico",ico:"🇨🇳",titulo:`${c.nro} — ${c.producto}`,msg:`El agente China dejó una nota: "${preview}"`,id:c.id,accion:"gestionar"});
                 }
               });
 
@@ -1884,10 +1857,6 @@ Número de seguimiento: ${c.nro}`;
                               },300);
                             } else if(a.accion==="gestionar"){
                               setOpenId(a.id);
-                              setTimeout(()=>{
-                                const el=document.getElementById(`card-${a.id}`);
-                                if(el) el.scrollIntoView({behavior:"smooth",block:"center"});
-                              },300);
                             } else {
                               setPreviewId(a.id);
                             }
@@ -2313,52 +2282,6 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                             )}
                           </div>
-
-                          {/* ── NOTAS DEL AGENTE CHINA ── */}
-                          {Array.isArray(c.notas_china_historial)&&c.notas_china_historial.length>0&&(
-                            <div style={{marginTop:20,borderTop:"1px solid #e2e8f0",paddingTop:16}}>
-                              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                                <span style={{fontSize:16}}>🇨🇳</span>
-                                <span style={{fontSize:10,fontWeight:700,color:"#b8922e",textTransform:"uppercase",letterSpacing:1}}>Notas del agente China</span>
-                                {c.nota_china_nueva&&<span style={{background:"#c0392b",color:"#fff",fontSize:9,fontWeight:800,borderRadius:4,padding:"2px 8px",letterSpacing:0.5}}>SIN LEER</span>}
-                                <span style={{fontSize:11,color:"#94a3b8",marginLeft:"auto"}}>{c.notas_china_historial.length} nota{c.notas_china_historial.length!==1?"s":""}</span>
-                              </div>
-                              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10}}>
-                                {c.notas_china_historial.map(function(nota,i){
-                                  return(
-                                    <div key={nota.id||i} style={{
-                                      background:c.nota_china_nueva&&i===c.notas_china_historial.length-1?"#fef9ec":"#fffbeb",
-                                      border:c.nota_china_nueva&&i===c.notas_china_historial.length-1?"2px solid #c9a055":"1px solid #c9a05540",
-                                      borderLeft:"4px solid #c9a055",
-                                      borderRadius:"0 10px 10px 0",
-                                      padding:"12px 16px",
-                                    }}>
-                                      <div style={{fontSize:13,color:"#334155",lineHeight:1.7,whiteSpace:"pre-wrap",marginBottom:6}}>{nota.texto}</div>
-                                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
-                                        <div style={{fontSize:10,color:"#94a3b8"}}>
-                                          {nota.fecha?new Date(nota.fecha).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}
-                                          {nota.editado&&<span style={{marginLeft:6,fontStyle:"italic"}}>(editado)</span>}
-                                        </div>
-                                        {c.nota_china_nueva&&i===c.notas_china_historial.length-1&&(
-                                          <span style={{background:"#fdf6e3",color:"#b8922e",fontSize:9,fontWeight:700,borderRadius:4,padding:"2px 7px",border:"1px solid #c9a05540"}}>
-                                            Nueva
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {c.nota_china_nueva&&(
-                                <button onClick={async()=>{
-                                  await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,nota_china_nueva:false}:x));
-                                  showToast("✓ Nota de China marcada como leída");
-                                }} style={{background:"#040c18",color:"#c9a055",border:"none",borderRadius:7,padding:"8px 18px",fontSize:12,cursor:"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:6,fontFamily:"inherit"}}>
-                                  ✓ Marcar como leída
-                                </button>
-                              )}
-                            </div>
-                          )}
 
                           {/* ── NOTAS INTERNAS ── */}
                           <div style={{marginTop:20,borderTop:"1px solid #e2e8f0",paddingTop:16}}>
