@@ -284,7 +284,8 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
   const [guardandoEdit, setGuardandoEdit] = useState(false)
   const [eliminandoId, setEliminandoId]   = useState(null)
 
-  // Función central: guarda el array de notas en Supabase
+  // Funcion central: guarda el array de notas en Supabase
+  // .select("id") es critico: sin el, Supabase no indica si RLS bloqueo el update
   async function persistirNotas(nuevoHistorial, esNueva) {
     const { _id, _updated, ...datosSinMeta } = c
     const newDatos = {
@@ -292,12 +293,17 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
       notas_china_historial: nuevoHistorial,
       nota_china_nueva: esNueva,
     }
-    const { error } = await supabase
+    const { data: filas, error } = await supabase
       .from("cotizaciones")
       .update({ datos: newDatos })
       .eq("id", c._id)
-    if (error) throw error
+      .select("id")
+    if (error) throw new Error("Error Supabase: " + (error.message||"") + " code:" + (error.code||""))
+    if (!filas || filas.length === 0) {
+      throw new Error("SIN_PERMISOS")
+    }
   }
+
 
   // Agregar nota nueva
   async function handleGuardar() {
@@ -315,7 +321,7 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
       setNuevaTexto("")
       recargar()
     } catch(e) {
-      setErrorMsg("❌ Error al guardar. Verifica tu conexión e intenta de nuevo.\n" + (e?.message || ""))
+      const esSinPermisos=(e?.message||"").includes("SIN_PERMISOS"); setErrorMsg(esSinPermisos ? "⚠️ Sin permisos para guardar. El administrador debe ejecutar el SQL en Supabase para habilitar este permiso." : "❌ Error al guardar: " + (e?.message||"Sin detalles"))
     }
     setGuardando(false)
   }
