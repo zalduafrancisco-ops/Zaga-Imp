@@ -1812,8 +1812,9 @@ Número de seguimiento: ${c.nro}`;
                 }
 
                 // 6. Negociación con propuestas pendientes > 5 días
+                const ESTADOS_TERMINALES=["completada","rechazada_cliente","anulada","no_procesada"];
                 const pendientes=(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente");
-                if(pendientes.length>0){
+                if(pendientes.length>0&&!ESTADOS_TERMINALES.includes(c.estado)){
                   const ultima=pendientes[pendientes.length-1];
                   const diasNeg=Math.round((hoy-new Date(ultima.fecha))/(1000*60*60*24));
                   if(diasNeg>5) alertas.push({nivel:"info",ico:"🤝",titulo:`${c.nro} — ${c.producto}`,msg:`Propuesta de negociación enviada hace ${diasNeg} días sin respuesta de China`,id:c.id,accion:"gestionar"});
