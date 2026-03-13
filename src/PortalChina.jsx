@@ -146,7 +146,7 @@ export default function PortalChina({ supabase, onLogout }) {
                 transition:"all 0.3s",
               }}/>
               <span style={{ fontSize:12, fontWeight:700, color:"#c9a055" }}>
-                {pending.length} Pendientes
+                {pending.length} 待处理
               </span>
             </div>
           )}
@@ -159,7 +159,7 @@ export default function PortalChina({ supabase, onLogout }) {
               fontFamily:"inherit", transition:"all 0.15s",
             }}
           >
-            Salir / 退出
+            退出 / Salir
           </button>
         </div>
       </div>
@@ -179,9 +179,9 @@ export default function PortalChina({ supabase, onLogout }) {
       <div style={{ background:"#fff", borderBottom:"1px solid #e2e8f0", padding:"0 24px" }}>
         <div style={{ display:"flex", gap:0 }}>
           {[
-            { id:"pending",  count:pending.length,  label:"Pendientes 待处理",  urgent:pending.length > 0 },
-            { id:"active",   count:active.length,   label:"Confirmadas 已确认" },
-            { id:"shipping", count:shipping.length, label:"En camino 运输中" },
+            { id:"pending",  count:pending.length,  label:"待处理 Pendientes",  urgent:pending.length > 0 },
+            { id:"active",   count:active.length,   label:"已确认 Confirmadas" },
+            { id:"shipping", count:shipping.length, label:"运输中 En camino" },
           ].map(t => {
             const isActive = tab === t.id
             return (
@@ -225,20 +225,20 @@ export default function PortalChina({ supabase, onLogout }) {
         {loading ? (
           <div style={{ textAlign:"center", padding:64, color:"#94a3b8" }}>
             <div style={{ fontSize:32, marginBottom:12 }}>⏳</div>
-            <div style={{ fontWeight:600 }}>Cargando... / 加载中</div>
+            <div style={{ fontWeight:600 }}>加载中 / Cargando...</div>
           </div>
         ) : shown.length === 0 ? (
           <div style={{ textAlign:"center", padding:64, color:"#94a3b8" }}>
             <div style={{ fontSize:40, marginBottom:14 }}>📭</div>
             <div style={{ fontWeight:700, fontSize:15, marginBottom:4, color:"#475569" }}>
-              {tab === "pending" ? "No hay solicitudes pendientes"
-               : tab === "active" ? "No hay ordenes activas"
-               : "No hay envios en camino"}
-            </div>
-            <div style={{ fontSize:13 }}>
               {tab === "pending" ? "暂无待处理请求"
                : tab === "active" ? "暂无进行中订单"
                : "暂无运输中货物"}
+            </div>
+            <div style={{ fontSize:13 }}>
+              {tab === "pending" ? "No hay solicitudes pendientes"
+               : tab === "active" ? "No hay ordenes activas"
+               : "No hay envios en camino"}
             </div>
           </div>
         ) : (
@@ -304,7 +304,7 @@ function CotCard({ c, expanded, onToggle }) {
               borderRadius:20, padding:"3px 10px",
               fontSize:11, fontWeight:700, whiteSpace:"nowrap",
             }}>
-              {EST_ES[est] || est}
+              {EST_ZH[est] || est}
             </span>
             <span style={{
               background:"#f8fafc", color:"#94a3b8",
@@ -313,7 +313,7 @@ function CotCard({ c, expanded, onToggle }) {
               fontSize:11, fontWeight:600, whiteSpace:"nowrap",
               fontFamily:"monospace",
             }}>
-              {EST_ZH[est] || ""}
+              {EST_ES[est] || ""}
             </span>
             {isUrg && (
               <span style={{
@@ -322,7 +322,7 @@ function CotCard({ c, expanded, onToggle }) {
                 borderRadius:20, padding:"3px 10px",
                 fontSize:11, fontWeight:800,
               }}>
-                Requiere cotizacion / 需要报价
+                需要报价 / Requiere cotizacion
               </span>
             )}
           </div>
@@ -330,22 +330,22 @@ function CotCard({ c, expanded, onToggle }) {
           {/* Nombre producto */}
           <div style={{ fontWeight:700, fontSize:15, color:"#0f172a", lineHeight:1.3, marginBottom:10 }}>
             {c.producto || "-"}
-            <span style={{ fontSize:11, color:"#94a3b8", fontWeight:400, marginLeft:6 }}>/ 产品名称</span>
+            <span style={{ fontSize:11, color:"#94a3b8", fontWeight:400, marginLeft:6 }}>/ 产品名称 Nombre del producto</span>
           </div>
 
           {/* Datos rapidos */}
           <div style={{ display:"flex", flexWrap:"wrap", gap:20 }}>
-            <Dato label="Unidades / 数量" valor={c.unidades || "-"} bold color="#040c18" />
+            <Dato label="数量 / Unidades" valor={c.unidades || "-"} bold color="#040c18" />
             <Dato
-              label="Transporte / 运输"
-              valor={`${TRANSP_ES[c.transporte]||"Maritimo"} / ${TRANSP_ZH[c.transporte]||"海运"}`}
+              label="运输 / Transporte"
+              valor={`${TRANSP_ZH[c.transporte]||"海运"} / ${TRANSP_ES[c.transporte]||"Maritimo"}`}
             />
             <Dato
-              label="Fecha solicitud / 发送日期"
-              valor={fmtDate(c.fecha_solicitud)}
-              sub={fmtDateZH(c.fecha_solicitud)}
+              label="发送日期 / Fecha solicitud"
+              valor={fmtDateZH(c.fecha_solicitud)}
+              sub={fmtDate(c.fecha_solicitud)}
             />
-            <Dato label="N solicitud / 编号" valor={`#${nro}`} mono />
+            <Dato label="编号 / N solicitud" valor={`#${nro}`} mono />
           </div>
         </div>
 
@@ -372,7 +372,7 @@ function CotCard({ c, expanded, onToggle }) {
         }}>
 
           {/* Link Alibaba */}
-          <Campo es="Link de Alibaba" zh="阿里巴巴链接">
+          <Campo es="阿里巴巴链接" zh="Link de Alibaba">
             {c.link_alibaba ? (
               <a
                 href={c.link_alibaba}
@@ -386,18 +386,16 @@ function CotCard({ c, expanded, onToggle }) {
                   fontFamily:"inherit",
                 }}
               >
-                🔗 Ver producto en Alibaba / 查看产品
+                🔗 查看产品 / Ver en Alibaba
               </a>
             ) : (
-              <span style={{ fontSize:13, color:"#94a3b8", fontStyle:"italic" }}>
-                Sin link / 暂无链接
-              </span>
+              <span style={{ fontSize:13, color:"#94a3b8", fontStyle:"italic" }}>暂无链接 / Sin link</span>
             )}
           </Campo>
 
           {/* SKU */}
           {c.sku_china && (
-            <Campo es="SKU / Codigo China" zh="产品编号">
+            <Campo es="产品编号" zh="SKU / Codigo China">
               <span style={{
                 fontFamily:"monospace", background:"#f1f5f9",
                 border:"1px solid #e2e8f0", padding:"6px 12px",
@@ -411,7 +409,7 @@ function CotCard({ c, expanded, onToggle }) {
 
           {/* Variantes */}
           {c.variantes && (
-            <Campo es="Variantes / Colores / Especificaciones" zh="规格 / 颜色 / 变体">
+            <Campo es="规格 / 颜色 / 变体" zh="Variantes / Colores / Especificaciones">
               <div style={{
                 background:"#f8fafc", border:"1px solid #e2e8f0",
                 padding:"12px 14px", borderRadius:8,
@@ -425,7 +423,7 @@ function CotCard({ c, expanded, onToggle }) {
 
           {/* Notas visibles */}
           {visibles.length > 0 && (
-            <Campo es="Notas / Observaciones" zh="备注说明">
+            <Campo es="备注说明" zh="Notas / Observaciones">
               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                 {visibles.slice(-3).map((n, i) => (
                   <div key={i} style={{
@@ -446,7 +444,7 @@ function CotCard({ c, expanded, onToggle }) {
 
           {/* Fecha llegada estimada */}
           {c.fecha_llegada_est && ESTADOS_CAMINO.includes(est) && (
-            <Campo es="Fecha estimada de llegada" zh="预计到达时间">
+            <Campo es="预计到达时间" zh="Fecha estimada de llegada">
               <div style={{
                 display:"inline-flex", gap:10, alignItems:"center",
                 background:"#f8f0fb", border:"1px solid #a8559040",
@@ -455,10 +453,10 @@ function CotCard({ c, expanded, onToggle }) {
                 <span>🚢</span>
                 <div>
                   <div style={{ fontWeight:700, color:"#a85590", fontSize:14 }}>
-                    {fmtDate(c.fecha_llegada_est)}
+                    {fmtDateZH(c.fecha_llegada_est)}
                   </div>
                   <div style={{ fontSize:11, color:"#a85590", opacity:0.7, marginTop:2 }}>
-                    {fmtDateZH(c.fecha_llegada_est)}
+                    {fmtDate(c.fecha_llegada_est)}
                   </div>
                 </div>
               </div>
