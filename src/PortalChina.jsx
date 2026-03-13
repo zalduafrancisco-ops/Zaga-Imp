@@ -248,8 +248,10 @@ export default function PortalChina({ supabase, onLogout }) {
               <CotCard
                 key={uid}
                 c={c}
+                supabase={supabase}
                 expanded={expanded === uid}
                 onToggle={() => setExpanded(expanded === uid ? null : uid)}
+                onNotaSaved={() => loadData()}
               />
             )
           })
@@ -259,12 +261,16 @@ export default function PortalChina({ supabase, onLogout }) {
   )
 }
 
-function CotCard({ c, expanded, onToggle }) {
+function CotCard({ c, expanded, onToggle, supabase, onNotaSaved }) {
   const est    = c.estado || "enviado_china"
   const color  = EST_COLOR[est] || "#64748b"
   const bg     = EST_BG[est]   || "#f1f5f9"
   const isUrg  = est === "enviado_china"
   const nro    = c.nro_cotizacion || c.nro || String(c._id || "").slice(-6).toUpperCase() || "-"
+
+  const [notaTexto, setNotaTexto]   = useState(c.nota_china?.texto || "")
+  const [guardando, setGuardando]   = useState(false)
+  const [notaGuardada, setNotaGuardada] = useState(false)
 
   let notasArr = []
   try {
@@ -462,6 +468,110 @@ function CotCard({ c, expanded, onToggle }) {
               </div>
             </Campo>
           )}
+
+          {/* ── NOTA PARA ZAGA ── */}
+          <div style={{
+            borderTop:"1px solid #e2e8f0",
+            paddingTop:16,
+          }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+              <span style={{ fontSize:13 }}>📩</span>
+              <span style={{ fontSize:11, fontWeight:700, color:"#040c18", textTransform:"uppercase", letterSpacing:0.5 }}>
+                留言给ZAGA
+              </span>
+              <span style={{ fontSize:10, color:"#94a3b8" }}>/ Nota para ZAGA (solo administradores)</span>
+            </div>
+
+            {/* Nota guardada previamente */}
+            {c.nota_china?.texto && (
+              <div style={{
+                background:"#fffbeb",
+                border:"1px solid #c9a05550",
+                borderLeft:"3px solid #c9a055",
+                borderRadius:"0 8px 8px 0",
+                padding:"10px 14px",
+                marginBottom:10,
+              }}>
+                <div style={{ fontSize:10, color:"#b8922e", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:0.5 }}>
+                  上次留言 / Nota anterior
+                </div>
+                <div style={{ fontSize:13, color:"#334155", lineHeight:1.6, whiteSpace:"pre-wrap" }}>
+                  {c.nota_china.texto}
+                </div>
+                {c.nota_china.fecha && (
+                  <div style={{ fontSize:10, color:"#94a3b8", marginTop:5 }}>
+                    {fmtDateZH(c.nota_china.fecha)} — {fmtDate(c.nota_china.fecha)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <textarea
+              value={notaTexto}
+              onChange={e => { setNotaTexto(e.target.value); setNotaGuardada(false); }}
+              placeholder={"写下您的回复或报价信息...\nEscriba su respuesta o información de cotización..."}
+              rows={4}
+              style={{
+                width:"100%",
+                background:"#fff",
+                border:"1px solid #e2e8f0",
+                borderRadius:8,
+                color:"#0f172a",
+                padding:"10px 12px",
+                fontSize:13,
+                outline:"none",
+                resize:"vertical",
+                boxSizing:"border-box",
+                lineHeight:1.6,
+                fontFamily:"inherit",
+              }}
+            />
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginTop:8 }}>
+              <button
+                disabled={!notaTexto.trim() || guardando}
+                onClick={async () => {
+                  if (!notaTexto.trim() || guardando) return
+                  setGuardando(true)
+                  try {
+                    const { _id, _updated, ...datosSinMeta } = c
+                    const newDatos = {
+                      ...datosSinMeta,
+                      nota_china: { texto: notaTexto.trim(), fecha: new Date().toISOString() },
+                      nota_china_nueva: true,
+                    }
+                    await supabase.from("cotizaciones").update({ datos: newDatos }).eq("id", c._id)
+                    setNotaGuardada(true)
+                    if (onNotaSaved) onNotaSaved()
+                  } catch(e) {
+                    console.error("Error guardando nota:", e)
+                  }
+                  setGuardando(false)
+                }}
+                style={{
+                  background: notaTexto.trim() && !guardando ? "#040c18" : "#e2e8f0",
+                  color: notaTexto.trim() && !guardando ? "#c9a055" : "#94a3b8",
+                  border:"none",
+                  borderRadius:8,
+                  padding:"9px 20px",
+                  fontSize:13,
+                  cursor: notaTexto.trim() && !guardando ? "pointer" : "default",
+                  fontWeight:700,
+                  fontFamily:"inherit",
+                  transition:"all 0.2s",
+                }}
+              >
+                {guardando ? "发送中... / Enviando..." : "📩 发送留言 / Enviar nota"}
+              </button>
+              {notaGuardada && (
+                <span style={{
+                  fontSize:12, color:"#1aa358", fontWeight:700,
+                  display:"flex", alignItems:"center", gap:5,
+                }}>
+                  ✓ 已发送 / Enviada correctamente
+                </span>
+              )}
+            </div>
+          </div>
 
         </div>
       )}
