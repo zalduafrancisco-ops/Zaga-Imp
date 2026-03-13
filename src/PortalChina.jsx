@@ -71,7 +71,7 @@ export default function PortalChina({ supabase, onLogout }) {
 
   useEffect(() => {
     loadData()
-    const channel = supabase.channel("zaga-portal-china-v1")
+    const channel = supabase.channel("zaga-portal-china-v2")
       .on("postgres_changes", { event:"*", schema:"public", table:"cotizaciones" }, () => {
         loadData()
         setPulse(true)
@@ -249,9 +249,9 @@ export default function PortalChina({ supabase, onLogout }) {
                 key={uid}
                 c={c}
                 supabase={supabase}
+                recargar={loadData}
                 expanded={expanded === uid}
                 onToggle={() => setExpanded(expanded === uid ? null : uid)}
-                onNotaSaved={() => loadData()}
               />
             )
           })
@@ -261,16 +261,97 @@ export default function PortalChina({ supabase, onLogout }) {
   )
 }
 
-function CotCard({ c, expanded, onToggle, supabase, onNotaSaved }) {
+function CotCard({ c, expanded, onToggle, supabase, recargar }) {
   const est    = c.estado || "enviado_china"
   const color  = EST_COLOR[est] || "#64748b"
   const bg     = EST_BG[est]   || "#f1f5f9"
   const isUrg  = est === "enviado_china"
   const nro    = c.nro_cotizacion || c.nro || String(c._id || "").slice(-6).toUpperCase() || "-"
 
-  const [notaTexto, setNotaTexto]   = useState(c.nota_china?.texto || "")
-  const [guardando, setGuardando]   = useState(false)
-  const [notaGuardada, setNotaGuardada] = useState(false)
+  // ── Historial de notas China ──
+  const getHistorial = () => {
+    try {
+      if (Array.isArray(c.notas_china_historial)) return c.notas_china_historial
+    } catch(e) {}
+    return []
+  }
+
+  const [nuevaTexto, setNuevaTexto]       = useState("")
+  const [guardando, setGuardando]         = useState(false)
+  const [errorMsg, setErrorMsg]           = useState("")
+  const [editandoId, setEditandoId]       = useState(null)
+  const [editTexto, setEditTexto]         = useState("")
+  const [guardandoEdit, setGuardandoEdit] = useState(false)
+  const [eliminandoId, setEliminandoId]   = useState(null)
+
+  // Función central: guarda el array de notas en Supabase
+  async function persistirNotas(nuevoHistorial, esNueva) {
+    const { _id, _updated, ...datosSinMeta } = c
+    const newDatos = {
+      ...datosSinMeta,
+      notas_china_historial: nuevoHistorial,
+      nota_china_nueva: esNueva,
+    }
+    const { error } = await supabase
+      .from("cotizaciones")
+      .update({ datos: newDatos })
+      .eq("id", c._id)
+    if (error) throw error
+  }
+
+  // Agregar nota nueva
+  async function handleGuardar() {
+    if (!nuevaTexto.trim() || guardando) return
+    setGuardando(true)
+    setErrorMsg("")
+    try {
+      const hist = getHistorial()
+      const nuevaNota = {
+        id: Date.now().toString(),
+        texto: nuevaTexto.trim(),
+        fecha: new Date().toISOString(),
+      }
+      await persistirNotas([...hist, nuevaNota], true)
+      setNuevaTexto("")
+      recargar()
+    } catch(e) {
+      setErrorMsg("❌ Error al guardar. Verifica tu conexión e intenta de nuevo.\n" + (e?.message || ""))
+    }
+    setGuardando(false)
+  }
+
+  // Guardar edición
+  async function handleGuardarEdicion(notaId) {
+    if (!editTexto.trim() || guardandoEdit) return
+    setGuardandoEdit(true)
+    setErrorMsg("")
+    try {
+      const hist = getHistorial().map(n =>
+        n.id === notaId ? { ...n, texto: editTexto.trim(), editado: new Date().toISOString() } : n
+      )
+      await persistirNotas(hist, c.nota_china_nueva || false)
+      setEditandoId(null)
+      setEditTexto("")
+      recargar()
+    } catch(e) {
+      setErrorMsg("❌ Error al guardar edición.")
+    }
+    setGuardandoEdit(false)
+  }
+
+  // Eliminar nota
+  async function handleEliminar(notaId) {
+    setEliminandoId(notaId)
+    setErrorMsg("")
+    try {
+      const hist = getHistorial().filter(n => n.id !== notaId)
+      await persistirNotas(hist, hist.length > 0 ? c.nota_china_nueva || false : false)
+      recargar()
+    } catch(e) {
+      setErrorMsg("❌ Error al eliminar.")
+    }
+    setEliminandoId(null)
+  }
 
   let notasArr = []
   try {
@@ -279,6 +360,7 @@ function CotCard({ c, expanded, onToggle, supabase, onNotaSaved }) {
   } catch(e) { notasArr = [] }
   if (notasArr.length === 0 && c.notas_internas) notasArr = [{ texto:c.notas_internas, oculta:false }]
   const visibles = notasArr.filter(n => !n.oculta)
+  const historialChina = getHistorial()
 
   return (
     <div style={{
@@ -469,107 +551,187 @@ function CotCard({ c, expanded, onToggle, supabase, onNotaSaved }) {
             </Campo>
           )}
 
-          {/* ── NOTA PARA ZAGA ── */}
-          <div style={{
-            borderTop:"1px solid #e2e8f0",
-            paddingTop:16,
-          }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
-              <span style={{ fontSize:13 }}>📩</span>
-              <span style={{ fontSize:11, fontWeight:700, color:"#040c18", textTransform:"uppercase", letterSpacing:0.5 }}>
-                留言给ZAGA
-              </span>
-              <span style={{ fontSize:10, color:"#94a3b8" }}>/ Nota para ZAGA (solo administradores)</span>
+          {/* ── 留言 NOTAS PARA ZAGA ── */}
+          <div style={{ borderTop:"1px solid #e2e8f0", paddingTop:16 }}>
+
+            {/* Título sección */}
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+              <span style={{ fontSize:15 }}>📩</span>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:"#040c18", letterSpacing:0.3 }}>
+                  留言给ZAGA / Notas para administración
+                </div>
+                <div style={{ fontSize:10, color:"#94a3b8", marginTop:1 }}>
+                  只有ZAGA管理员可以看到 / Solo visible para administradores ZAGA
+                </div>
+              </div>
+              {historialChina.length > 0 && (
+                <span style={{
+                  marginLeft:"auto", background:"#040c18", color:"#c9a055",
+                  borderRadius:20, padding:"2px 10px",
+                  fontSize:11, fontWeight:700,
+                }}>
+                  {historialChina.length}
+                </span>
+              )}
             </div>
 
-            {/* Nota guardada previamente */}
-            {c.nota_china?.texto && (
+            {/* Error message */}
+            {errorMsg && (
               <div style={{
-                background:"#fffbeb",
-                border:"1px solid #c9a05550",
-                borderLeft:"3px solid #c9a055",
-                borderRadius:"0 8px 8px 0",
-                padding:"10px 14px",
-                marginBottom:10,
+                background:"#fef2f2", border:"1px solid #fecdd3",
+                borderRadius:8, padding:"10px 14px", marginBottom:12,
+                fontSize:12, color:"#c0392b", whiteSpace:"pre-wrap", lineHeight:1.6,
               }}>
-                <div style={{ fontSize:10, color:"#b8922e", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:0.5 }}>
-                  上次留言 / Nota anterior
-                </div>
-                <div style={{ fontSize:13, color:"#334155", lineHeight:1.6, whiteSpace:"pre-wrap" }}>
-                  {c.nota_china.texto}
-                </div>
-                {c.nota_china.fecha && (
-                  <div style={{ fontSize:10, color:"#94a3b8", marginTop:5 }}>
-                    {fmtDateZH(c.nota_china.fecha)} — {fmtDate(c.nota_china.fecha)}
-                  </div>
-                )}
+                {errorMsg}
               </div>
             )}
 
-            <textarea
-              value={notaTexto}
-              onChange={e => { setNotaTexto(e.target.value); setNotaGuardada(false); }}
-              placeholder={"写下您的回复或报价信息...\nEscriba su respuesta o información de cotización..."}
-              rows={4}
-              style={{
-                width:"100%",
-                background:"#fff",
-                border:"1px solid #e2e8f0",
-                borderRadius:8,
-                color:"#0f172a",
-                padding:"10px 12px",
-                fontSize:13,
-                outline:"none",
-                resize:"vertical",
-                boxSizing:"border-box",
-                lineHeight:1.6,
-                fontFamily:"inherit",
-              }}
-            />
-            <div style={{ display:"flex", alignItems:"center", gap:10, marginTop:8 }}>
-              <button
-                disabled={!notaTexto.trim() || guardando}
-                onClick={async () => {
-                  if (!notaTexto.trim() || guardando) return
-                  setGuardando(true)
-                  try {
-                    const { _id, _updated, ...datosSinMeta } = c
-                    const newDatos = {
-                      ...datosSinMeta,
-                      nota_china: { texto: notaTexto.trim(), fecha: new Date().toISOString() },
-                      nota_china_nueva: true,
-                    }
-                    await supabase.from("cotizaciones").update({ datos: newDatos }).eq("id", c._id)
-                    setNotaGuardada(true)
-                    if (onNotaSaved) onNotaSaved()
-                  } catch(e) {
-                    console.error("Error guardando nota:", e)
-                  }
-                  setGuardando(false)
-                }}
+            {/* Historial de notas existentes */}
+            {historialChina.length > 0 && (
+              <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:12 }}>
+                {historialChina.map((nota) => {
+                  const esEditando = editandoId === nota.id
+                  const esEliminando = eliminandoId === nota.id
+                  return (
+                    <div key={nota.id} style={{
+                      background: esEditando ? "#fffbeb" : "#f0f9ff",
+                      border: esEditando ? "1px solid #c9a05560" : "1px solid #06b6d430",
+                      borderLeft: `3px solid ${esEditando ? "#c9a055" : "#2a8aaa"}`,
+                      borderRadius:"0 8px 8px 0",
+                      padding:"10px 14px",
+                      opacity: esEliminando ? 0.5 : 1,
+                      transition:"opacity 0.2s",
+                    }}>
+                      {esEditando ? (
+                        /* Modo edición */
+                        <div>
+                          <textarea
+                            value={editTexto}
+                            onChange={e => setEditTexto(e.target.value)}
+                            rows={3}
+                            autoFocus
+                            style={{
+                              width:"100%", background:"#fff",
+                              border:"1px solid #e2e8f0", borderRadius:6,
+                              color:"#0f172a", padding:"8px 10px",
+                              fontSize:12, outline:"none", resize:"vertical",
+                              boxSizing:"border-box", lineHeight:1.5,
+                              fontFamily:"inherit",
+                            }}
+                          />
+                          <div style={{ display:"flex", gap:6, marginTop:8 }}>
+                            <button
+                              disabled={!editTexto.trim() || guardandoEdit}
+                              onClick={() => handleGuardarEdicion(nota.id)}
+                              style={{
+                                background: editTexto.trim() && !guardandoEdit ? "#040c18" : "#e2e8f0",
+                                color: editTexto.trim() && !guardandoEdit ? "#c9a055" : "#94a3b8",
+                                border:"none", borderRadius:6,
+                                padding:"6px 14px", fontSize:11,
+                                cursor: editTexto.trim() && !guardandoEdit ? "pointer" : "default",
+                                fontWeight:700, fontFamily:"inherit",
+                              }}
+                            >
+                              {guardandoEdit ? "保存中..." : "💾 保存 / Guardar"}
+                            </button>
+                            <button
+                              onClick={() => { setEditandoId(null); setEditTexto(""); }}
+                              style={{
+                                background:"#f1f5f9", color:"#64748b",
+                                border:"1px solid #e2e8f0", borderRadius:6,
+                                padding:"6px 14px", fontSize:11,
+                                cursor:"pointer", fontFamily:"inherit",
+                              }}
+                            >
+                              取消 / Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Modo vista */
+                        <div>
+                          <div style={{ fontSize:13, color:"#0f172a", lineHeight:1.65, whiteSpace:"pre-wrap", marginBottom:6 }}>
+                            {nota.texto}
+                          </div>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:6 }}>
+                            <div style={{ fontSize:10, color:"#94a3b8" }}>
+                              {nota.fecha ? fmtDateZH(nota.fecha) + " — " + fmtDate(nota.fecha) : ""}
+                              {nota.editado && <span style={{ marginLeft:6, fontStyle:"italic" }}>(已编辑)</span>}
+                            </div>
+                            <div style={{ display:"flex", gap:6 }}>
+                              <button
+                                onClick={() => { setEditandoId(nota.id); setEditTexto(nota.texto); setErrorMsg(""); }}
+                                style={{
+                                  background:"#f1f5f9", color:"#475569",
+                                  border:"1px solid #e2e8f0", borderRadius:5,
+                                  padding:"3px 10px", fontSize:11,
+                                  cursor:"pointer", fontFamily:"inherit",
+                                }}
+                              >
+                                ✏️ 编辑
+                              </button>
+                              <button
+                                disabled={esEliminando}
+                                onClick={() => handleEliminar(nota.id)}
+                                style={{
+                                  background:"#fef2f2", color:"#c0392b",
+                                  border:"1px solid #fecdd3", borderRadius:5,
+                                  padding:"3px 10px", fontSize:11,
+                                  cursor: esEliminando ? "default" : "pointer",
+                                  fontFamily:"inherit",
+                                }}
+                              >
+                                🗑️ 删除
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Formulario nueva nota */}
+            <div style={{
+              background:"#f8fafc",
+              border:"1px solid #e2e8f0",
+              borderRadius:8, padding:"12px 14px",
+            }}>
+              <div style={{ fontSize:10, fontWeight:700, color:"#475569", marginBottom:7, textTransform:"uppercase", letterSpacing:0.5 }}>
+                + 新留言 / Nueva nota
+              </div>
+              <textarea
+                value={nuevaTexto}
+                onChange={e => { setNuevaTexto(e.target.value); setErrorMsg(""); }}
+                placeholder={"写下报价、问题或意见...\nEscriba su cotización, preguntas u observaciones..."}
+                rows={3}
                 style={{
-                  background: notaTexto.trim() && !guardando ? "#040c18" : "#e2e8f0",
-                  color: notaTexto.trim() && !guardando ? "#c9a055" : "#94a3b8",
-                  border:"none",
-                  borderRadius:8,
-                  padding:"9px 20px",
-                  fontSize:13,
-                  cursor: notaTexto.trim() && !guardando ? "pointer" : "default",
-                  fontWeight:700,
+                  width:"100%", background:"#fff",
+                  border:"1px solid #e2e8f0", borderRadius:6,
+                  color:"#0f172a", padding:"9px 12px",
+                  fontSize:13, outline:"none", resize:"vertical",
+                  boxSizing:"border-box", lineHeight:1.6,
                   fontFamily:"inherit",
-                  transition:"all 0.2s",
+                }}
+              />
+              <button
+                disabled={!nuevaTexto.trim() || guardando}
+                onClick={handleGuardar}
+                style={{
+                  marginTop:8,
+                  background: nuevaTexto.trim() && !guardando ? "#040c18" : "#e2e8f0",
+                  color: nuevaTexto.trim() && !guardando ? "#c9a055" : "#94a3b8",
+                  border:"none", borderRadius:7,
+                  padding:"9px 20px", fontSize:13,
+                  cursor: nuevaTexto.trim() && !guardando ? "pointer" : "default",
+                  fontWeight:700, fontFamily:"inherit", transition:"all 0.2s",
                 }}
               >
                 {guardando ? "发送中... / Enviando..." : "📩 发送留言 / Enviar nota"}
               </button>
-              {notaGuardada && (
-                <span style={{
-                  fontSize:12, color:"#1aa358", fontWeight:700,
-                  display:"flex", alignItems:"center", gap:5,
-                }}>
-                  ✓ 已发送 / Enviada correctamente
-                </span>
-              )}
             </div>
           </div>
 
