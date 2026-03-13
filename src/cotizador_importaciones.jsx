@@ -1883,6 +1883,10 @@ Número de seguimiento: ${c.nro}`;
                               },300);
                             } else if(a.accion==="gestionar"){
                               setOpenId(a.id);
+                              setTimeout(()=>{
+                                const el=document.getElementById(`card-${a.id}`);
+                                if(el) el.scrollIntoView({behavior:"smooth",block:"center"});
+                              },300);
                             } else {
                               setPreviewId(a.id);
                             }
