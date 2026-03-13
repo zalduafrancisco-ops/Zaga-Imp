@@ -291,6 +291,23 @@ export default function App({ supabase, usuario, onLogout }){
       setCargando(false);
     };
     cargar();
+    // ── REAL-TIME: detectar cambios externos (ej. nota del agente China) ──
+    const channel=supabase.channel("zaga-cotizador-admin-v1")
+      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"cotizaciones"},async(payload)=>{
+        // Recarga solo la cotización modificada sin sobreescribir el estado local
+        const {data}=await supabase.from("cotizaciones").select("id,datos").eq("id",payload.new.id).single();
+        if(data){
+          const nuevaDatos=data.datos;
+          // Si tiene nota china nueva, mostrar toast de alerta
+          if(nuevaDatos?.nota_china_nueva&&nuevaDatos?.nota_china?.texto){
+            showToast(`🇨🇳 El agente China respondió en "${nuevaDatos.nro||nuevaDatos.producto||"cotización"}"`, "ok");
+          }
+          cotizacionesRef.current=cotizacionesRef.current.map(c=>c.id===nuevaDatos.id?nuevaDatos:c);
+          setCotizaciones(prev=>prev.map(c=>c.id===nuevaDatos.id?nuevaDatos:c));
+        }
+      })
+      .subscribe();
+    return ()=>{ supabase.removeChannel(channel); };
   },[]);
 
   const exportarDatos=()=>{
