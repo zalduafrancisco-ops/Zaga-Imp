@@ -1809,6 +1809,12 @@ Número de seguimiento: ${c.nro}`;
                   const que=sinDimensiones?"dimensiones (L×A×H)":"unidades por caja";
                   alertas.push({nivel:"info",ico:"📐",titulo:`${c.nro} — ${c.cliente||c.producto}`,msg:`Pago recibido pero sin ${que} — proyección M³ incompleta`,id:c.id,accion:"dimensiones"});
                 }
+
+                // 8. Nota nueva del agente China
+                if(c.nota_china_nueva&&c.nota_china?.texto){
+                  const preview = c.nota_china.texto.length>80 ? c.nota_china.texto.slice(0,80)+"…" : c.nota_china.texto;
+                  alertas.push({nivel:"critico",ico:"🇨🇳",titulo:`${c.nro} — ${c.producto}`,msg:`El agente China respondió: "${preview}"`,id:c.id,accion:"gestionar"});
+                }
               });
 
               if(alertas.length===0) return null;
@@ -2282,6 +2288,37 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                             )}
                           </div>
+
+                          {/* ── NOTA DE CHINA ── */}
+                          {c.nota_china?.texto&&(
+                            <div style={{marginTop:20,borderTop:"1px solid #e2e8f0",paddingTop:16}}>
+                              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                                <span style={{fontSize:14}}>🇨🇳</span>
+                                <span style={{fontSize:10,fontWeight:700,color:"#b8922e",textTransform:"uppercase",letterSpacing:1}}>Nota del agente China</span>
+                                {c.nota_china_nueva&&(
+                                  <span style={{background:"#c0392b",color:"#fff",fontSize:9,fontWeight:800,borderRadius:4,padding:"2px 7px",letterSpacing:0.5,textTransform:"uppercase",animation:"pulse 1.5s infinite"}}>
+                                    NUEVA
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{background:c.nota_china_nueva?"#fef3cd":"#fffbeb",border:c.nota_china_nueva?"2px solid #c9a055":"1px solid #c9a05540",borderLeft:`4px solid ${c.nota_china_nueva?"#c0392b":"#c9a055"}`,borderRadius:"0 10px 10px 0",padding:"12px 16px",marginBottom:10}}>
+                                <div style={{fontSize:13,color:"#334155",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{c.nota_china.texto}</div>
+                                {c.nota_china.fecha&&(
+                                  <div style={{fontSize:10,color:"#94a3b8",marginTop:6}}>
+                                    {new Date(c.nota_china.fecha).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+                                  </div>
+                                )}
+                              </div>
+                              {c.nota_china_nueva&&(
+                                <button onClick={async()=>{
+                                  await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,nota_china_nueva:false}:x));
+                                  showToast("Nota de China marcada como leída ✓");
+                                }} style={{background:"#040c18",color:"#c9a055",border:"none",borderRadius:7,padding:"7px 16px",fontSize:11,cursor:"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
+                                  ✓ Marcar como leída
+                                </button>
+                              )}
+                            </div>
+                          )}
 
                           {/* ── NOTAS INTERNAS ── */}
                           <div style={{marginTop:20,borderTop:"1px solid #e2e8f0",paddingTop:16}}>
