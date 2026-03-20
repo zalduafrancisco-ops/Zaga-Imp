@@ -3117,20 +3117,7 @@ Número de seguimiento: ${c.nro}`;
                           {comp>0&&<span style={{fontSize:11,color:"#0d9870"}}>✅ {comp} completada{comp!==1?"s":""}</span>}
                           {rech>0&&<span style={{fontSize:11,color:"#94a3b8"}}>✗ {rech} rechazada{rech!==1?"s":""}</span>}
                         </div>
-                        {/* Números de cotización */}
-                        {imps.length>0&&(
-                          <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>
-                            {imps.map(c=>(
-                              <span key={c.id} style={{
-                                fontSize:10,fontFamily:"monospace",
-                                color:PROCESADAS.includes(c.estado)&&c.estado!=="completada"?"#c47830":c.estado==="completada"?"#0d9870":["rechazada_cliente","anulada","no_procesada"].includes(c.estado)?"#cbd5e1":"#64748b",
-                                background:PROCESADAS.includes(c.estado)&&c.estado!=="completada"?"#fdf0e3":c.estado==="completada"?"#f0fdf4":["rechazada_cliente","anulada","no_procesada"].includes(c.estado)?"#f8fafc":"#f1f5f9",
-                                border:`1px solid ${PROCESADAS.includes(c.estado)&&c.estado!=="completada"?"#f59e0b33":c.estado==="completada"?"#bbf7d0":"#e2e8f0"}`,
-                                borderRadius:4,padding:"1px 6px",whiteSpace:"nowrap",
-                              }}>{c.nro||"—"}</span>
-                            ))}
-                          </div>
-                        )}
+
                         {/* Mini barra conversión */}
                         <div style={{display:"flex",alignItems:"center",gap:6}}>
                           <div style={{flex:1,height:3,background:"#e2e8f0",borderRadius:4,overflow:"hidden"}}>
