@@ -819,6 +819,76 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
             </Campo>
           )}
 
+          {/* Notas de negociacion — solo visible en estado en_negociacion */}
+          {est === "en_negociacion" && Array.isArray(c.negociacion_rondas) && c.negociacion_rondas.filter(r => r.nota).length > 0 && (
+            <div style={{
+              background:"#fffbeb",
+              border:"1px solid #f59e0b44",
+              borderRadius:10,
+              overflow:"hidden",
+            }}>
+              {/* Header */}
+              <div style={{
+                background:"#fef3c7",
+                borderBottom:"1px solid #f59e0b33",
+                padding:"9px 14px",
+                display:"flex", alignItems:"center", gap:8,
+              }}>
+                <span style={{ fontSize:14 }}>🤝</span>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, color:"#92400e" }}>
+                    谈判记录 / Historial de negociacion
+                  </div>
+                  <div style={{ fontSize:10, color:"#b45309", marginTop:1 }}>
+                    来自ZAGA管理员的谈判说明 / Notas del administrador ZAGA sobre esta negociacion
+                  </div>
+                </div>
+                <span style={{
+                  marginLeft:"auto",
+                  background:"#92400e", color:"#fef3c7",
+                  borderRadius:20, padding:"2px 9px",
+                  fontSize:11, fontWeight:700,
+                }}>
+                  {c.negociacion_rondas.filter(r => r.nota).length} nota{c.negociacion_rondas.filter(r => r.nota).length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              {/* Lista de rondas con nota */}
+              <div style={{ padding:"10px 14px", display:"flex", flexDirection:"column", gap:8 }}>
+                {c.negociacion_rondas.filter(r => r.nota).map((r, i) => (
+                  <div key={i} style={{
+                    background:"#fff",
+                    border:"1px solid #f59e0b22",
+                    borderLeft:"3px solid #f59e0b",
+                    borderRadius:"0 8px 8px 0",
+                    padding:"10px 14px",
+                  }}>
+                    <div style={{ fontSize:13, color:"#0f172a", lineHeight:1.65, whiteSpace:"pre-wrap" }}>
+                      {r.nota}
+                    </div>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:6, flexWrap:"wrap", gap:4 }}>
+                      <div style={{ fontSize:10, color:"#94a3b8" }}>
+                        {r.fecha ? fmtDateZH(r.fecha) + " — " + fmtDate(r.fecha) : ""}
+                      </div>
+                      {r.estado && (
+                        <span style={{
+                          fontSize:10, fontWeight:700,
+                          color: r.estado === "aplicada" ? "#1aa358" : r.estado === "rechazada" ? "#c0392b" : "#c47830",
+                          background: r.estado === "aplicada" ? "#f0fdf4" : r.estado === "rechazada" ? "#fef2f2" : "#fdf0e3",
+                          border: `1px solid ${r.estado === "aplicada" ? "#bbf7d0" : r.estado === "rechazada" ? "#fecdd3" : "#f59e0b33"}`,
+                          borderRadius:20, padding:"2px 9px",
+                        }}>
+                          {r.estado === "aplicada" ? "✓ 已采用 / Aplicada"
+                           : r.estado === "rechazada" ? "✗ 已拒绝 / Rechazada"
+                           : "⏳ 待确认 / Pendiente"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Fecha llegada estimada — solo en tab camino */}
           {c.fecha_llegada_est && ESTADOS_CAMINO.includes(est) && (
             <Campo es="预计到达时间" zh="Fecha estimada de llegada">
