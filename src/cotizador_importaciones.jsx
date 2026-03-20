@@ -3061,7 +3061,12 @@ Número de seguimiento: ${c.nro}`;
 
         {/* ══ CLIENTES ══ */}
         {tab2==="clientes"&&(()=>{
-          const clientes=[...new Set(cotizaciones.filter(c=>c.tipo!=="propia"&&c.cliente).map(c=>c.cliente))].sort();
+          const clientes=[...new Set(cotizaciones.filter(c=>c.tipo!=="propia"&&c.cliente).map(c=>c.cliente))]
+            .sort((a,b)=>{
+              const ganA=cotizaciones.filter(c=>c.cliente===a&&c.tipo!=="propia"&&!["rechazada_cliente","anulada","no_procesada"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+              const ganB=cotizaciones.filter(c=>c.cliente===b&&c.tipo!=="propia"&&!["rechazada_cliente","anulada","no_procesada"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+              return ganB-ganA;
+            });
           const todasCliente=clienteSeleccionado?cotizaciones.filter(c=>c.cliente===clienteSeleccionado&&c.tipo!=="propia"):[];
 
           // Estados agrupados para filtro
@@ -3079,6 +3084,7 @@ Número de seguimiento: ${c.nro}`;
           const totPagado=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.totCl||0),0);
           const tot1er=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.p1Cl||0),0);
           const tot2do=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.p2Cl||0),0);
+          const totGanancia=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
           const enCurso=todasCliente.filter(c=>PROCESADAS.includes(c.estado)&&c.estado!=="completada").length;
           const completadas=todasCliente.filter(c=>c.estado==="completada").length;
           const rechazadas=todasCliente.filter(c=>RECHAZADAS.includes(c.estado)).length;
@@ -3097,6 +3103,7 @@ Número de seguimiento: ${c.nro}`;
                     const comp=imps.filter(c=>c.estado==="completada").length;
                     const rech=imps.filter(c=>["rechazada_cliente","anulada","no_procesada"].includes(c.estado)).length;
                     const conv=imps.length>0?Math.round((imps.filter(c=>PROCESADAS.includes(c.estado)).length/imps.length)*100):0;
+                    const ganTotal=imps.filter(c=>!["rechazada_cliente","anulada","no_procesada"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
                     const sel=clienteSeleccionado===cl;
                     const tienePrimerPago=imps.some(c=>c.checklist?.pago1_cliente);
                     const tieneAcceso=imps.some(c=>c.app_email);
@@ -3125,6 +3132,11 @@ Número de seguimiento: ${c.nro}`;
                           </div>
                           <span style={{fontSize:10,color:"#64748b",whiteSpace:"nowrap"}}>{conv}% conv.</span>
                         </div>
+                        {ganTotal>0&&(
+                          <div style={{marginTop:6,fontSize:11,fontWeight:700,color:"#c9a055"}}>
+                            💰 {fmt(ganTotal)} ganancia
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -3200,13 +3212,27 @@ Número de seguimiento: ${c.nro}`;
 
                   {/* Financiero — solo cotizaciones no rechazadas */}
                   {totPagado>0&&(
-                    <div className="dash-fin3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
-                      {[["Total facturado",fmt(totPagado),"#0f172a"],["1er pago",fmt(tot1er),"#16a34a"],["2do pago",fmt(tot2do),"#334155"]].map(([l,v,col])=>(
-                        <div key={l} style={{background:"#f0fdf4",borderRadius:10,padding:"12px 14px",border:"1px solid #bbf7d0",textAlign:"center"}}>
-                          <div style={{fontSize:10,color:"#64748b",marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>{l}</div>
-                          <div style={{fontSize:15,fontWeight:800,color:col}}>{v}</div>
+                    <div style={{marginBottom:16}}>
+                      {totGanancia>0&&(
+                        <div style={{background:"#040c18",borderRadius:10,padding:"14px 18px",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between",border:"1px solid #c9a05530"}}>
+                          <div>
+                            <div style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>💰 Ganancia total ZAGA</div>
+                            <div style={{fontSize:22,fontWeight:800,color:"#c9a055"}}>{fmt(totGanancia)}</div>
+                          </div>
+                          <div style={{textAlign:"right"}}>
+                            <div style={{fontSize:10,color:"#94a3b8",marginBottom:3}}>sobre {fmt(totPagado)} facturado</div>
+                            <div style={{fontSize:13,fontWeight:700,color:"#c9a05599"}}>{totPagado>0?Math.round((totGanancia/totPagado)*100):0}% margen</div>
+                          </div>
                         </div>
-                      ))}
+                      )}
+                      <div className="dash-fin3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+                        {[["Total facturado",fmt(totPagado),"#0f172a"],["1er pago",fmt(tot1er),"#16a34a"],["2do pago",fmt(tot2do),"#334155"]].map(([l,v,col])=>(
+                          <div key={l} style={{background:"#f0fdf4",borderRadius:10,padding:"12px 14px",border:"1px solid #bbf7d0",textAlign:"center"}}>
+                            <div style={{fontSize:10,color:"#64748b",marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>{l}</div>
+                            <div style={{fontSize:15,fontWeight:800,color:col}}>{v}</div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
