@@ -256,6 +256,10 @@ export default function App({ supabase, usuario, onLogout }){
     try{ return new Set(JSON.parse(localStorage.getItem("zaga_alertas_leidas")||"[]")); }
     catch(e){ return new Set(); }
   });
+  const [clientCodes,setClientCodes]=useState(()=>{
+    try{ return JSON.parse(localStorage.getItem("zaga_client_codes")||"{}"); }
+    catch(e){ return {}; }
+  });
 
   // ── CARGA INICIAL DESDE SUPABASE ──────────────────────────────
   useEffect(()=>{
@@ -495,6 +499,27 @@ export default function App({ supabase, usuario, onLogout }){
   const getChecklist=c=>c.tipo==="propia"?CHECKLIST_PROPIA:CHECKLIST_CLIENTE;
   const checkProg=c=>{ const def=getChecklist(c); if(!c.checklist) return{done:0,total:def.length}; return{done:def.filter(d=>c.checklist[d.key]).length,total:def.length}; };
   const clientesUnicos=[...new Set(cotizaciones.filter(c=>c.tipo!=="propia"&&c.cliente).map(c=>c.cliente))].sort();
+
+  // Asigna y persiste codigos unicos de cliente (CLI-001, CLI-002...)
+  // El orden se basa en la fecha de la primera cotizacion de cada cliente
+  const getClientCode=(nombre)=>{
+    if(!nombre) return null;
+    if(clientCodes[nombre]) return clientCodes[nombre];
+    const porFecha=[...new Set(cotizaciones.filter(c=>c.tipo!=="propia"&&c.cliente).map(c=>c.cliente))]
+      .map(cl=>({ cl, fecha: cotizaciones.filter(c=>c.cliente===cl).map(c=>c.fecha_solicitud||"").sort()[0]||"9999" }))
+      .sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    const nuevos={...clientCodes};
+    let changed=false;
+    porFecha.forEach((item,i)=>{
+      const code=`CLI-${String(i+1).padStart(3,"0")}`;
+      if(!nuevos[item.cl]){ nuevos[item.cl]=code; changed=true; }
+    });
+    if(changed){
+      setClientCodes(nuevos);
+      try{ localStorage.setItem("zaga_client_codes",JSON.stringify(nuevos)); }catch(e){}
+    }
+    return nuevos[nombre]||null;
+  };
   const filtradas=cotizaciones.filter(c=>{
     if(c.id===openId) return true; // siempre mostrar la cotización con el panel abierto
     const passEstado=filterEstado==="todos"||c.estado===filterEstado;
@@ -3078,7 +3103,7 @@ Número de seguimiento: ${c.nro}`;
                     return(
                       <div key={cl} onClick={()=>{setClienteSeleccionado(sel?null:cl);setFiltroCliente("todas");}} style={{background:sel?"#f0fdf4":"#f8fafc",border:`1px solid ${sel?"#22c55e55":"#e2e8f0"}`,borderRadius:10,padding:"12px 14px",cursor:"pointer",transition:"all .15s"}}>
                         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                          <span style={{fontWeight:700,fontSize:13,color:sel?"#1aa358":"#0f172a",flex:1}}>👤 {cl}</span>
+                          <div style={{flex:1,minWidth:0}}><span style={{fontWeight:700,fontSize:13,color:sel?"#1aa358":"#0f172a"}}>👤 {cl}</span>{getClientCode(cl)&&<span style={{fontSize:9,fontFamily:"monospace",color:sel?"#1aa358":"#94a3b8",marginLeft:6}}>{getClientCode(cl)}</span>}</div>
                           {tieneAcceso
                             ? <span style={{fontSize:9,fontWeight:700,color:"#16a34a",background:"#f0fdf4",border:"1px solid #22c55e44",borderRadius:20,padding:"2px 8px",whiteSpace:"nowrap"}}>🔐 App activa</span>
                             : tienePrimerPago
@@ -3092,6 +3117,20 @@ Número de seguimiento: ${c.nro}`;
                           {comp>0&&<span style={{fontSize:11,color:"#0d9870"}}>✅ {comp} completada{comp!==1?"s":""}</span>}
                           {rech>0&&<span style={{fontSize:11,color:"#94a3b8"}}>✗ {rech} rechazada{rech!==1?"s":""}</span>}
                         </div>
+                        {/* Números de cotización */}
+                        {imps.length>0&&(
+                          <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>
+                            {imps.map(c=>(
+                              <span key={c.id} style={{
+                                fontSize:10,fontFamily:"monospace",
+                                color:PROCESADAS.includes(c.estado)&&c.estado!=="completada"?"#c47830":c.estado==="completada"?"#0d9870":["rechazada_cliente","anulada","no_procesada"].includes(c.estado)?"#cbd5e1":"#64748b",
+                                background:PROCESADAS.includes(c.estado)&&c.estado!=="completada"?"#fdf0e3":c.estado==="completada"?"#f0fdf4":["rechazada_cliente","anulada","no_procesada"].includes(c.estado)?"#f8fafc":"#f1f5f9",
+                                border:`1px solid ${PROCESADAS.includes(c.estado)&&c.estado!=="completada"?"#f59e0b33":c.estado==="completada"?"#bbf7d0":"#e2e8f0"}`,
+                                borderRadius:4,padding:"1px 6px",whiteSpace:"nowrap",
+                              }}>{c.nro||"—"}</span>
+                            ))}
+                          </div>
+                        )}
                         {/* Mini barra conversión */}
                         <div style={{display:"flex",alignItems:"center",gap:6}}>
                           <div style={{flex:1,height:3,background:"#e2e8f0",borderRadius:4,overflow:"hidden"}}>
@@ -3125,7 +3164,7 @@ Número de seguimiento: ${c.nro}`;
                       </div>
                     ) : (
                       <div style={{display:"flex",alignItems:"center",gap:8,flex:1}}>
-                        <div style={{fontWeight:800,fontSize:18,color:"#0f172a"}}>👤 {clienteSeleccionado}</div>
+                        <div style={{display:"flex",alignItems:"baseline",gap:8}}><div style={{fontWeight:800,fontSize:18,color:"#0f172a"}}>👤 {clienteSeleccionado}</div>{getClientCode(clienteSeleccionado)&&<span style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:"#c9a055",background:"#040c1810",border:"1px solid #c9a05540",borderRadius:6,padding:"2px 8px"}}>{getClientCode(clienteSeleccionado)}</span>}</div>
                         <button onClick={()=>{setRenombrando(true);setNuevoNombreCliente(clienteSeleccionado);}} title="Renombrar cliente" style={{background:"#f8fafc",color:"#94a3b8",border:"1px solid #e2e8f0",borderRadius:7,padding:"4px 9px",fontSize:12,cursor:"pointer"}}>✏️</button>
                       </div>
                     )}
