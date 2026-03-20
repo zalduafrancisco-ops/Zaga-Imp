@@ -548,11 +548,19 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
   const [eliminandoId, setEliminandoId]   = useState(null)
 
   // Funcion central: guarda el array de notas en Supabase
-  // .select("id") es critico: sin el, Supabase no indica si RLS bloqueo el update
+  // IMPORTANTE: lee datos frescos antes de escribir para no pisar cambios del admin
   async function persistirNotas(nuevoHistorial, esNueva) {
-    const { _id, _updated, ...datosSinMeta } = c
+    // 1. Leer version actual de Supabase
+    const { data: fresh, error: fetchErr } = await supabase
+      .from("cotizaciones")
+      .select("datos")
+      .eq("id", c._id)
+      .single()
+    if (fetchErr || !fresh) throw new Error("No se pudo leer cotizacion actualizada: " + (fetchErr?.message||""))
+
+    // 2. Solo modificar las dos claves de notas, sin tocar el resto
     const newDatos = {
-      ...datosSinMeta,
+      ...fresh.datos,
       notas_china_historial: nuevoHistorial,
       nota_china_nueva: esNueva,
     }
