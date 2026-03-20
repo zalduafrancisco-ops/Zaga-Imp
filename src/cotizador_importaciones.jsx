@@ -252,6 +252,10 @@ export default function App({ supabase, usuario, onLogout }){
   const vistaClienteRef                  = useRef(null);
 
   const [cargando,setCargando]=useState(true);
+  const [alertasLeidas,setAlertasLeidas]=useState(()=>{
+    try{ return new Set(JSON.parse(localStorage.getItem("zaga_alertas_leidas")||"[]")); }
+    catch(e){ return new Set(); }
+  });
 
   // ── CARGA INICIAL DESDE SUPABASE ──────────────────────────────
   useEffect(()=>{
@@ -1789,30 +1793,30 @@ Número de seguimiento: ${c.nro}`;
                 if(c.checklist?.pago_china&&!c.fecha_llegada_real&&c.fecha_llegada_est){
                   const fPago=new Date(c.fecha_llegada_est); fPago.setDate(fPago.getDate()-90);
                   const dias=Math.round((hoy-fPago)/(1000*60*60*24));
-                  if(dias>90) alertas.push({nivel:"critico",ico:"🚨",titulo:`${c.nro} — ${c.producto}`,msg:`${dias} días en tránsito sin llegar a Chile (límite: 90d)`,id:c.id,accion:"gestionar"});
-                  else if(dias>75) alertas.push({nivel:"warning",ico:"⚠️",titulo:`${c.nro} — ${c.producto}`,msg:`${dias} días en tránsito — se acerca al límite de 90d`,id:c.id,accion:"gestionar"});
+                  if(dias>90) alertas.push({nivel:"critico",ico:"🚨",titulo:`${c.nro} — ${c.producto}`,msg:`${dias} días en tránsito sin llegar a Chile (límite: 90d)`,id:c.id,accion:"gestionar",alertKey:`${c.id}_transito`});
+                  else if(dias>75) alertas.push({nivel:"warning",ico:"⚠️",titulo:`${c.nro} — ${c.producto}`,msg:`${dias} días en tránsito — se acerca al límite de 90d`,id:c.id,accion:"gestionar",alertKey:`${c.id}_transito_warn`});
                 }
 
                 // 2. Fecha de llegada estimada vencida y no llegó
                 if(c.fecha_llegada_est&&!c.fecha_llegada_real&&c.checklist?.pago_china){
                   const diasAtraso=Math.round((hoy-new Date(c.fecha_llegada_est))/(1000*60*60*24));
-                  if(diasAtraso>0) alertas.push({nivel:"critico",ico:"📅",titulo:`${c.nro} — ${c.producto}`,msg:`Llegada estimada vencida hace ${diasAtraso} día${diasAtraso!==1?"s":""} (${c.fecha_llegada_est})`,id:c.id,accion:"gestionar"});
+                  if(diasAtraso>0) alertas.push({nivel:"critico",ico:"📅",titulo:`${c.nro} — ${c.producto}`,msg:`Llegada estimada vencida hace ${diasAtraso} día${diasAtraso!==1?"s":""} (${c.fecha_llegada_est})`,id:c.id,accion:"gestionar",alertKey:`${c.id}_atraso`});
                 }
 
                 // 3. Cotización enviada al cliente sin respuesta > 7 días
                 if(c.estado==="enviada_cliente"&&c.fecha_solicitud){
                   const diasEspera=Math.round((hoy-new Date(c.fecha_solicitud))/(1000*60*60*24));
-                  if(diasEspera>7) alertas.push({nivel:"warning",ico:"👤",titulo:`${c.nro} — ${c.producto}`,msg:`Sin respuesta del cliente hace ${diasEspera} días (enviada ${c.fecha_solicitud})`,id:c.id,accion:"gestionar"});
+                  if(diasEspera>7) alertas.push({nivel:"warning",ico:"👤",titulo:`${c.nro} — ${c.producto}`,msg:`Sin respuesta del cliente hace ${diasEspera} días (enviada ${c.fecha_solicitud})`,id:c.id,accion:"gestionar",alertKey:`${c.id}_sin_respuesta`});
                 }
 
                 // 4. Mercadería en bodega con 2do pago cliente pendiente
                 if(c.estado==="en_bodega"&&!c.checklist?.pago2_cliente&&c.tipo!=="propia"){
-                  alertas.push({nivel:"warning",ico:"💰",titulo:`${c.nro} — ${c.cliente||c.producto}`,msg:`Mercadería en bodega con 2do pago cliente pendiente de cobrar (${fmt(c.calc?.p2Cl)})`,id:c.id,accion:"gestionar"});
+                  alertas.push({nivel:"warning",ico:"💰",titulo:`${c.nro} — ${c.cliente||c.producto}`,msg:`Mercadería en bodega con 2do pago cliente pendiente de cobrar (${fmt(c.calc?.p2Cl)})`,id:c.id,accion:"gestionar",alertKey:`${c.id}_pago2`});
                 }
 
                 // 5. Fulfillment pendiente de crear producto
                 if(c.fulfillment_cliente!==false&&!c.fulfillment_producto_creado&&c.checklist?.retirado_bodega){
-                  alertas.push({nivel:"info",ico:"🚚",titulo:`${c.nro} — ${c.producto}`,msg:`Producto en bodega pero pendiente de crear en sistema de fulfillment`,id:c.id,accion:"gestionar"});
+                  alertas.push({nivel:"info",ico:"🚚",titulo:`${c.nro} — ${c.producto}`,msg:`Producto en bodega pero pendiente de crear en sistema de fulfillment`,id:c.id,accion:"gestionar",alertKey:`${c.id}_fulfillment`});
                 }
 
                 // 6. Negociación con propuestas pendientes > 5 días
@@ -1821,7 +1825,7 @@ Número de seguimiento: ${c.nro}`;
                 if(pendientes.length>0&&c.estado==="en_negociacion"){
                   const ultima=pendientes[pendientes.length-1];
                   const diasNeg=Math.round((hoy-new Date(ultima.fecha))/(1000*60*60*24));
-                  if(diasNeg>5) alertas.push({nivel:"info",ico:"🤝",titulo:`${c.nro} — ${c.producto}`,msg:`Propuesta de negociación enviada hace ${diasNeg} días sin respuesta de China`,id:c.id,accion:"gestionar"});
+                  if(diasNeg>5) alertas.push({nivel:"info",ico:"🤝",titulo:`${c.nro} — ${c.producto}`,msg:`Propuesta de negociación enviada hace ${diasNeg} días sin respuesta de China`,id:c.id,accion:"gestionar",alertKey:`${c.id}_negociacion`});
                 }
 
                 // 7. Primer pago recibido pero sin dimensiones ingresadas
@@ -1831,22 +1835,38 @@ Número de seguimiento: ${c.nro}`;
                 const activa=!["completada","rechazada_cliente","anulada","no_procesada"].includes(c.estado);
                 if(tienePrimerPago&&activa&&(sinDimensiones||sinCajas)){
                   const que=sinDimensiones?"dimensiones (L×A×H)":"unidades por caja";
-                  alertas.push({nivel:"info",ico:"📐",titulo:`${c.nro} — ${c.cliente||c.producto}`,msg:`Pago recibido pero sin ${que} — proyección M³ incompleta`,id:c.id,accion:"dimensiones"});
+                  alertas.push({nivel:"info",ico:"📐",titulo:`${c.nro} — ${c.cliente||c.producto}`,msg:`Pago recibido pero sin ${que} — proyección M³ incompleta`,id:c.id,accion:"dimensiones",alertKey:`${c.id}_dimensiones`});
                 }
 
                 // 8. Nota nueva del agente China sin leer
                 if(c.nota_china_nueva&&Array.isArray(c.notas_china_historial)&&c.notas_china_historial.length>0){
                   const ultima=c.notas_china_historial[c.notas_china_historial.length-1];
                   const preview=ultima?.texto?.length>70?ultima.texto.slice(0,70)+"...":ultima?.texto||"";
-                  alertas.push({nivel:"critico",ico:"🇨🇳",titulo:`${c.nro} — ${c.producto}`,msg:`El agente China dejó una nota: "${preview}"`,id:c.id,accion:"gestionar"});
+                  alertas.push({nivel:"critico",ico:"🇨🇳",titulo:`${c.nro} — ${c.producto}`,msg:`El agente China dejó una nota: "${preview}"`,id:c.id,accion:"gestionar",alertKey:`${c.id}_china_nota`});
                 }
               });
 
               if(alertas.length===0) return null;
 
-              const criticas=alertas.filter(a=>a.nivel==="critico");
-              const warnings=alertas.filter(a=>a.nivel==="warning");
-              const infos=alertas.filter(a=>a.nivel==="info");
+              const alertasFiltradas=alertas.filter(a=>!alertasLeidas.has(a.alertKey));
+              if(alertasFiltradas.length===0) return(
+                <div style={{marginBottom:20,background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:12,padding:"14px 18px",display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:16}}>✅</span>
+                  <span style={{fontSize:13,color:"#16a34a",fontWeight:600}}>Sin alertas activas — todas marcadas como leídas</span>
+                  <button onClick={()=>{ setAlertasLeidas(new Set()); localStorage.removeItem("zaga_alertas_leidas"); }} style={{marginLeft:"auto",background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:7,padding:"4px 12px",fontSize:11,cursor:"pointer"}}>Restablecer</button>
+                </div>
+              );
+
+              const criticas=alertasFiltradas.filter(a=>a.nivel==="critico");
+              const warnings=alertasFiltradas.filter(a=>a.nivel==="warning");
+              const infos=alertasFiltradas.filter(a=>a.nivel==="info");
+
+              const marcarLeida=(key)=>{
+                const nuevas=new Set(alertasLeidas);
+                nuevas.add(key);
+                setAlertasLeidas(nuevas);
+                try{ localStorage.setItem("zaga_alertas_leidas",JSON.stringify([...nuevas])); }catch(e){}
+              };
 
               return(
                 <div style={{marginBottom:20,background:"#fff1f2",border:"1px solid #fecdd3",borderRadius:12,overflow:"hidden"}}>
@@ -1855,7 +1875,7 @@ Número de seguimiento: ${c.nro}`;
                       <span style={{fontSize:16}}>🔔</span>
                       <span style={{fontWeight:700,fontSize:13,color:"#c0392b"}}>Centro de Alertas</span>
                       <span style={{fontSize:12,color:"#64748b"}}>—</span>
-                      <span style={{fontSize:12,color:"#64748b"}}>{alertas.length} alerta{alertas.length!==1?"s":""} activa{alertas.length!==1?"s":""}</span>
+                      <span style={{fontSize:12,color:"#64748b"}}>{alertasFiltradas.length} alerta{alertasFiltradas.length!==1?"s":""} activa{alertasFiltradas.length!==1?"s":""}</span>
                     </div>
                     <div style={{display:"flex",gap:6}}>
                       {criticas.length>0&&<span style={{background:"#ef444422",color:"#c0392b",border:"1px solid #ef444444",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>🚨 {criticas.length} crítica{criticas.length!==1?"s":""}</span>}
@@ -1864,40 +1884,45 @@ Número de seguimiento: ${c.nro}`;
                     </div>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:0}}>
-                    {alertas.map((a,i)=>{
+                    {alertasFiltradas.map((a,i)=>{
                       const cfg={
                         critico:{bg:"#1a0a0a",border:"#c0392b33",icon_bg:"#ef444422",color:"#c0392b"},
                         warning:{bg:"#12160a",border:"#b8922e33",icon_bg:"#b8922e22",color:"#b8922e"},
                         info:{bg:"#0a1020",border:"#2d78c833",icon_bg:"#2d78c822",color:"#2d78c8"},
                       }[a.nivel];
                       return(
-                        <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 18px",background:cfg.bg,borderBottom:i<alertas.length-1?`1px solid ${cfg.border}`:"none"}}>
+                        <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 18px",background:cfg.bg,borderBottom:i<alertasFiltradas.length-1?`1px solid ${cfg.border}`:"none"}}>
                           <div style={{width:32,height:32,borderRadius:8,background:cfg.icon_bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{a.ico}</div>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:12,fontWeight:700,color:cfg.color,marginBottom:2}}>{a.titulo}</div>
                             <div style={{fontSize:11,color:"#64748b"}}>{a.msg}</div>
                           </div>
-                          <button onClick={()=>{
-                            setTab("tracker");
-                            setFilterEstado("todos");
-                            if(a.accion==="dimensiones"){
-                              setOpenId(a.id);
-                              setTimeout(()=>{
-                                const el=document.getElementById(`dim-section-${a.id}`);
-                                if(el) el.scrollIntoView({behavior:"smooth",block:"center"});
-                              },300);
-                            } else if(a.accion==="gestionar"){
-                              setOpenId(a.id);
-                              setTimeout(()=>{
-                                const el=document.getElementById(`card-${a.id}`);
-                                if(el) el.scrollIntoView({behavior:"smooth",block:"center"});
-                              },300);
-                            } else {
-                              setPreviewId(a.id);
-                            }
-                          }} style={{background:cfg.icon_bg,color:cfg.color,border:`1px solid ${cfg.border}`,borderRadius:7,padding:"5px 12px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
-                            {a.accion==="dimensiones"?"📐 Completar →":a.accion==="gestionar"?"Gestionar →":"Ver →"}
-                          </button>
+                          <div style={{display:"flex",gap:6,flexShrink:0}}>
+                            <button onClick={()=>{
+                              setTab("tracker");
+                              setFilterEstado("todos");
+                              if(a.accion==="dimensiones"){
+                                setOpenId(a.id);
+                                setTimeout(()=>{
+                                  const el=document.getElementById(`dim-section-${a.id}`);
+                                  if(el) el.scrollIntoView({behavior:"smooth",block:"center"});
+                                },300);
+                              } else if(a.accion==="gestionar"){
+                                setOpenId(a.id);
+                                setTimeout(()=>{
+                                  const el=document.getElementById(`card-${a.id}`);
+                                  if(el) el.scrollIntoView({behavior:"smooth",block:"center"});
+                                },300);
+                              } else {
+                                setPreviewId(a.id);
+                              }
+                            }} style={{background:cfg.icon_bg,color:cfg.color,border:`1px solid ${cfg.border}`,borderRadius:7,padding:"5px 12px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>
+                              {a.accion==="dimensiones"?"📐 Completar →":a.accion==="gestionar"?"Gestionar →":"Ver →"}
+                            </button>
+                            <button onClick={()=>marcarLeida(a.alertKey)} title="Marcar como leída" style={{background:"#ffffff10",color:"#64748b",border:"1px solid #ffffff15",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>
+                              ✓ Leída
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
