@@ -746,8 +746,12 @@ export default function App({ supabase, usuario, onLogout }){
       {/* MODAL RESUMEN PARA CHINA */}
       {resumenChina&&(()=>{
         const c=resumenChina;
+        const esPropia=c.tipo==="propia";
         const transp=c.transporte==="aereo"?"✈️ Aéreo":c.transporte==="ambos"?"🚢 Marítimo + ✈️ Aéreo (cotizar ambos)":"🚢 Marítimo";
-        const texto=`Hola! Te mando cotización ${c.nro} 🙌${c.categoria_cliente==="premium"?" — ⭐ CLIENTE PREMIUM, prioridad favor":c.categoria_cliente==="recurrente"?" — Cliente recurrente nuestro":""}
+        const saludo=esPropia
+          ? `Hola! Te mando cotización ${c.nro} 🙌`
+          : `Hola! Te mando cotización ${c.nro} 🙌${c.categoria_cliente==="premium"?" — ⭐ CLIENTE PREMIUM, prioridad favor":c.categoria_cliente==="recurrente"?" — Cliente recurrente nuestro":""}`;
+        const texto=`${saludo}
 
 📦 Producto: ${c.producto}
 🔢 Cantidad: ${c.unidades||"Por confirmar"} unidades
@@ -1712,10 +1716,10 @@ Número de seguimiento: ${c.nro}`;
 
             {/* BOTONES GUARDAR — fuera del grid, siempre visibles */}
             <div style={{marginTop:16}}>
-              {esPaso1&&form.tipo==="cliente"&&(
+              {esPaso1&&(
                 <div style={{marginBottom:12}}>
                   <div style={{background:"#f5f3ff",border:"1px solid #ddd6fe",borderRadius:10,padding:"12px 16px",marginBottom:10}}>
-                    <div style={{fontSize:11,color:"#334155",fontWeight:700,marginBottom:4}}>📥 PASO 1 — Registrar solicitud del cliente</div>
+                    <div style={{fontSize:11,color:"#334155",fontWeight:700,marginBottom:4}}>📥 PASO 1 — {form.tipo==="propia"?"Registrar importación propia":"Registrar solicitud del cliente"}</div>
                     <div style={{fontSize:11,color:"#64748b",lineHeight:1.5}}>¿China aún no te ha respondido el precio? Guarda la solicitud ahora con el link y las variantes. Cuando China responda, editas y agregas el precio para calcular todo.</div>
                   </div>
                   <button onClick={handleSaveSolicitud} style={{width:"100%",background:"#ffffff",border:"2px solid #040c18",borderRadius:10,padding:12,fontSize:13,fontWeight:700,color:"#040c18",cursor:"pointer"}}>
