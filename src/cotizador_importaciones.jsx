@@ -2809,7 +2809,7 @@ Número de seguimiento: ${c.nro}`;
 
               // Importaciones de Luisa con 1er pago recibido, agrupadas por mes
               const luisaCerradas=cotizaciones.filter(c=>
-                c.gestor==="luisa"&&c.tipo!=="propia"&&c.checklist?.pago1_cliente&&c.fecha_pago1_cliente
+                c.gestor==="luisa"&&c.tipo!=="propia"&&c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["rechazada_cliente","anulada","no_procesada"].includes(c.estado)
               );
 
               // Agrupar por mes de fecha_pago1_cliente
@@ -3447,7 +3447,7 @@ Número de seguimiento: ${c.nro}`;
 
           const todas=cotizaciones.filter(c=>c.gestor==="luisa"&&c.tipo!=="propia");
           const enProceso=todas.filter(c=>["enviado_china","respuesta_china","enviada_cliente","en_negociacion","aceptada","pagada_china","en_camino"].includes(c.estado));
-          const cerradas=todas.filter(c=>c.checklist?.pago1_cliente&&c.fecha_pago1_cliente);
+          const cerradas=todas.filter(c=>c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["rechazada_cliente","anulada","no_procesada"].includes(c.estado));
           const completadas=todas.filter(c=>c.estado==="completada");
 
           // Ganancias reales por mes (base para comisión)
@@ -3573,15 +3573,15 @@ Número de seguimiento: ${c.nro}`;
                     </div>
                     <div style={{borderTop:"1px solid #22c55e33",paddingTop:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <span style={{fontSize:13,color:"#1aa358",fontWeight:700}}>Comisión proyectada</span>
-                      <span style={{fontSize:22,fontWeight:800,color:"#1aa358"}}>{fmt(proyComision)}</span>
+                      <span style={{fontSize:22,fontWeight:800,color:"#64748b"}}>{fmt(proyComision)}</span>
                     </div>
                   </div>
                   {proyPendientes.length>0&&(
                     <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:4}}>
                       {proyPendientes.map(c=>(
-                        <div key={c.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"4px 8px",background:"#f0fdf4",borderRadius:6}}>
-                          <span style={{color:"#475569"}}>{c.nro} · {c.cliente}</span>
-                          <span style={{color:"#16a34a",fontWeight:600}}>+{fmt(c.calc?.ganImp||0)}</span>
+                        <div key={c.id} style={{display:"flex",justifyContent:"space-between",fontSize:10,padding:"3px 8px",background:"#f8fafc",borderRadius:6}}>
+                          <span style={{color:"#94a3b8"}}>{c.nro} · {c.cliente} (hipotético)</span>
+                          <span style={{color:"#94a3b8",fontWeight:500}}>+{fmt((c.calc?.ganImp||0)*proyPct)}</span>
                         </div>
                       ))}
                     </div>
