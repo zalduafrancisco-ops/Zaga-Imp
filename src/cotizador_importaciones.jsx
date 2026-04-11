@@ -246,6 +246,7 @@ export default function App({ supabase, usuario, onLogout }){
   const [vistaClienteId,setVistaClienteId] = useState(null);
   const [negForm,setNegForm] = useState({});
   const [notaInput,setNotaInput] = useState({});
+  const [notaClienteInput,setNotaClienteInput] = useState({});
   const [notaOculta,setNotaOculta] = useState({});
   const [notaEditando,setNotaEditando] = useState({}); // key: "cotId_i" → {texto, oculta}
   const [resumenChina,setResumenChina] = useState(null);
@@ -313,6 +314,12 @@ export default function App({ supabase, usuario, onLogout }){
             if(nd.notas_china_historial.length>prevNotas.length){
               showToast(`🇨🇳 El agente China dejó una nota en "${nd.nro||nd.producto||"cotización"}"`, "ok");
             }
+          }
+          // Alerta si llegó nota nueva del cliente (contamos no leídas por admin)
+          const prevCliNoLeidas=(prev?.notas_cliente_historial||[]).filter(n=>n.autor==="cliente"&&!n.leida_por_admin).length;
+          const newCliNoLeidas=(nd?.notas_cliente_historial||[]).filter(n=>n.autor==="cliente"&&!n.leida_por_admin).length;
+          if(newCliNoLeidas>prevCliNoLeidas){
+            showToast(`💬 Cliente dejó nota en "${nd.nro||nd.producto||"cotización"}"`, "ok");
           }
           const updated=prevList.map(x=>x.id===nd.id?nd:x);
           cotizacionesRef.current=updated;
@@ -1913,6 +1920,15 @@ Número de seguimiento: ${c.nro}`;
                   const preview=ultima?.texto?.length>70?ultima.texto.slice(0,70)+"...":ultima?.texto||"";
                   alertas.push({nivel:"critico",ico:"🇨🇳",titulo:`${c.nro} — ${c.producto}`,msg:`El agente China dejó una nota: "${preview}"`,id:c.id,accion:"gestionar",alertKey:`${c.id}_china_nota`});
                 }
+
+                // 9. Cliente dejó notas sin leer por admin
+                const notasCliArr=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
+                const noLeidasCli=notasCliArr.filter(n=>n.autor==="cliente"&&!n.leida_por_admin);
+                if(noLeidasCli.length>0){
+                  const ultCli=noLeidasCli[noLeidasCli.length-1];
+                  const prevCli=ultCli?.texto?.length>70?ultCli.texto.slice(0,70)+"...":ultCli?.texto||"";
+                  alertas.push({nivel:"info",ico:"💬",titulo:`${c.nro} — ${c.cliente||c.producto}`,msg:`Cliente dejó ${noLeidasCli.length} nota${noLeidasCli.length!==1?"s":""} sin leer: "${prevCli}"`,id:c.id,accion:"gestionar",alertKey:`${c.id}_cliente_nota`});
+                }
               });
 
               if(alertas.length===0) return null;
@@ -2004,6 +2020,7 @@ Número de seguimiento: ${c.nro}`;
               {filtradas.map(c=>{
                 const sc=EST_COLOR[c.estado]||"#888", sl=EST_LABEL[c.estado]||c.estado;
                 const prog=checkProg(c), isOpen=openId===c.id, isPropia=c.tipo==="propia";
+                const notasCliNoLeidas=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial.filter(n=>n.autor==="cliente"&&!n.leida_por_admin).length:0;
                 const TL_CLIENTE=["solicitud","enviado_china","respuesta_china","enviada_cliente","en_negociacion","re_testeando","aceptada","pagada_china","en_camino","en_bodega","completada"];
                 const TL_PROPIA=["solicitud","enviado_china","respuesta_china","pagada_china","en_camino","en_bodega","completada"];
                 const tlSteps=isPropia?TL_PROPIA:TL_CLIENTE;
@@ -2041,6 +2058,7 @@ Número de seguimiento: ${c.nro}`;
                             {c.estado==="en_negociacion"&&(c.negociacion_rondas||[]).length>0&&<span style={{background:"#b8922e22",color:"#b8922e",border:"1px solid #f59e0b44",borderRadius:20,padding:"2px 10px",fontSize:11}}>🤝 {(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length} propuesta{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""} pendiente{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""}</span>}
                             {c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&<span style={{background:"#0d987018",color:"#0d9870",border:"1px solid #1aa35844",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600}}>✅ {c.pago_100?"Pago único":"Pago 1"} · {fmtFechaCorta(c.fecha_pago1_cliente)}</span>}
                             {c.pago_100&&<span style={{background:"#c9a05522",color:"#c9a055",border:"1px solid #f5c84244",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>💰 PAGO 100%</span>}
+                            {notasCliNoLeidas>0&&<span style={{background:"#c0392b22",color:"#c0392b",border:"1px solid #ef444444",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>💬 {notasCliNoLeidas}</span>}
                           </div>
                           <div style={{color:"#64748b",fontSize:13,marginBottom:2}}>{c.producto} · {fmtN(c.unidades)} und</div>
                           {(c.sku_china||c.sku_bodega)&&(
@@ -2627,6 +2645,94 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                             )}
                           </div>
+
+                          {/* ── COMUNICACIÓN CON CLIENTE ── */}
+                          {c.tipo!=="propia"&&(
+                            <div style={{marginTop:18,borderTop:"1px solid #e2e8f0",paddingTop:18}}>
+                              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+                                <span style={{fontSize:10,color:"#2d78c8",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>💬 Comunicación con cliente</span>
+                                {notasCliNoLeidas>0&&<span style={{background:"#c0392b",color:"#fff",fontSize:9,fontWeight:800,borderRadius:4,padding:"2px 8px",letterSpacing:0.5}}>{notasCliNoLeidas} SIN LEER</span>}
+                                {Array.isArray(c.notas_cliente_historial)&&c.notas_cliente_historial.length>0&&<span style={{fontSize:11,color:"#94a3b8",marginLeft:"auto"}}>{c.notas_cliente_historial.length} mensaje{c.notas_cliente_historial.length!==1?"s":""}</span>}
+                              </div>
+
+                              {Array.isArray(c.notas_cliente_historial)&&c.notas_cliente_historial.length>0&&(
+                                <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+                                  {c.notas_cliente_historial.map(function(nota,i){
+                                    const esAdmin=nota.autor==="admin";
+                                    const esNoLeida=nota.autor==="cliente"&&!nota.leida_por_admin;
+                                    return(
+                                      <div key={nota.id||i} style={{display:"flex",justifyContent:esAdmin?"flex-start":"flex-end"}}>
+                                        <div style={{
+                                          maxWidth:"80%",
+                                          background:esAdmin?"#f0fdf4":(esNoLeida?"#fef2f2":"#eff6ff"),
+                                          border:"1px solid "+(esAdmin?"#bbf7d0":(esNoLeida?"#fecdd3":"#bfdbfe")),
+                                          borderLeft:esAdmin?"4px solid #16a34a":(esNoLeida?"4px solid #c0392b":"4px solid #2d78c8"),
+                                          borderRadius:esAdmin?"0 10px 10px 10px":"10px 0 10px 10px",
+                                          padding:"10px 14px",
+                                        }}>
+                                          <div style={{fontSize:13,color:"#334155",lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:6}}>{nota.texto}</div>
+                                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                            <span style={{fontSize:10,fontWeight:700,color:esAdmin?"#16a34a":"#2d78c8"}}>{esAdmin?"ZAGA":(c.cliente||"Cliente")}</span>
+                                            <span style={{fontSize:10,color:"#94a3b8"}}>{nota.fecha?new Date(nota.fecha).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              <div style={{background:"#f8fafc",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0"}}>
+                                <textarea
+                                  value={notaClienteInput[c.id]||""}
+                                  rows={2}
+                                  maxLength={2000}
+                                  onChange={e=>setNotaClienteInput(p=>({...p,[c.id]:e.target.value}))}
+                                  placeholder="Escribe un mensaje al cliente..."
+                                  style={{width:"100%",background:"#fff",border:"1px solid #e2e8f0",borderRadius:6,color:"#0f172a",padding:"8px 10px",fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.5}}
+                                />
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,gap:8,flexWrap:"wrap"}}>
+                                  <span style={{fontSize:10,color:"#94a3b8"}}>{(notaClienteInput[c.id]||"").length}/2000</span>
+                                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                                    {notasCliNoLeidas>0&&(
+                                      <button onClick={async()=>{
+                                        const histActualizado=(c.notas_cliente_historial||[]).map(n=>n.autor==="cliente"?{...n,leida_por_admin:true}:n);
+                                        await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_cliente_historial:histActualizado}:x));
+                                        showToast("✓ Notas del cliente marcadas como leídas");
+                                      }} style={{background:"#f1f5f9",color:"#475569",border:"1px solid #e2e8f0",borderRadius:6,padding:"7px 14px",fontSize:11,cursor:"pointer",fontWeight:600}}>
+                                        ✓ Marcar todas leídas
+                                      </button>
+                                    )}
+                                    <button
+                                      disabled={!(notaClienteInput[c.id]||"").trim()}
+                                      onClick={async()=>{
+                                        const txt=(notaClienteInput[c.id]||"").trim();
+                                        if(!txt) return;
+                                        if(txt.length>2000){ showToast("Máximo 2000 caracteres","err"); return; }
+                                        const nuevaNota={id:Date.now().toString(),autor:"admin",texto:txt,fecha:new Date().toISOString(),leida_por_admin:true};
+                                        const hist=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
+                                        const nuevo=[...hist,nuevaNota];
+                                        await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_cliente_historial:nuevo}:x));
+                                        setNotaClienteInput(p=>({...p,[c.id]:""}));
+                                        showToast("💬 Nota enviada al cliente");
+                                      }}
+                                      style={{
+                                        background:(notaClienteInput[c.id]||"").trim()?"#040c18":"#e2e8f0",
+                                        color:(notaClienteInput[c.id]||"").trim()?"#c9a055":"#94a3b8",
+                                        border:"none",
+                                        borderRadius:6,
+                                        padding:"7px 16px",
+                                        fontSize:11,
+                                        cursor:(notaClienteInput[c.id]||"").trim()?"pointer":"default",
+                                        fontWeight:700,
+                                      }}>
+                                      💬 Enviar al cliente
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
                           {/* ── SKU + FULFILLMENT ── */}
                           {(c.checklist?.pago_china||c.sku_china)&&(

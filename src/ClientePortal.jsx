@@ -132,6 +132,15 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   var [alertas, setAlertas] = useState([])      // cambios detectados al cargar
   var [alertaVista, setAlertaVista] = useState(false)  // banner cerrado?
   var fetchIdRef = useRef(0)  // contador para evitar race conditions en cargas simultáneas
+  var [mensajeInput, setMensajeInput] = useState({})   // textarea por cotización
+  var [enviandoId, setEnviandoId] = useState(null)     // cotización con envío en curso
+  var [toast, setToast] = useState(null)                // toast efímero para notificaciones
+  var prevCotsRef = useRef([])                          // snapshot previo para detectar notas nuevas del admin
+
+  var showToast = function(msg, type){
+    setToast({ msg: msg, type: type||"ok" })
+    setTimeout(function(){ setToast(null) }, 3500)
+  }
 
   var STORAGE_KEY = "zaga_estados_"+perfil.id
 
@@ -165,7 +174,6 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
       if(miId !== fetchIdRef.current) return  // llego tarde, hay una carga mas reciente en curso
       if(result.data&&!result.error){
         var lista = result.data.map(function(r){ return typeof r.datos==='string'?JSON.parse(r.datos):r.datos })
-        setCotizaciones(lista)
         // Detectar cambios vs ultima visita
         var anteriores = leerEstadosGuardados()
         if(Object.keys(anteriores).length > 0){
@@ -178,10 +186,51 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
           })
           if(cambios.length > 0){ setAlertas(cambios); setAlertaVista(false) }
         }
+        // Detectar notas nuevas del admin (comparando con snapshot previo)
+        if(prevCotsRef.current.length > 0){
+          lista.forEach(function(c){
+            var prev = prevCotsRef.current.find(function(p){ return p.id===c.id })
+            if(prev){
+              var prevAdmin = (prev.notas_cliente_historial||[]).filter(function(n){ return n.autor==="admin" }).length
+              var nowAdmin = (c.notas_cliente_historial||[]).filter(function(n){ return n.autor==="admin" }).length
+              if(nowAdmin > prevAdmin){
+                showToast("📬 ZAGA te respondió en "+(c.nro||c.producto||"tu cotización"))
+              }
+            }
+          })
+        }
+        prevCotsRef.current = lista
+        setCotizaciones(lista)
         guardarEstados(lista)
       }
     }catch(e){ console.warn("Error cargando cotizaciones:", e) }
     if(miId === fetchIdRef.current) setLoading(false)
+  }
+
+  // ── Enviar mensaje al admin vía RPC add_cliente_nota ──
+  var enviarMensajeCliente = async function(cotId, texto){
+    var trimmed = (texto||"").trim()
+    if(!trimmed){ showToast("El mensaje no puede estar vacío","err"); return }
+    if(trimmed.length > 2000){ showToast("Máximo 2000 caracteres","err"); return }
+    setEnviandoId(cotId)
+    try{
+      var result = await supabase.rpc('add_cliente_nota', { cot_id: cotId, texto: trimmed })
+      if(result.error){
+        var msg = result.error.message||"Error al enviar"
+        if(msg.indexOf("RATE_LIMIT")>=0) showToast("Límite de 20 mensajes por día alcanzado","err")
+        else if(msg.indexOf("TEXTO_LARGO")>=0) showToast("Máximo 2000 caracteres","err")
+        else if(msg.indexOf("COT_CERRADA")>=0) showToast("Esta cotización está cerrada","err")
+        else if(msg.indexOf("NO_AUTORIZADO")>=0) showToast("No autorizado","err")
+        else showToast("Error al enviar el mensaje","err")
+      } else {
+        setMensajeInput(function(p){ var n=Object.assign({},p); n[cotId]=""; return n })
+        showToast("✓ Mensaje enviado")
+        // La real-time subscription refrescará la lista automáticamente
+      }
+    }catch(e){
+      showToast("Error de conexión","err")
+    }
+    setEnviandoId(null)
   }
 
   var getTab = function(id){
@@ -581,7 +630,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                           <div style={{display:"flex",padding:"0 16px",borderBottom:"1px solid #f1f5f9",overflowX:"auto",gap:0}}>
                             {(isRech
                               ? [["detalle","📋 Detalle"]]
-                              : [["timeline","🗺️ Seguimiento"],["pagos","💳 Pagos"],["detalle","📋 Detalle"]]
+                              : [["timeline","🗺️ Seguimiento"],["pagos","💳 Pagos"],["detalle","📋 Detalle"],["mensajes","💬 Mensajes"]]
                             ).map(function(item){
                               return <button key={item[0]} className={"ztab"+(tab===item[0]?" on":"")} onClick={function(){ setTab(c.id,item[0]) }}>{item[1]}</button>
                             })}
@@ -766,6 +815,77 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               </div>
                             )}
 
+                            {/* TAB MENSAJES */}
+                            {tab==="mensajes"&&(
+                              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                                <div style={{fontSize:11,color:"#64748b",lineHeight:1.5,background:"#f8fafc",borderRadius:8,padding:"10px 12px",border:"1px solid #e2e8f0"}}>
+                                  💬 Comunicate directamente con el equipo ZAGA sobre esta importación. Las respuestas llegan en tiempo real.
+                                </div>
+
+                                {Array.isArray(c.notas_cliente_historial)&&c.notas_cliente_historial.length>0?(
+                                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                                    {c.notas_cliente_historial.map(function(nota,i){
+                                      var esCliente = nota.autor==="cliente"
+                                      return (
+                                        <div key={nota.id||i} style={{display:"flex",justifyContent:esCliente?"flex-end":"flex-start"}}>
+                                          <div style={{
+                                            maxWidth:"82%",
+                                            background:esCliente?"#eff6ff":"#f0fdf4",
+                                            border:"1px solid "+(esCliente?"#bfdbfe":"#bbf7d0"),
+                                            borderLeft:esCliente?"none":"4px solid #16a34a",
+                                            borderRight:esCliente?"4px solid #2d78c8":"none",
+                                            borderRadius:esCliente?"10px 0 10px 10px":"0 10px 10px 10px",
+                                            padding:"10px 14px",
+                                          }}>
+                                            <div style={{fontSize:13,color:"#334155",lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:6}}>{nota.texto}</div>
+                                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                              <span style={{fontSize:10,fontWeight:700,color:esCliente?"#2d78c8":"#16a34a"}}>{esCliente?(perfil.nombre||"Tú"):"ZAGA"}</span>
+                                              <span style={{fontSize:10,color:"#94a3b8"}}>{nota.fecha?new Date(nota.fecha).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                ):(
+                                  <div style={{textAlign:"center",padding:"24px 16px",fontSize:12,color:"#94a3b8",background:"#f8fafc",borderRadius:10,border:"1px dashed #e2e8f0"}}>
+                                    Todavía no hay mensajes. Escribí el primero abajo.
+                                  </div>
+                                )}
+
+                                <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0"}}>
+                                  <textarea
+                                    value={mensajeInput[c.id]||""}
+                                    rows={3}
+                                    maxLength={2000}
+                                    disabled={enviandoId===c.id}
+                                    onChange={function(e){ var v=e.target.value; setMensajeInput(function(p){ var n=Object.assign({},p); n[c.id]=v; return n }) }}
+                                    placeholder="Escribí tu mensaje a ZAGA..."
+                                    style={{width:"100%",background:"#fff",border:"1px solid #e2e8f0",borderRadius:6,color:"#0f172a",padding:"10px 12px",fontSize:13,outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.5,fontFamily:"inherit"}}
+                                  />
+                                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,gap:8,flexWrap:"wrap"}}>
+                                    <span style={{fontSize:10,color:"#94a3b8"}}>{(mensajeInput[c.id]||"").length}/2000</span>
+                                    <button
+                                      disabled={!(mensajeInput[c.id]||"").trim()||enviandoId===c.id}
+                                      onClick={function(){ enviarMensajeCliente(c.id, mensajeInput[c.id]||"") }}
+                                      style={{
+                                        background:((mensajeInput[c.id]||"").trim()&&enviandoId!==c.id)?"#040c18":"#e2e8f0",
+                                        color:((mensajeInput[c.id]||"").trim()&&enviandoId!==c.id)?"#c9a055":"#94a3b8",
+                                        border:"none",
+                                        borderRadius:7,
+                                        padding:"9px 20px",
+                                        fontSize:12,
+                                        cursor:((mensajeInput[c.id]||"").trim()&&enviandoId!==c.id)?"pointer":"default",
+                                        fontWeight:700,
+                                        fontFamily:"inherit",
+                                      }}>
+                                      {enviandoId===c.id?"Enviando...":"💬 Enviar mensaje"}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                           </div>
                         </div>
                       )}
@@ -774,6 +894,28 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {toast&&(
+          <div style={{
+            position:"fixed",
+            bottom:24,
+            left:"50%",
+            transform:"translateX(-50%)",
+            background:toast.type==="err"?"#fef2f2":"#f0fdf4",
+            border:"1px solid "+(toast.type==="err"?"#fecdd3":"#bbf7d0"),
+            color:toast.type==="err"?"#c0392b":"#16a34a",
+            borderRadius:10,
+            padding:"12px 20px",
+            fontSize:13,
+            fontWeight:600,
+            boxShadow:"0 4px 16px rgba(0,0,0,0.15)",
+            zIndex:300,
+            maxWidth:"90vw",
+            textAlign:"center",
+          }}>
+            {toast.msg}
           </div>
         )}
 
