@@ -507,7 +507,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                   var pct = Math.round((done/CHECKLIST_FULL.length)*100)
                   var dias = (c.fecha_llegada_est&&!isRech&&!['completada','en_bodega'].includes(c.estado))?getDias(c.fecha_llegada_est):null
                   var tab = getTab(c.id)
-                  var pctPago = pagado1&&pagado2?100:pagado1?30:0
+                  var pctPago = c.pago_100?(pagado1?100:0):(pagado1&&pagado2?100:pagado1?30:0)
 
                   // ── PASO ACTIVO: desde estado + checklist para estados con sub-pasos ─
                   var _maxPaso = (TIMELINE_MAX_POR_ESTADO[c.estado]!==undefined) ? TIMELINE_MAX_POR_ESTADO[c.estado] : 10
@@ -651,23 +651,36 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                     <div style={{width:pctPago+"%",height:"100%",background:"linear-gradient(90deg,#c9a055,#16a34a)",borderRadius:4,transition:"width .5s"}}/>
                                   </div>
                                 </div>
-                                {[
-                                  {label:"1er pago · "+(c.pct_deposito||30)+"% del total",amount:p1,paid:pagado1,pendingMsg:"Pendiente de pago"},
-                                  {label:"2do pago · "+(100-(c.pct_deposito||30))+"% del total",amount:p2,paid:pagado2,pendingMsg:"Se paga al recibir la mercaderia"},
-                                ].map(function(row,ri){
-                                  return (
-                                    <div key={ri} style={{background:row.paid?"#f0fdf4":"#fff",border:"1px solid "+(row.paid?"#bbf7d0":"#e2e8f0"),borderRadius:12,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
-                                      <div>
-                                        <div style={{fontSize:11,color:"#64748b",marginBottom:4,fontWeight:500}}>{row.label}</div>
-                                        <div style={{fontSize:20,fontWeight:800,color:row.paid?"#16a34a":"#0f172a"}}>{fmt(row.amount)}</div>
-                                        <div style={{fontSize:11,color:row.paid?"#16a34a":"#94a3b8",marginTop:4,fontWeight:row.paid?600:400}}>{row.paid?"Pagado y confirmado ✓":row.pendingMsg}</div>
-                                      </div>
-                                      <div style={{width:42,height:42,borderRadius:"50%",background:row.paid?"#dcfce7":"#f8fafc",border:"2px solid "+(row.paid?"#86efac":"#e2e8f0"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                                        {row.paid?"✅":"⏳"}
-                                      </div>
+                                {c.pago_100 ? (
+                                  <div style={{background:pagado1?"#f0fdf4":"#fff",border:"1px solid "+(pagado1?"#bbf7d0":"#e2e8f0"),borderRadius:12,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+                                    <div>
+                                      <div style={{fontSize:11,color:"#64748b",marginBottom:4,fontWeight:500}}>💰 Pago único · 100% del total</div>
+                                      <div style={{fontSize:20,fontWeight:800,color:pagado1?"#16a34a":"#0f172a"}}>{fmt(p1)}</div>
+                                      <div style={{fontSize:11,color:pagado1?"#16a34a":"#94a3b8",marginTop:4,fontWeight:pagado1?600:400}}>{pagado1?"Pagado y confirmado ✓":"Pendiente de pago"}</div>
                                     </div>
-                                  )
-                                })}
+                                    <div style={{width:42,height:42,borderRadius:"50%",background:pagado1?"#dcfce7":"#f8fafc",border:"2px solid "+(pagado1?"#86efac":"#e2e8f0"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                                      {pagado1?"✅":"⏳"}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  [
+                                    {label:"1er pago · "+(c.pct_deposito||30)+"% del total",amount:p1,paid:pagado1,pendingMsg:"Pendiente de pago"},
+                                    {label:"2do pago · "+(100-(c.pct_deposito||30))+"% del total",amount:p2,paid:pagado2,pendingMsg:"Se paga al recibir la mercaderia"},
+                                  ].map(function(row,ri){
+                                    return (
+                                      <div key={ri} style={{background:row.paid?"#f0fdf4":"#fff",border:"1px solid "+(row.paid?"#bbf7d0":"#e2e8f0"),borderRadius:12,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+                                        <div>
+                                          <div style={{fontSize:11,color:"#64748b",marginBottom:4,fontWeight:500}}>{row.label}</div>
+                                          <div style={{fontSize:20,fontWeight:800,color:row.paid?"#16a34a":"#0f172a"}}>{fmt(row.amount)}</div>
+                                          <div style={{fontSize:11,color:row.paid?"#16a34a":"#94a3b8",marginTop:4,fontWeight:row.paid?600:400}}>{row.paid?"Pagado y confirmado ✓":row.pendingMsg}</div>
+                                        </div>
+                                        <div style={{width:42,height:42,borderRadius:"50%",background:row.paid?"#dcfce7":"#f8fafc",border:"2px solid "+(row.paid?"#86efac":"#e2e8f0"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                                          {row.paid?"✅":"⏳"}
+                                        </div>
+                                      </div>
+                                    )
+                                  })
+                                )}
                                 <div style={{background:"#040c18",borderRadius:12,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
                                   <div>
                                     <div style={{fontSize:12,color:"#c9a055",fontWeight:600,marginBottom:2}}>Total importacion</div>
