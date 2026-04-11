@@ -77,3 +77,26 @@ The admin UI has Export/Import JSON buttons (`exportarDatos`, `importarDatos`, `
 - Spanish is the UI language (and the variable names mix Spanish/English freely — `cotizaciones`, `persist`, `gestor`, `calcCliente`). Keep copy in Spanish.
 - Logos are imported as assets from `src/logo-white.png` and `src/logo-dark.png`.
 - Dates are stored as ISO `YYYY-MM-DD` strings; money is CLP formatted with `fmt` / `fmtN` helpers (line 150).
+
+## Recent work (Sesión 7 parte 2 + Sesión B)
+
+**Sesión 7 parte 2** (completed): Mejoras 1-4 en la calculadora y tracker.
+- **Mejora 4** — Fecha del 1er pago visible en la tarjeta del tracker (badge colapsado + label dinámico en checkbox expandido). Helper `fmtFechaCorta` añadido.
+- **Mejora 1** — Botón "Guardar Solicitud" disponible también para `tipo=propia`, con resumen China filtrado (sin categoria_cliente).
+- **Mejora 3** — Campo "Factura 2do Pago" (nº + fecha auto + link) dentro del bloque Factura al cliente en la tarjeta expandida. Nuevos campos en `datos` jsonb: `nro_factura_pago2`, `fecha_factura_pago2`, `link_factura_pago2`.
+- **Mejora 2** — Toggle "Pago 100%" en la calculadora: cuando `pago_100=true`, sin split 30/70, `comR` y `difCom` forzados a 0 en `calcCliente`, servicio ZAGA incluido en el pago único. Propagado a 5 vistas del admin. Nuevo campo en `datos`: `pago_100:boolean`.
+
+**Sesión B** (completed):
+- **Parte 1 — punto (f) de Mejora 2**: `ClientePortal.jsx` lee `pago_100` y muestra una sola card "💰 Pago único · 100% del total" en vez de dos cards 1er/2do. Bug menor corregido: `pctPago` ya no se traba en 30% bajo pago_100.
+- **Parte 2 — Mejora 5: notas bidireccionales admin ↔ cliente.** Nuevo campo en `datos`: `notas_cliente_historial: [{id, autor, texto, fecha, leida_por_admin}]`.
+  - **Admin** escribe via `persist()` normal (tiene UPDATE full por RLS). Bloque "💬 Comunicación con cliente" en la tarjeta expandida + badge contador rojo en la colapsada + alerta info en Centro de Alertas + toast real-time cuando llega nota del cliente.
+  - **Cliente** escribe via función RPC `add_cliente_nota(cot_id, texto)` en Postgres (`SECURITY DEFINER`, `SELECT FOR UPDATE` para evitar race con admin, valida rol/ownership/estado/longitud 2000 chars/rate-limit 20 por 24h). `ClientePortal.jsx` agrega cuarto tab "💬 Mensajes" (solo no-rechazadas) + helper `enviarMensajeCliente` + toast flotante.
+  - ⚠️ **La función `add_cliente_nota` vive en Supabase pero NO está versionada en el repo.** Fue aplicada via MCP `apply_migration` durante la sesión. Si hay que recrearla en otro ambiente (branch, staging, nuevo proyecto), reconstruir el SQL manualmente desde el historial de la sesión o introducir una carpeta `supabase/migrations/` como follow-up.
+
+### Follow-ups conocidos
+
+- **Versionar el SQL de `add_cliente_nota`** en el repo (ej. `supabase/migrations/2026-04-11_add_cliente_nota.sql`).
+- **Parametrizar la Edge Function `create-cliente-user`** para que acepte email/password/nombre via POST body. Hoy está hardcodeada con los datos del último cliente creado (Agustín al 2026-04-11) y hay que redesplegar cada vez.
+- La Edge Function además hace `UPDATE` sobre `public.perfiles` asumiendo que existe un trigger que auto-crea la fila en el insert de `auth.users`. No hay tal trigger, así que el UPDATE matchea 0 filas silenciosamente. Workaround actual: hacer un INSERT manual en `public.perfiles` después de llamar la función. Fix sugerido: cambiar el UPDATE por UPSERT en la función y añadir `cliente_nombre` como parámetro.
+- **Bug pre-existente del Centro de Alertas**: los `alertKey` son estáticos (`${c.id}_china_nota`, `${c.id}_cliente_nota`). Cuando admin marca una alerta como leída via localStorage `zaga_alertas_leidas`, alertas nuevas subsiguientes del mismo tipo en esa cotización quedan suprimidas hasta que admin clickea "Restablecer". Fix sugerido: incluir hash del contenido o contador en el `alertKey`.
+- **Race condition residual entre admin y cliente**: el RPC del cliente usa `SELECT FOR UPDATE` para serializarse contra otras escrituras, pero el `persist()` del admin NO usa lock — si admin y cliente escriben al mismo tiempo, el admin puede pisar la nota del cliente. Fix sugerido: mover el admin también a un RPC, o hacer `persist()` read-modify-write con versioning optimista.
