@@ -153,6 +153,7 @@ const fmtP = n=>isNaN(n)||n===null?"-":`${Number(n).toFixed(1)}%`;
 const todayStr=()=>new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
 const monthKey=d=>{ try{ const dt=new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`; }catch{ return ""; }};
 const monthLabel=k=>{ try{ const [y,m]=k.split("-"); return new Date(y,Number(m)-1).toLocaleDateString("es-CL",{month:"long",year:"numeric"}); }catch{ return k; }};
+const fmtFechaCorta=s=>{ if(!s) return ""; const [y,m,d]=String(s).split("-"); const mm=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"]; return `${d}-${mm[Number(m)-1]||""}-${y}`; };
 
 // ── UI helpers ────────────────────────────────────────────────────
 const ROW=({label,value,accent,big,sub,topLine})=>(
@@ -1995,6 +1996,7 @@ Número de seguimiento: ${c.nro}`;
                             {diasLL!==null&&c.checklist?.pago_china&&!c.fecha_llegada_real&&<span style={{background:"#f9741618",color:"#c47830",border:"1px solid #f9741633",borderRadius:20,padding:"2px 10px",fontSize:11}}>{diasLL>0?`🚢 ${diasLL}d`:diasLL===0?"¡Llega hoy!":`⚠️ ${Math.abs(diasLL)}d tarde`}</span>}
                             {c.fulfillment_cliente&&<span style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:20,padding:"2px 10px",fontSize:11}}>🚚 Fulfillment{c.fulfillment_producto_creado?" ✓":""}</span>}
                             {c.estado==="en_negociacion"&&(c.negociacion_rondas||[]).length>0&&<span style={{background:"#b8922e22",color:"#b8922e",border:"1px solid #f59e0b44",borderRadius:20,padding:"2px 10px",fontSize:11}}>🤝 {(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length} propuesta{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""} pendiente{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""}</span>}
+                            {c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&<span style={{background:"#0d987018",color:"#0d9870",border:"1px solid #1aa35844",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600}}>✅ Pago 1 · {fmtFechaCorta(c.fecha_pago1_cliente)}</span>}
                           </div>
                           <div style={{color:"#64748b",fontSize:13,marginBottom:2}}>{c.producto} · {fmtN(c.unidades)} und</div>
                           {(c.sku_china||c.sku_bodega)&&(
@@ -2192,7 +2194,10 @@ Número de seguimiento: ${c.nro}`;
                                       {step.checks.map(key=>{
                                         const isFactura=key.startsWith("factura");
                                         const disabled=isFactura&&!c.requiere_factura;
-                                        const lbl=isFactura?(c.requiere_factura?CHKL_LABELS[key]+" ✱":CHKL_LABELS[key]+" (no req.)"):CHKL_LABELS[key];
+                                        let lbl=isFactura?(c.requiere_factura?CHKL_LABELS[key]+" ✱":CHKL_LABELS[key]+" (no req.)"):CHKL_LABELS[key];
+                                        if(key==="pago1_cliente"&&c.checklist?.pago1_cliente&&c.fecha_pago1_cliente){
+                                          lbl=`✅ Pago 1 recibido · ${fmtFechaCorta(c.fecha_pago1_cliente)}`;
+                                        }
                                         return <CheckItem key={key} label={lbl} checked={c.checklist?.[key]||false} onChange={v=>handleCheck(c.id,key,v)} disabled={disabled}/>;
                                       })}
                                     </div>
