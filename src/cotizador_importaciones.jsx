@@ -2528,6 +2528,28 @@ Número de seguimiento: ${c.nro}`;
                                       {c.link_factura_cliente&&<a href={c.link_factura_cliente} target="_blank" rel="noreferrer" style={{background:"#1aa35820",color:"#1aa358",border:"1px solid #1aa35844",borderRadius:7,padding:"8px 12px",fontSize:12,fontWeight:700,textDecoration:"none",whiteSpace:"nowrap"}}>🔗 Abrir</a>}
                                     </div>
                                   </div>
+                                  <div style={{borderTop:"1px solid #bbf7d0",marginTop:6,paddingTop:10}}>
+                                    <div style={{fontSize:10,color:"#1aa358",marginBottom:6,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>Factura 2do Pago</div>
+                                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                                        <div style={{flex:"1 1 180px"}}>
+                                          <div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Nº de factura 2do pago</div>
+                                          <input value={c.nro_factura_pago2||""} onChange={async e=>{ const val=e.target.value; await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,nro_factura_pago2:val,fecha_factura_pago2:(val&&!x.fecha_factura_pago2)?new Date().toISOString().split("T")[0]:x.fecha_factura_pago2}:x)); }} placeholder="Ej: 001235" style={{width:"100%",background:"#f8fafc",border:"1px solid #1aa35833",borderRadius:7,color:"#0f172a",padding:"8px 10px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                                        </div>
+                                        <div style={{flex:"1 1 140px"}}>
+                                          <div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Fecha</div>
+                                          <input type="date" value={c.fecha_factura_pago2||""} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,fecha_factura_pago2:e.target.value}:x)); }} style={{width:"100%",background:"#f8fafc",border:"1px solid #1aa35833",borderRadius:7,color:"#0f172a",padding:"8px 10px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Link de la factura 2do pago (Drive u otro)</div>
+                                        <div style={{display:"flex",gap:6}}>
+                                          <input value={c.link_factura_pago2||""} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,link_factura_pago2:e.target.value}:x)); }} placeholder="https://drive.google.com/..." style={{flex:1,background:"#f8fafc",border:"1px solid #1aa35833",borderRadius:7,color:"#0f172a",padding:"8px 10px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                                          {c.link_factura_pago2&&<a href={c.link_factura_pago2} target="_blank" rel="noreferrer" style={{background:"#1aa35820",color:"#1aa358",border:"1px solid #1aa35844",borderRadius:7,padding:"8px 12px",fontSize:12,fontWeight:700,textDecoration:"none",whiteSpace:"nowrap"}}>🔗 Abrir</a>}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             )}
