@@ -67,7 +67,7 @@ const makeDefaultForm = (usuario) => ({
   unidades:"", precio_china:"", comision_real:"",
   pct_deposito:30, margen_und:"", pct_servicio:4, pct_com_prestamo:6.5, precio_venta_cliente:"",
   fulfillment_und:1000, pct_devolucion:20,
-  cda:0, cda_cl:0, cda_descripcion:"", con_iva:false, notas:"", requiere_factura:false,
+  cda:0, cda_cl:0, cda_descripcion:"", con_iva:false, pago_100:false, notas:"", requiere_factura:false,
   nro_factura_cliente:"", link_factura_cliente:"",
   variantes:"", // colores, tallas, cantidades por variante
   fecha_llegada_real:"", sku_china:"",
@@ -86,28 +86,31 @@ function calcCliente(d) {
   const pDep=(Number(d.pct_deposito)||30)/100, mar=Number(d.margen_und)||0;
   const pServ=(Number(d.pct_servicio)||4)/100, fUnd=Number(d.fulfillment_und)||1000;
   const pDev=(Number(d.pct_devolucion)||20)/100, cda=Number(d.cda)||0, cdaCl=Number(d.cda_cl)||cda;
-  const conFact=!!d.requiere_factura, conIva=!!d.con_iva;
+  const conFact=!!d.requiere_factura, conIva=!!d.con_iva, pago100=!!d.pago_100;
+  const comREff=pago100?0:comR;
 
   // ── Lado China ──
   const tChNeto=pCh*u;                          // costo producto sin IVA
   const ivaChina=conFact?tChNeto*0.19:0;        // IVA que pago al final (2do pago)
   const tCh=tChNeto+ivaChina;                   // total real pagado a China
-  const dCh=tChNeto*pDep, prCh=tChNeto*(1-pDep); // depósito y saldo sobre monto NETO
-  const p1Ch=dCh+comR+cda, p2Ch=prCh+ivaChina;     // IVA va solo al 2do pago; CDA va al 1er pago
-  const totCh=tChNeto+comR+ivaChina+cda, cRUnd=u>0?totCh/u:0;
+  const totCh=tChNeto+comREff+ivaChina+cda, cRUnd=u>0?totCh/u:0;
+  const dCh=pago100?0:tChNeto*pDep, prCh=pago100?0:tChNeto*(1-pDep); // split 30/70 solo si NO pago 100%
+  const p1Ch=pago100?totCh:dCh+comREff+cda, p2Ch=pago100?0:prCh+ivaChina; // pago_100: todo va al 1er pago
 
   // ── Lado Cliente ──
-  const pCUnd=pCh+mar, tCl=pCUnd*u, dCl=tCl*pDep, prCl=tCl*(1-pDep);
-  const comCl=prCl*((Number(d.pct_com_prestamo)||6.5)/100), serv=tCl*pServ;
+  const pCUnd=pCh+mar, tCl=pCUnd*u;
+  const dCl=pago100?0:tCl*pDep, prCl=pago100?0:tCl*(1-pDep);
+  const comCl=pago100?0:prCl*((Number(d.pct_com_prestamo)||6.5)/100), serv=tCl*pServ;
   const ivaCliente=conIva?(tCl+comCl+serv+cdaCl)*0.19:0; // IVA que cobro al cliente
-  const p1Cl=dCl+comCl+cdaCl, p2Cl=prCl+serv, totCl=tCl+comCl+serv+cdaCl;
+  const totCl=tCl+comCl+serv+cdaCl;
+  const p1Cl=pago100?totCl:dCl+comCl+cdaCl, p2Cl=pago100?0:prCl+serv;
   const p1ClIva=conIva?p1Cl*1.19:p1Cl, p2ClIva=conIva?p2Cl*1.19:p2Cl;
   const totClIva=conIva?totCl*1.19:totCl;
   const pfUnd=u>0?totCl/u:0;
 
   // ── Ganancia ──
   // Ganancia base (sin considerar IVA — margen operacional)
-  const ganMar=tCl-tChNeto, difCom=comCl-comR, ganServ=serv, ganCda=cdaCl-cda;
+  const ganMar=tCl-tChNeto, difCom=comCl-comREff, ganServ=serv, ganCda=cdaCl-cda;
   const ganImp=ganMar+difCom+ganServ+ganCda;
   // Impacto neto IVA: recupero IVA china (crédito fiscal) contra IVA cliente (débito)
   const ivaRecuperado=ivaChina;            // crédito fiscal por compra con factura
@@ -116,13 +119,13 @@ function calcCliente(d) {
   // Ganancia real después de IVA
   const ganImpConIva=ganImp+(conIva?ivaNetoFavor:0)-(conFact&&!conIva?ivaChina:0);
 
-  const gan1=(dCl-tCh*pDep)+difCom, gan2=(prCl-tCh*(1-pDep))+serv;
+  const gan1=pago100?ganImp:(dCl-tCh*pDep)+difCom, gan2=pago100?0:(prCl-tCh*(1-pDep))+serv;
   const uDev=Math.round(u*pDev), uFull=u+uDev, ganFull=uFull*fUnd, ganTot=ganImp+ganFull;
   const markup=pCh>0?((pCUnd-pCh)/pCh)*100:0;
   const mgBrut=totCl>0?(ganImp/totCl)*100:0;
   const roi=totCh>0?(ganImp/totCh)*100:0;
   const mult=cRUnd>0?pfUnd/cRUnd:0;
-  return { tChNeto,ivaChina,tCh,dCh,prCh,comR,p1Ch,p2Ch,totCh,cRUnd,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,ivaCliente,ivaRecuperado,ivaNetoFavor,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult };
+  return { tChNeto,ivaChina,tCh,dCh,prCh,comR:comREff,p1Ch,p2Ch,totCh,cRUnd,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,ivaCliente,ivaRecuperado,ivaNetoFavor,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult };
 }
 
 function calcPropia(d) {
@@ -883,7 +886,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:24}}>
                       <div>
                         <div style={{fontSize:12,fontWeight:700,color:"#333",marginBottom:12,paddingBottom:6,borderBottom:"2px solid #f0f0f0"}}>💳 Detalle de pagos</div>
-                        {[["1er Pago (depósito)",fmt(vistaData.calc?.p1Cl)],["2do Pago (saldo)",fmt(vistaData.calc?.p2Cl)],["Total",fmt(vistaData.calc?.totCl)]].map(([l,v])=>(
+                        {(vistaData.pago_100?[["💰 Pago Único",fmt(vistaData.calc?.p1Cl)],["Total",fmt(vistaData.calc?.totCl)]]:[["1er Pago (depósito)",fmt(vistaData.calc?.p1Cl)],["2do Pago (saldo)",fmt(vistaData.calc?.p2Cl)],["Total",fmt(vistaData.calc?.totCl)]]).map(([l,v])=>(
                           <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #f5f5f5"}}>
                             <span style={{fontSize:13,color:"#666"}}>{l}</span>
                             <span style={{fontSize:13,fontWeight:700,color:l==="Total"?"#0f7040":"#222"}}>{v}</span>
@@ -1027,7 +1030,7 @@ Número de seguimiento: ${c.nro}`;
                     <div>
                       <div style={{fontSize:10,color:"#1aa358",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:10}}>💰 Pagos del Cliente</div>
                       <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                        {[["1er Pago",fmt(p.calc.p1Cl),p.checklist?.pago1_cliente],["2do Pago",fmt(p.calc.p2Cl),p.checklist?.pago2_cliente],["Total",fmt(p.calc.totCl),null]].map(([l,v,chk])=>(
+                        {(p.pago_100?[["💰 Pago Único",fmt(p.calc.p1Cl),p.checklist?.pago1_cliente],["Total",fmt(p.calc.totCl),null]]:[["1er Pago",fmt(p.calc.p1Cl),p.checklist?.pago1_cliente],["2do Pago",fmt(p.calc.p2Cl),p.checklist?.pago2_cliente],["Total",fmt(p.calc.totCl),null]]).map(([l,v,chk])=>(
                           <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:7,padding:"8px 12px"}}>
                             <span style={{fontSize:12,color:"#64748b"}}>{l}</span>
                             <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -1042,36 +1045,48 @@ Número de seguimiento: ${c.nro}`;
                   <div>
                     <div style={{fontSize:10,color:"#2d78c8",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:10}}>🇨🇳 Pagos a China</div>
                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                      {/* 1er Pago */}
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:7,padding:"8px 12px"}}>
-                        <span style={{fontSize:12,color:"#64748b"}}>1er Pago</span>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span style={{fontSize:10,color:p.checklist?.pago_china?"#2d78c8":"#555"}}>{p.checklist?.pago_china?"✓ Pagado":"⏳ Pendiente"}</span>
-                          <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(p.calc?.p1Ch)}</span>
-                        </div>
-                      </div>
-                      {/* 2do Pago — con desglose IVA si aplica */}
-                      <div style={{background:"#f8fafc",borderRadius:7,padding:"8px 12px"}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <span style={{fontSize:12,color:"#64748b"}}>2do Pago</span>
+                      {p.pago_100 ? (
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:7,padding:"8px 12px"}}>
+                          <span style={{fontSize:12,color:"#64748b"}}>💰 Pago Único</span>
                           <div style={{display:"flex",alignItems:"center",gap:8}}>
-                            <span style={{fontSize:10,color:p.checklist?.retirado_bodega?"#2d78c8":"#555"}}>{p.checklist?.retirado_bodega?"✓ Pagado":"⏳ Pendiente"}</span>
-                            <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(p.calc?.p2Ch)}</span>
+                            <span style={{fontSize:10,color:p.checklist?.pago_china?"#2d78c8":"#555"}}>{p.checklist?.pago_china?"✓ Pagado":"⏳ Pendiente"}</span>
+                            <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(p.calc?.p1Ch)}</span>
                           </div>
                         </div>
-                        {p.requiere_factura&&p.calc?.ivaChina>0&&(
-                          <div style={{marginTop:6,paddingTop:6,borderTop:"1px solid #1a2d4533",display:"flex",flexDirection:"column",gap:3}}>
-                            <div style={{display:"flex",justifyContent:"space-between"}}>
-                              <span style={{fontSize:10,color:"#64748b"}}>↳ Saldo producto (neto)</span>
-                              <span style={{fontSize:11,color:"#334155",fontWeight:600}}>{fmt(p.calc?.prCh)}</span>
-                            </div>
-                            <div style={{display:"flex",justifyContent:"space-between"}}>
-                              <span style={{fontSize:10,color:"#c0392b"}}>↳ IVA 19% (total pedido)</span>
-                              <span style={{fontSize:11,color:"#c0392b",fontWeight:600}}>{fmt(p.calc?.ivaChina)}</span>
+                      ) : (
+                        <>
+                          {/* 1er Pago */}
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:7,padding:"8px 12px"}}>
+                            <span style={{fontSize:12,color:"#64748b"}}>1er Pago</span>
+                            <div style={{display:"flex",alignItems:"center",gap:8}}>
+                              <span style={{fontSize:10,color:p.checklist?.pago_china?"#2d78c8":"#555"}}>{p.checklist?.pago_china?"✓ Pagado":"⏳ Pendiente"}</span>
+                              <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(p.calc?.p1Ch)}</span>
                             </div>
                           </div>
-                        )}
-                      </div>
+                          {/* 2do Pago — con desglose IVA si aplica */}
+                          <div style={{background:"#f8fafc",borderRadius:7,padding:"8px 12px"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                              <span style={{fontSize:12,color:"#64748b"}}>2do Pago</span>
+                              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                <span style={{fontSize:10,color:p.checklist?.retirado_bodega?"#2d78c8":"#555"}}>{p.checklist?.retirado_bodega?"✓ Pagado":"⏳ Pendiente"}</span>
+                                <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(p.calc?.p2Ch)}</span>
+                              </div>
+                            </div>
+                            {p.requiere_factura&&p.calc?.ivaChina>0&&(
+                              <div style={{marginTop:6,paddingTop:6,borderTop:"1px solid #1a2d4533",display:"flex",flexDirection:"column",gap:3}}>
+                                <div style={{display:"flex",justifyContent:"space-between"}}>
+                                  <span style={{fontSize:10,color:"#64748b"}}>↳ Saldo producto (neto)</span>
+                                  <span style={{fontSize:11,color:"#334155",fontWeight:600}}>{fmt(p.calc?.prCh)}</span>
+                                </div>
+                                <div style={{display:"flex",justifyContent:"space-between"}}>
+                                  <span style={{fontSize:10,color:"#c0392b"}}>↳ IVA 19% (total pedido)</span>
+                                  <span style={{fontSize:11,color:"#c0392b",fontWeight:600}}>{fmt(p.calc?.ivaChina)}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
                       {/* Total */}
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:7,padding:"8px 12px"}}>
                         <span style={{fontSize:12,color:"#64748b"}}>Total</span>
@@ -1229,22 +1244,35 @@ Número de seguimiento: ${c.nro}`;
                 </div>
                 <div style={{marginBottom:24}}>
                   <div style={{fontSize:14,fontWeight:700,marginBottom:14,color:"#0f172a"}}>Estructura de Pago</div>
-                  <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:18,marginBottom:12}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontWeight:700,fontSize:15,color:"#0f7040"}}>1er Pago — Al confirmar la orden</span><span style={{fontWeight:800,fontSize:20,color:"#0f7040"}}>{vistaData.con_iva?fmt((vistaData.calc?.p1Cl||0)*1.19):fmt(vistaData.calc?.p1Cl)}</span></div>
-                    <div style={{fontSize:12,color:"#666"}}>
-                      {[[`Depósito ${vistaData.pct_deposito}% del total`,fmt(vistaData.calc?.dCl)],[`Comisión financiamiento (${(Number(vistaData.pct_com_prestamo)||6.5).toFixed(1)}%)`,fmt(vistaData.calc?.comCl)],...((Number(vistaData.cda_cl)||Number(vistaData.cda))>0?[[vistaData.cda_descripcion||"Certificado",fmt(vistaData.calc?.cdaCl||Number(vistaData.cda_cl)||Number(vistaData.cda)||0)]]:[] ),...(vistaData.con_iva?[["IVA (19%)",fmt((vistaData.calc?.p1Cl||0)*0.19)]]:[] )].map(([l,v])=>(
-                        <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #dcfce7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
-                      ))}
+                  {vistaData.pago_100 ? (
+                    <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:18,marginBottom:12}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontWeight:700,fontSize:15,color:"#0f7040"}}>💰 Pago Único — Al confirmar la orden</span><span style={{fontWeight:800,fontSize:20,color:"#0f7040"}}>{vistaData.con_iva?fmt((vistaData.calc?.p1Cl||0)*1.19):fmt(vistaData.calc?.p1Cl)}</span></div>
+                      <div style={{fontSize:12,color:"#666"}}>
+                        {[["Total importación",fmt(vistaData.calc?.tCl)],[`Servicio de importación (${vistaData.pct_servicio}%)`,fmt(vistaData.calc?.serv)],...((Number(vistaData.cda_cl)||Number(vistaData.cda))>0?[[vistaData.cda_descripcion||"Certificado",fmt(vistaData.calc?.cdaCl||Number(vistaData.cda_cl)||Number(vistaData.cda)||0)]]:[] ),...(vistaData.con_iva?[["IVA (19%)",fmt((vistaData.calc?.p1Cl||0)*0.19)]]:[] )].map(([l,v])=>(
+                          <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #dcfce7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  <div style={{background:"#fffbeb",border:"2px solid #f5c84244",borderRadius:10,padding:18}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontWeight:700,fontSize:15,color:"#92400e"}}>2do Pago — Al recibir la mercancía en Chile</span><span style={{fontWeight:800,fontSize:20,color:"#92400e"}}>{vistaData.con_iva?fmt((vistaData.calc?.p2Cl||0)*1.19):fmt(vistaData.calc?.p2Cl)}</span></div>
-                    <div style={{fontSize:12,color:"#666"}}>
-                      {[[`Saldo importación (${100-Number(vistaData.pct_deposito)}%)`,fmt(vistaData.calc?.prCl)],[`Servicio de importación (${vistaData.pct_servicio}%)`,fmt(vistaData.calc?.serv)],...(vistaData.con_iva?[["IVA (19%)",fmt((vistaData.calc?.p2Cl||0)*0.19)]]:[] )].map(([l,v])=>(
-                        <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #fef3c7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
-                      ))}
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:18,marginBottom:12}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontWeight:700,fontSize:15,color:"#0f7040"}}>1er Pago — Al confirmar la orden</span><span style={{fontWeight:800,fontSize:20,color:"#0f7040"}}>{vistaData.con_iva?fmt((vistaData.calc?.p1Cl||0)*1.19):fmt(vistaData.calc?.p1Cl)}</span></div>
+                        <div style={{fontSize:12,color:"#666"}}>
+                          {[[`Depósito ${vistaData.pct_deposito}% del total`,fmt(vistaData.calc?.dCl)],[`Comisión financiamiento (${(Number(vistaData.pct_com_prestamo)||6.5).toFixed(1)}%)`,fmt(vistaData.calc?.comCl)],...((Number(vistaData.cda_cl)||Number(vistaData.cda))>0?[[vistaData.cda_descripcion||"Certificado",fmt(vistaData.calc?.cdaCl||Number(vistaData.cda_cl)||Number(vistaData.cda)||0)]]:[] ),...(vistaData.con_iva?[["IVA (19%)",fmt((vistaData.calc?.p1Cl||0)*0.19)]]:[] )].map(([l,v])=>(
+                            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #dcfce7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{background:"#fffbeb",border:"2px solid #f5c84244",borderRadius:10,padding:18}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontWeight:700,fontSize:15,color:"#92400e"}}>2do Pago — Al recibir la mercancía en Chile</span><span style={{fontWeight:800,fontSize:20,color:"#92400e"}}>{vistaData.con_iva?fmt((vistaData.calc?.p2Cl||0)*1.19):fmt(vistaData.calc?.p2Cl)}</span></div>
+                        <div style={{fontSize:12,color:"#666"}}>
+                          {[[`Saldo importación (${100-Number(vistaData.pct_deposito)}%)`,fmt(vistaData.calc?.prCl)],[`Servicio de importación (${vistaData.pct_servicio}%)`,fmt(vistaData.calc?.serv)],...(vistaData.con_iva?[["IVA (19%)",fmt((vistaData.calc?.p2Cl||0)*0.19)]]:[] )].map(([l,v])=>(
+                            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #fef3c7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div style={{background:"#f1f5f9",borderRadius:10,padding:"16px 20px",marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <span style={{color:"#64748b",fontSize:13}}>TOTAL IMPORTACIÓN</span>
@@ -1253,7 +1281,8 @@ Número de seguimiento: ${c.nro}`;
                 <div style={{background:"#f9f9f9",borderRadius:8,padding:14,fontSize:12,color:"#666"}}>
                   <div style={{fontWeight:700,color:"#333",marginBottom:8}}>Consideraciones</div>
                   <div style={{marginBottom:4}}>• Plazo estimado de llegada: <strong>90 días</strong> desde la confirmación y pago.</div>
-                  <div style={{marginBottom:4}}>• El {100-Number(vistaData.pct_deposito)}% del valor queda financiado hasta la recepción.</div>
+                  {!vistaData.pago_100&&<div style={{marginBottom:4}}>• El {100-Number(vistaData.pct_deposito)}% del valor queda financiado hasta la recepción.</div>}
+                  {vistaData.pago_100&&<div style={{marginBottom:4}}>• Pago 100% al confirmar la orden (sin financiamiento).</div>}
                   <div style={{marginBottom:4}}>• Servicio de fulfillment disponible desde <strong>$1.000</strong>, monto puede variar según necesidad del cliente.</div>
                   {vistaData.notas&&<div style={{marginBottom:4}}>• {vistaData.notas}</div>}
                   <div>• Todos los valores son <strong>{vistaData.con_iva?"con IVA incluido":"sin IVA"}</strong>.</div>
@@ -1357,7 +1386,7 @@ Número de seguimiento: ${c.nro}`;
                     </div>
                     {form.tipo==="cliente"&&(
                       <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:18}}>
-                        {[["con_iva","Cotizar c/IVA"],["requiere_factura","Requiere factura"]].map(([f,l])=>(
+                        {[["con_iva","Cotizar c/IVA"],["pago_100","Pago 100% (sin split 30/70)"],["requiere_factura","Requiere factura"]].map(([f,l])=>(
                           <label key={f} style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontSize:12,color:"#999"}}><input type="checkbox" checked={form[f]||false} onChange={e=>setForm(p=>({...p,[f]:e.target.checked}))} style={{cursor:"pointer"}}/>{l}</label>
                         ))}
                       </div>
@@ -1573,13 +1602,18 @@ Número de seguimiento: ${c.nro}`;
                   <ROW label="Total producto (neto)" value={fmt(calcActual.tChNeto)} big/>
                   {form.requiere_factura&&<ROW label="IVA 19% (compra con factura a China)" value={fmt(calcActual.ivaChina)} accent="#c0392b"/>}
                   {form.requiere_factura&&<ROW label="Total producto con IVA" value={fmt(calcActual.tCh)} accent="#c47830" big/>}
-                  <ROW label={`Depósito ${form.pct_deposito}%`} value={fmt(calcActual.dCh)} sub/>
-                  <ROW label={`Préstamo ${100-Number(form.pct_deposito)}%`} value={fmt(calcActual.prCh)} sub/>
-                  <ROW label="Comisión real según APP" value={fmt(calcActual.comR)} accent="#b8922e"/>
+                  {!form.pago_100&&<ROW label={`Depósito ${form.pct_deposito}%`} value={fmt(calcActual.dCh)} sub/>}
+                  {!form.pago_100&&<ROW label={`Préstamo ${100-Number(form.pct_deposito)}%`} value={fmt(calcActual.prCh)} sub/>}
+                  {!form.pago_100&&<ROW label="Comisión real según APP" value={fmt(calcActual.comR)} accent="#b8922e"/>}
                   {Number(form.cda)>0&&<ROW label={`${form.cda_descripcion||"Certificado especial"}`} value={fmt(calcActual.cda)} accent="#c47830"/>}
                   <div style={{height:6}}/>
-                  <PAYBOX label="1er PAGO a China" amount={fmt(calcActual.p1Ch)} color="#2d78c8" detail={`Depósito ${fmt(calcActual.dCh)} + Comisión ${fmt(calcActual.comR)}${Number(form.cda)>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cda)}`:""} (sin IVA)`}/>
-                  <PAYBOX label="2do PAGO a China" amount={fmt(calcActual.p2Ch)} color="#2d78c8" detail={form.requiere_factura?`Saldo ${fmt(calcActual.prCh)} + IVA 19% ${fmt(calcActual.ivaChina)}`:"Saldo al recibir la mercancía"}/>
+                  {form.pago_100
+                    ? <PAYBOX label="PAGO ÚNICO a China" amount={fmt(calcActual.p1Ch)} color="#2d78c8" detail={`Producto ${fmt(calcActual.tChNeto)}${form.requiere_factura?` + IVA 19% ${fmt(calcActual.ivaChina)}`:""}${Number(form.cda)>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cda)}`:""}`}/>
+                    : <>
+                        <PAYBOX label="1er PAGO a China" amount={fmt(calcActual.p1Ch)} color="#2d78c8" detail={`Depósito ${fmt(calcActual.dCh)} + Comisión ${fmt(calcActual.comR)}${Number(form.cda)>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cda)}`:""} (sin IVA)`}/>
+                        <PAYBOX label="2do PAGO a China" amount={fmt(calcActual.p2Ch)} color="#2d78c8" detail={form.requiere_factura?`Saldo ${fmt(calcActual.prCh)} + IVA 19% ${fmt(calcActual.ivaChina)}`:"Saldo al recibir la mercancía"}/>
+                      </>
+                  }
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:8}}>
                     <span style={{fontSize:12,color:"#64748b"}}>Costo real por unidad{form.requiere_factura?" (c/IVA China)":""}</span>
                     <span style={{fontSize:19,fontWeight:800,color:"#2d78c8"}}>{fmt(calcActual.cRUnd)}</span>
@@ -1591,14 +1625,19 @@ Número de seguimiento: ${c.nro}`;
                   <BLOCK title="📄 Tabla 2 — Cotización al Cliente" accent="#1aa358">
                     <ROW label="Precio por unidad (China + margen)" value={fmt(calcActual.pCUnd)} accent="#1aa358" big/>
                     <ROW label="Total importación" value={fmt(calcActual.tCl)}/>
-                    <ROW label={`Depósito ${form.pct_deposito}%`} value={fmt(calcActual.dCl)} sub/>
-                    <ROW label={`Comisión préstamo ${form.pct_com_prestamo||6.5}%`} value={fmt(calcActual.comCl)} accent="#b8922e"/>
+                    {!form.pago_100&&<ROW label={`Depósito ${form.pct_deposito}%`} value={fmt(calcActual.dCl)} sub/>}
+                    {!form.pago_100&&<ROW label={`Comisión préstamo ${form.pct_com_prestamo||6.5}%`} value={fmt(calcActual.comCl)} accent="#b8922e"/>}
                     {(Number(form.cda_cl)||Number(form.cda))>0&&<ROW label={form.cda_descripcion||"Certificado especial"} value={fmt(calcActual.cdaCl)} accent="#c47830"/>}
                     <ROW label={`Servicio ZAGA ${form.pct_servicio}%`} value={fmt(calcActual.serv)} accent="#1aa358" sub/>
                     {form.con_iva&&<ROW label="IVA 19% (cobrado al cliente)" value={fmt(calcActual.ivaCliente)} accent="#1aa358" sub/>}
                     <div style={{height:6}}/>
-                    <PAYBOX label="1er PAGO Cliente" color="#1aa358" amount={form.con_iva?`${fmt(calcActual.p1ClIva)} c/IVA`:fmt(calcActual.p1Cl)} detail={`Depósito ${fmt(calcActual.dCl)} + Comisión ${fmt(calcActual.comCl)}${(Number(form.cda_cl)||Number(form.cda))>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cdaCl)}`:""}`}/>
-                    <PAYBOX label="2do PAGO Cliente" color="#1aa358" amount={form.con_iva?`${fmt(calcActual.p2ClIva)} c/IVA`:fmt(calcActual.p2Cl)} detail={`Saldo ${fmt(calcActual.prCl)} + Servicio ${fmt(calcActual.serv)}`}/>
+                    {form.pago_100
+                      ? <PAYBOX label="💰 PAGO ÚNICO Cliente" color="#1aa358" amount={form.con_iva?`${fmt(calcActual.p1ClIva)} c/IVA`:fmt(calcActual.p1Cl)} detail={`Total ${fmt(calcActual.tCl)} + Servicio ZAGA ${fmt(calcActual.serv)}${(Number(form.cda_cl)||Number(form.cda))>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cdaCl)}`:""}`}/>
+                      : <>
+                          <PAYBOX label="1er PAGO Cliente" color="#1aa358" amount={form.con_iva?`${fmt(calcActual.p1ClIva)} c/IVA`:fmt(calcActual.p1Cl)} detail={`Depósito ${fmt(calcActual.dCl)} + Comisión ${fmt(calcActual.comCl)}${(Number(form.cda_cl)||Number(form.cda))>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cdaCl)}`:""}`}/>
+                          <PAYBOX label="2do PAGO Cliente" color="#1aa358" amount={form.con_iva?`${fmt(calcActual.p2ClIva)} c/IVA`:fmt(calcActual.p2Cl)} detail={`Saldo ${fmt(calcActual.prCl)} + Servicio ${fmt(calcActual.serv)}`}/>
+                        </>
+                    }
                     <div style={{background:"#f0fdf4",borderRadius:9,padding:"12px 14px",marginTop:8,border:"1px solid #bbf7d0"}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,color:"#64748b"}}>Precio base por unidad</span><span style={{fontSize:15,fontWeight:700,color:"#16a34a"}}>{fmt(calcActual.pCUnd)}</span></div>
                       <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"#64748b"}}>Precio final / unidad (todo incluido)</span><span style={{fontSize:19,fontWeight:800,color:"#16a34a"}}>{form.con_iva?`${fmt(calcActual.pfUnd*1.19)} c/IVA`:fmt(calcActual.pfUnd)}</span></div>
@@ -1658,7 +1697,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{fontSize:11,color:"#c9a055",letterSpacing:2,fontWeight:700,marginBottom:14,textTransform:"uppercase"}}>⭐ Tabla 3 — Resumen Ganancia ZAGA</div>
                     <ROW label="Ganancia por margen de precio" value={fmt(calcActual.ganMar)} accent="#c9a055"/>
                     <ROW label={`Servicio ZAGA ${form.pct_servicio}%`} value={fmt(calcActual.ganServ)} accent="#c9a055"/>
-                    <ROW label="Diferencia comisión (6.5% − real app)" value={fmt(calcActual.difCom)} accent="#aaa" sub/>
+                    {!form.pago_100&&<ROW label="Diferencia comisión (6.5% − real app)" value={fmt(calcActual.difCom)} accent="#aaa" sub/>}
                     {calcActual.ganCda!==0&&<ROW label={`Diferencia ${form.cda_descripcion||"Certificado"} (cobrado − costo)`} value={fmt(calcActual.ganCda)} accent={calcActual.ganCda>=0?"#c9a055":"#c0392b"} sub/>}
                     <ROW label="GANANCIA IMPORTACIÓN (sin IVA)" value={fmt(calcActual.ganImp)} big topLine/>
                     {(form.requiere_factura||form.con_iva)&&(
@@ -2000,7 +2039,8 @@ Número de seguimiento: ${c.nro}`;
                             {diasLL!==null&&c.checklist?.pago_china&&!c.fecha_llegada_real&&<span style={{background:"#f9741618",color:"#c47830",border:"1px solid #f9741633",borderRadius:20,padding:"2px 10px",fontSize:11}}>{diasLL>0?`🚢 ${diasLL}d`:diasLL===0?"¡Llega hoy!":`⚠️ ${Math.abs(diasLL)}d tarde`}</span>}
                             {c.fulfillment_cliente&&<span style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:20,padding:"2px 10px",fontSize:11}}>🚚 Fulfillment{c.fulfillment_producto_creado?" ✓":""}</span>}
                             {c.estado==="en_negociacion"&&(c.negociacion_rondas||[]).length>0&&<span style={{background:"#b8922e22",color:"#b8922e",border:"1px solid #f59e0b44",borderRadius:20,padding:"2px 10px",fontSize:11}}>🤝 {(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length} propuesta{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""} pendiente{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""}</span>}
-                            {c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&<span style={{background:"#0d987018",color:"#0d9870",border:"1px solid #1aa35844",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600}}>✅ Pago 1 · {fmtFechaCorta(c.fecha_pago1_cliente)}</span>}
+                            {c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&<span style={{background:"#0d987018",color:"#0d9870",border:"1px solid #1aa35844",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600}}>✅ {c.pago_100?"Pago único":"Pago 1"} · {fmtFechaCorta(c.fecha_pago1_cliente)}</span>}
+                            {c.pago_100&&<span style={{background:"#c9a05522",color:"#c9a055",border:"1px solid #f5c84244",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>💰 PAGO 100%</span>}
                           </div>
                           <div style={{color:"#64748b",fontSize:13,marginBottom:2}}>{c.producto} · {fmtN(c.unidades)} und</div>
                           {(c.sku_china||c.sku_bodega)&&(
@@ -2045,10 +2085,43 @@ Número de seguimiento: ${c.nro}`;
                         </div>
                       </div>
                       {c.calc&&(
-                        <div className="cot-card-meta" style={{display:"grid",gridTemplateColumns:isPropia?"repeat(4,1fr)":"repeat(3,1fr)",gap:8,background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:12}}>
+                        <div className="cot-card-meta" style={{display:"grid",gridTemplateColumns:isPropia?"repeat(4,1fr)":c.pago_100?"repeat(2,1fr)":"repeat(3,1fr)",gap:8,background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:12}}>
                         {isPropia
                           ? [["Costo total China",fmt(c.calc.tCh||0),"#2d78c8"],["Costo real/und",fmt(c.calc.cRUnd||0),"#2d78c8"],["Precio venta/und",fmt(c.calc.pvUnd||0),"#3d7fc4"],["Margen bruto",fmtP(c.calc.mgBruto),"#475569"]]
                               .map(([l,v,col])=>(<div key={l} style={{textAlign:"center"}}><div style={{fontSize:10,color:"#444",marginBottom:2}}>{l}</div><div style={{fontSize:12,fontWeight:600,color:col}}>{v}</div></div>))
+                          : c.pago_100
+                          ? (<>
+                              {/* Bloque Pago Único */}
+                              <div style={{background:"#fff",borderRadius:7,padding:"8px 10px",border:"1px solid #f5c84255"}}>
+                                <div style={{fontSize:9,color:"#c9a055",textTransform:"uppercase",letterSpacing:.5,marginBottom:4,fontWeight:700}}>💰 Pago Único</div>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:4}}>
+                                  <div style={{textAlign:"center",flex:1}}>
+                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>Cliente</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:"#1aa358"}}>{fmt(c.calc.p1Cl||0)}</div>
+                                  </div>
+                                  <div style={{width:1,height:24,background:"#e2e8f0"}}/>
+                                  <div style={{textAlign:"center",flex:1}}>
+                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>China</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:"#2d78c8"}}>{fmt(c.calc.p1Ch||0)}</div>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Bloque Total */}
+                              <div style={{background:"#fff",borderRadius:7,padding:"8px 10px",border:"1px solid #e2e8f0"}}>
+                                <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.5,marginBottom:4,fontWeight:600}}>Total</div>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:4}}>
+                                  <div style={{textAlign:"center",flex:1}}>
+                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>Cliente</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:"#1aa358"}}>{fmt(c.calc.totCl||0)}</div>
+                                  </div>
+                                  <div style={{width:1,height:24,background:"#e2e8f0"}}/>
+                                  <div style={{textAlign:"center",flex:1}}>
+                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>China</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:"#2d78c8"}}>{fmt(c.calc.tCh||0)}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </>)
                           : (<>
                               {/* Bloque 1er pago */}
                               <div style={{background:"#fff",borderRadius:7,padding:"8px 10px",border:"1px solid #e2e8f0"}}>
@@ -3390,7 +3463,7 @@ Número de seguimiento: ${c.nro}`;
                             </div>
                             {!isRech&&c.calc&&(
                               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,minWidth:240}}>
-                                {[["Unidades",fmtN(c.unidades),"#0f172a"],["1er Pago",fmt(c.calc?.p1Cl),"#16a34a"],["2do Pago",fmt(c.calc?.p2Cl),"#334155"]].map(([l,v,col])=>(
+                                {(c.pago_100?[["Unidades",fmtN(c.unidades),"#0f172a"],["💰 Pago Único",fmt(c.calc?.p1Cl),"#c9a055"],["Total",fmt(c.calc?.totCl),"#16a34a"]]:[["Unidades",fmtN(c.unidades),"#0f172a"],["1er Pago",fmt(c.calc?.p1Cl),"#16a34a"],["2do Pago",fmt(c.calc?.p2Cl),"#334155"]]).map(([l,v,col])=>(
                                   <div key={l} style={{background:"#f8fafc",borderRadius:7,padding:"7px 8px",textAlign:"center"}}>
                                     <div style={{fontSize:10,color:"#64748b",marginBottom:2}}>{l}</div>
                                     <div style={{fontSize:12,fontWeight:700,color:col}}>{v}</div>
