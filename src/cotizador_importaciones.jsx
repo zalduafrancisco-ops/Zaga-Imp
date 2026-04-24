@@ -1219,80 +1219,97 @@ Número de seguimiento: ${c.nro}`;
 
       {/* MODAL VISTA CLIENTE */}
       {vistaData&&vistaData.tipo!=="propia"&&(
-        <div style={{position:"fixed",inset:0,background:"#000b",zIndex:900,overflowY:"auto",padding:"40px 20px"}} onClick={e=>e.target===e.currentTarget&&setVistaId(null)}>
-          <div style={{maxWidth:700,margin:"0 auto"}}>
-            <div style={{display:"flex",gap:10,marginBottom:12,justifyContent:"flex-end"}}>
-              <button onClick={()=>abrirPrint("tracker")} style={{background:"#c9a055",color:"#05100e",border:"none",borderRadius:9,padding:"10px 22px",fontSize:14,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>
-              <button onClick={()=>setVistaId(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:9,padding:"10px 20px",fontSize:14,cursor:"pointer"}}>✕ Cerrar</button>
+        <div style={{position:"fixed",inset:0,background:"#000b",zIndex:900,overflowY:"auto",padding:"12px 8px"}} onClick={e=>e.target===e.currentTarget&&setVistaId(null)}>
+          <div style={{maxWidth:520,margin:"0 auto"}}>
+            <div style={{display:"flex",gap:8,marginBottom:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>abrirPrint("tracker")} style={{background:"#c9a055",color:"#05100e",border:"none",borderRadius:9,padding:"8px 16px",fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>
+              <button onClick={()=>setVistaId(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:9,padding:"8px 14px",fontSize:13,cursor:"pointer"}}>✕ Cerrar</button>
             </div>
-            <div ref={vistaRef} style={{background:"#fff",borderRadius:16,overflow:"hidden",color:"#222",fontFamily:"'Segoe UI',Arial,sans-serif"}}>
-              <div style={{background:"#ffffff",padding:"20px 36px 14px 36px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"2px solid #f0f0f0"}}>
-                <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:48,width:"auto",objectFit:"contain"}}/>
+            <div ref={vistaRef} style={{background:"#fff",borderRadius:14,overflow:"hidden",color:"#222",fontFamily:"'Segoe UI',Arial,sans-serif"}}>
+              {/* Header compacto */}
+              <div style={{background:"#ffffff",padding:"12px 18px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"2px solid #f0f0f0"}}>
+                <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:32,width:"auto",objectFit:"contain"}}/>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{vistaData.nro}</div>
-                  <div style={{fontSize:11,color:"#94a3b8",letterSpacing:1,textTransform:"uppercase",marginTop:2}}>Cotización de Importación</div>
-                  <div style={{fontSize:12,color:"#64748b",marginTop:2}}>{todayStr()}</div>
+                  <div style={{fontSize:10,color:"#94a3b8",letterSpacing:.5,textTransform:"uppercase"}}>Cotización de Importación</div>
+                  <div style={{fontSize:11,color:"#64748b"}}>{todayStr()}</div>
                 </div>
               </div>
-              <div style={{padding:"28px 36px"}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:24,paddingBottom:20,borderBottom:"2px solid #f0f0f0"}}>
+              <div style={{padding:"14px 18px"}}>
+                {/* Info cliente — 2 cols compactas */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 14px",marginBottom:12,paddingBottom:12,borderBottom:"1px solid #f0f0f0"}}>
                   {[["Cliente",vistaData.cliente],["Producto",vistaData.producto],["Unidades",fmtN(vistaData.unidades)],["Fecha",todayStr()]].map(([l,v])=>(
-                    <div key={l}><div style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>{l}</div><div style={{fontSize:15,fontWeight:700}}>{v}</div></div>
+                    <div key={l}><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:2}}>{l}</div><div style={{fontSize:13,fontWeight:700,lineHeight:1.3}}>{v}</div></div>
                   ))}
                 </div>
-                <div style={{background:"#f8f9ff",border:"2px solid #1a1a2e22",borderRadius:12,padding:"16px 20px",marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div><div style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Precio por unidad (base)</div><div style={{fontSize:26,fontWeight:800,color:"#0f172a"}}>{fmt(vistaData.calc?.pCUnd)}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{vistaData.con_iva?"+ IVA":"Sin IVA"}</div></div>
+                {/* Precio */}
+                <div style={{background:"#f8f9ff",border:"1px solid #1a1a2e22",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:2}}>Precio por unidad (base)</div>
+                    <div style={{fontSize:22,fontWeight:800,color:"#0f172a"}}>{fmt(vistaData.calc?.pCUnd)}</div>
+                    <div style={{fontSize:10,color:"#64748b"}}>{vistaData.con_iva?"+ IVA":"Sin IVA"}</div>
+                  </div>
                   <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Precio final / unidad (todo incluido)</div>
-                    <div style={{fontSize:26,fontWeight:800,color:"#0f7040"}}>{fmt(vistaData.calc?.pfUnd)}<span style={{fontSize:13,color:"#64748b",fontWeight:400,marginLeft:4}}>neto</span></div>
-                    {vistaData.con_iva&&<div style={{fontSize:18,fontWeight:700,color:"#1a6644",marginTop:2}}>{fmt((vistaData.calc?.pfUnd||0)*1.19)}<span style={{fontSize:12,color:"#64748b",fontWeight:400,marginLeft:4}}>c/IVA</span></div>}
-                    <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Incluye comisiones y servicio</div>
+                    <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:2}}>Precio final / unidad (todo incluido)</div>
+                    <div style={{fontSize:22,fontWeight:800,color:"#0f7040"}}>{fmt(vistaData.calc?.pfUnd)}<span style={{fontSize:11,color:"#64748b",fontWeight:400,marginLeft:3}}>neto</span></div>
+                    {vistaData.con_iva&&<div style={{fontSize:15,fontWeight:700,color:"#1a6644"}}>{fmt((vistaData.calc?.pfUnd||0)*1.19)}<span style={{fontSize:10,color:"#64748b",fontWeight:400,marginLeft:3}}>c/IVA</span></div>}
+                    <div style={{fontSize:10,color:"#64748b"}}>Incluye comisiones y servicio</div>
                   </div>
                 </div>
-                <div style={{marginBottom:24}}>
-                  <div style={{fontSize:14,fontWeight:700,marginBottom:14,color:"#0f172a"}}>Estructura de Pago</div>
+                {/* Estructura de Pago */}
+                <div style={{marginBottom:10}}>
+                  <div style={{fontSize:12,fontWeight:700,marginBottom:8,color:"#0f172a"}}>Estructura de Pago</div>
                   {(vistaData.pago_100||Number(vistaData.pct_deposito)>=100) ? (
-                    <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:18,marginBottom:12}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontWeight:700,fontSize:15,color:"#0f7040"}}>💰 Pago Único — Al confirmar la orden</span><span style={{fontWeight:800,fontSize:20,color:"#0f7040"}}>{vistaData.con_iva?fmt((vistaData.calc?.totCl||0)*1.19):fmt(vistaData.calc?.totCl)}</span></div>
-                      <div style={{fontSize:12,color:"#666"}}>
-                        {[["Total importación",fmt(vistaData.calc?.tCl)],[`Servicio de importación (${vistaData.pct_servicio}%)`,fmt(vistaData.calc?.serv)],...((Number(vistaData.cda_cl)||Number(vistaData.cda))>0?[[vistaData.cda_descripcion||"Certificado",fmt(vistaData.calc?.cdaCl||Number(vistaData.cda_cl)||Number(vistaData.cda)||0)]]:[] ),...(vistaData.con_iva?[["IVA (19%)",fmt((vistaData.calc?.p1Cl||0)*0.19)]]:[] )].map(([l,v])=>(
-                          <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #dcfce7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
+                    <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:"10px 14px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontWeight:700,fontSize:13,color:"#0f7040"}}>💰 Pago Único — Al confirmar la orden</span><span style={{fontWeight:800,fontSize:17,color:"#0f7040"}}>{vistaData.con_iva?fmt((vistaData.calc?.totCl||0)*1.19):fmt(vistaData.calc?.totCl)}</span></div>
+                      <div style={{fontSize:11,color:"#666"}}>
+                        {[["Total importación",fmt(vistaData.calc?.tCl)],[`Servicio de importación (${vistaData.pct_servicio}%)`,fmt(vistaData.calc?.serv)],...((Number(vistaData.cda_cl)||Number(vistaData.cda))>0?[[vistaData.cda_descripcion||"Certificado",fmt(vistaData.calc?.cdaCl||Number(vistaData.cda_cl)||Number(vistaData.cda)||0)]]:[] ),...(vistaData.con_iva?[["IVA (19%)",fmt((vistaData.calc?.totCl||0)*0.19)]]:[] )].map(([l,v])=>(
+                          <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid #dcfce7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
                         ))}
                       </div>
                     </div>
                   ) : (
-                    <>
-                      <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:18,marginBottom:12}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontWeight:700,fontSize:15,color:"#0f7040"}}>1er Pago — Al confirmar la orden</span><span style={{fontWeight:800,fontSize:20,color:"#0f7040"}}>{vistaData.con_iva?fmt((vistaData.calc?.p1Cl||0)*1.19):fmt(vistaData.calc?.p1Cl)}</span></div>
-                        <div style={{fontSize:12,color:"#666"}}>
-                          {[[`Depósito ${vistaData.pct_deposito}% del total`,fmt(vistaData.calc?.dCl)],[`Comisión financiamiento (${(Number(vistaData.pct_com_prestamo)||6.5).toFixed(1)}%)`,fmt(vistaData.calc?.comCl)],...((Number(vistaData.cda_cl)||Number(vistaData.cda))>0?[[vistaData.cda_descripcion||"Certificado",fmt(vistaData.calc?.cdaCl||Number(vistaData.cda_cl)||Number(vistaData.cda)||0)]]:[] ),...(vistaData.con_iva?[["IVA (19%)",fmt((vistaData.calc?.p1Cl||0)*0.19)]]:[] )].map(([l,v])=>(
-                            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #dcfce7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:"10px 12px"}}>
+                        <div style={{fontWeight:700,fontSize:12,color:"#0f7040",marginBottom:4}}>1er Pago</div>
+                        <div style={{fontWeight:800,fontSize:18,color:"#0f7040",marginBottom:6}}>{vistaData.con_iva?fmt((vistaData.calc?.p1Cl||0)*1.19):fmt(vistaData.calc?.p1Cl)}</div>
+                        <div style={{fontSize:10,color:"#0f7040",marginBottom:6}}>Al confirmar la orden</div>
+                        <div style={{fontSize:10,color:"#666"}}>
+                          {[[`Depósito ${vistaData.pct_deposito}%`,fmt(vistaData.calc?.dCl)],[`Comisión ${(Number(vistaData.pct_com_prestamo)||6.5).toFixed(1)}%`,fmt(vistaData.calc?.comCl)],...((Number(vistaData.cda_cl)||Number(vistaData.cda))>0?[[vistaData.cda_descripcion||"Certificado",fmt(vistaData.calc?.cdaCl||Number(vistaData.cda_cl)||Number(vistaData.cda)||0)]]:[] ),...(vistaData.con_iva?[["IVA 19%",fmt((vistaData.calc?.p1Cl||0)*0.19)]]:[] )].map(([l,v])=>(
+                            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"2px 0",borderBottom:"1px solid #dcfce7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
                           ))}
                         </div>
                       </div>
-                      <div style={{background:"#fffbeb",border:"2px solid #f5c84244",borderRadius:10,padding:18}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontWeight:700,fontSize:15,color:"#92400e"}}>2do Pago — Al recibir la mercancía en Chile</span><span style={{fontWeight:800,fontSize:20,color:"#92400e"}}>{vistaData.con_iva?fmt((vistaData.calc?.p2Cl||0)*1.19):fmt(vistaData.calc?.p2Cl)}</span></div>
-                        <div style={{fontSize:12,color:"#666"}}>
-                          {[[`Saldo importación (${100-Number(vistaData.pct_deposito)}%)`,fmt(vistaData.calc?.prCl)],[`Servicio de importación (${vistaData.pct_servicio}%)`,fmt(vistaData.calc?.serv)],...(vistaData.con_iva?[["IVA (19%)",fmt((vistaData.calc?.p2Cl||0)*0.19)]]:[] )].map(([l,v])=>(
-                            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #fef3c7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
+                      <div style={{background:"#fffbeb",border:"2px solid #f5c84244",borderRadius:10,padding:"10px 12px"}}>
+                        <div style={{fontWeight:700,fontSize:12,color:"#92400e",marginBottom:4}}>2do Pago</div>
+                        <div style={{fontWeight:800,fontSize:18,color:"#92400e",marginBottom:6}}>{vistaData.con_iva?fmt((vistaData.calc?.p2Cl||0)*1.19):fmt(vistaData.calc?.p2Cl)}</div>
+                        <div style={{fontSize:10,color:"#92400e",marginBottom:6}}>Al recibir en Chile</div>
+                        <div style={{fontSize:10,color:"#666"}}>
+                          {[[`Saldo ${100-Number(vistaData.pct_deposito)}%`,fmt(vistaData.calc?.prCl)],[`Servicio ${vistaData.pct_servicio}%`,fmt(vistaData.calc?.serv)],...(vistaData.con_iva?[["IVA 19%",fmt((vistaData.calc?.p2Cl||0)*0.19)]]:[] )].map(([l,v])=>(
+                            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"2px 0",borderBottom:"1px solid #fef3c7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
                           ))}
                         </div>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
-                <div style={{background:"#f1f5f9",borderRadius:10,padding:"16px 20px",marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{color:"#64748b",fontSize:13}}>TOTAL IMPORTACIÓN</span>
-                  <div style={{textAlign:"right"}}><div style={{color:"#0f172a",fontSize:22,fontWeight:800}}>{vistaData.con_iva?fmt((vistaData.calc?.totCl||0)*1.19):fmt(vistaData.calc?.totCl)}</div><div style={{color:"#64748b",fontSize:11,marginTop:2}}>{fmtN(vistaData.unidades)} unidades · {fmt(vistaData.calc?.pfUnd)} /und total</div></div>
+                {/* Total */}
+                <div style={{background:"#f1f5f9",borderRadius:10,padding:"10px 14px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{color:"#64748b",fontSize:12}}>TOTAL IMPORTACIÓN</span>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{color:"#0f172a",fontSize:20,fontWeight:800}}>{vistaData.con_iva?fmt((vistaData.calc?.totCl||0)*1.19):fmt(vistaData.calc?.totCl)}</div>
+                    <div style={{color:"#64748b",fontSize:10}}>{fmtN(vistaData.unidades)} und · {fmt(vistaData.calc?.pfUnd)}/und</div>
+                  </div>
                 </div>
-                <div style={{background:"#f9f9f9",borderRadius:8,padding:14,fontSize:12,color:"#666"}}>
-                  <div style={{fontWeight:700,color:"#333",marginBottom:8}}>Consideraciones</div>
-                  <div style={{marginBottom:4}}>• Plazo estimado de llegada: <strong>90 días</strong> desde la confirmación y pago.</div>
-                  {!vistaData.pago_100&&Number(vistaData.pct_deposito)<100&&<div style={{marginBottom:4}}>• El {100-Number(vistaData.pct_deposito)}% del valor queda financiado hasta la recepción.</div>}
-                  {(vistaData.pago_100||Number(vistaData.pct_deposito)>=100)&&<div style={{marginBottom:4}}>• Pago 100% al confirmar la orden (sin financiamiento).</div>}
-                  <div style={{marginBottom:4}}>• Servicio de fulfillment disponible desde <strong>$1.200</strong>, monto puede variar según necesidad del cliente.</div>
-                  {vistaData.notas&&<div style={{marginBottom:4}}>• {vistaData.notas}</div>}
-                  <div>• Todos los valores son <strong>{vistaData.con_iva?"con IVA incluido":"sin IVA"}</strong>.</div>
+                {/* Consideraciones compactas */}
+                <div style={{background:"#f9f9f9",borderRadius:8,padding:"8px 12px",fontSize:11,color:"#666"}}>
+                  <div style={{fontWeight:700,color:"#333",marginBottom:5}}>Consideraciones</div>
+                  <div style={{marginBottom:3}}>• Llegada estimada: <strong>90 días</strong> desde confirmación y pago.</div>
+                  {!vistaData.pago_100&&Number(vistaData.pct_deposito)<100&&<div style={{marginBottom:3}}>• El {100-Number(vistaData.pct_deposito)}% del valor queda financiado hasta la recepción.</div>}
+                  {(vistaData.pago_100||Number(vistaData.pct_deposito)>=100)&&<div style={{marginBottom:3}}>• Pago 100% al confirmar la orden (sin financiamiento).</div>}
+                  <div style={{marginBottom:3}}>• Fulfillment disponible desde <strong>$1.200</strong> según necesidad.</div>
+                  {vistaData.notas&&<div style={{marginBottom:3}}>• {vistaData.notas}</div>}
+                  <div>• Valores <strong>{vistaData.con_iva?"con IVA incluido":"sin IVA"}</strong>.</div>
                 </div>
               </div>
             </div>
