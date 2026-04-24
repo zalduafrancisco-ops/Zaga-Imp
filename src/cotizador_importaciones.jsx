@@ -66,7 +66,7 @@ const makeDefaultForm = (usuario) => ({
   fecha_solicitud: new Date().toISOString().split("T")[0],
   unidades:"", precio_china:"", comision_real:"",
   pct_deposito:30, margen_und:"", pct_servicio:4, pct_com_prestamo:6.5, precio_venta_cliente:"",
-  fulfillment_und:1000, pct_devolucion:20,
+  fulfillment_und:1200, pct_devolucion:20,
   cda:0, cda_cl:0, cda_descripcion:"", con_iva:false, pago_100:false, notas:"", requiere_factura:false,
   nro_factura_cliente:"", link_factura_cliente:"",
   variantes:"", // colores, tallas, cantidades por variante
@@ -84,7 +84,7 @@ const makeDefaultForm = (usuario) => ({
 function calcCliente(d) {
   const u=Number(d.unidades)||0, pCh=Number(d.precio_china)||0, comR=Number(d.comision_real)||0;
   const pDep=(Number(d.pct_deposito)||30)/100, mar=Number(d.margen_und)||0;
-  const pServ=(Number(d.pct_servicio)||4)/100, fUnd=Number(d.fulfillment_und)||1000;
+  const pServ=(Number(d.pct_servicio)||4)/100, fUnd=Number(d.fulfillment_und)||1200;
   const pDev=(Number(d.pct_devolucion)||20)/100, cda=Number(d.cda)||0, cdaCl=Number(d.cda_cl)||cda;
   const conFact=!!d.requiere_factura, conIva=!!d.con_iva, pago100=!!d.pago_100;
   const comREff=pago100?0:comR;
@@ -1251,9 +1251,9 @@ Número de seguimiento: ${c.nro}`;
                 </div>
                 <div style={{marginBottom:24}}>
                   <div style={{fontSize:14,fontWeight:700,marginBottom:14,color:"#0f172a"}}>Estructura de Pago</div>
-                  {vistaData.pago_100 ? (
+                  {(vistaData.pago_100||Number(vistaData.pct_deposito)>=100) ? (
                     <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:18,marginBottom:12}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontWeight:700,fontSize:15,color:"#0f7040"}}>💰 Pago Único — Al confirmar la orden</span><span style={{fontWeight:800,fontSize:20,color:"#0f7040"}}>{vistaData.con_iva?fmt((vistaData.calc?.p1Cl||0)*1.19):fmt(vistaData.calc?.p1Cl)}</span></div>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontWeight:700,fontSize:15,color:"#0f7040"}}>💰 Pago Único — Al confirmar la orden</span><span style={{fontWeight:800,fontSize:20,color:"#0f7040"}}>{vistaData.con_iva?fmt((vistaData.calc?.totCl||0)*1.19):fmt(vistaData.calc?.totCl)}</span></div>
                       <div style={{fontSize:12,color:"#666"}}>
                         {[["Total importación",fmt(vistaData.calc?.tCl)],[`Servicio de importación (${vistaData.pct_servicio}%)`,fmt(vistaData.calc?.serv)],...((Number(vistaData.cda_cl)||Number(vistaData.cda))>0?[[vistaData.cda_descripcion||"Certificado",fmt(vistaData.calc?.cdaCl||Number(vistaData.cda_cl)||Number(vistaData.cda)||0)]]:[] ),...(vistaData.con_iva?[["IVA (19%)",fmt((vistaData.calc?.p1Cl||0)*0.19)]]:[] )].map(([l,v])=>(
                           <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #dcfce7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
@@ -1288,9 +1288,9 @@ Número de seguimiento: ${c.nro}`;
                 <div style={{background:"#f9f9f9",borderRadius:8,padding:14,fontSize:12,color:"#666"}}>
                   <div style={{fontWeight:700,color:"#333",marginBottom:8}}>Consideraciones</div>
                   <div style={{marginBottom:4}}>• Plazo estimado de llegada: <strong>90 días</strong> desde la confirmación y pago.</div>
-                  {!vistaData.pago_100&&<div style={{marginBottom:4}}>• El {100-Number(vistaData.pct_deposito)}% del valor queda financiado hasta la recepción.</div>}
-                  {vistaData.pago_100&&<div style={{marginBottom:4}}>• Pago 100% al confirmar la orden (sin financiamiento).</div>}
-                  <div style={{marginBottom:4}}>• Servicio de fulfillment disponible desde <strong>$1.000</strong>, monto puede variar según necesidad del cliente.</div>
+                  {!vistaData.pago_100&&Number(vistaData.pct_deposito)<100&&<div style={{marginBottom:4}}>• El {100-Number(vistaData.pct_deposito)}% del valor queda financiado hasta la recepción.</div>}
+                  {(vistaData.pago_100||Number(vistaData.pct_deposito)>=100)&&<div style={{marginBottom:4}}>• Pago 100% al confirmar la orden (sin financiamiento).</div>}
+                  <div style={{marginBottom:4}}>• Servicio de fulfillment disponible desde <strong>$1.200</strong>, monto puede variar según necesidad del cliente.</div>
                   {vistaData.notas&&<div style={{marginBottom:4}}>• {vistaData.notas}</div>}
                   <div>• Todos los valores son <strong>{vistaData.con_iva?"con IVA incluido":"sin IVA"}</strong>.</div>
                 </div>
@@ -1557,7 +1557,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
                       <NInput label="% Servicio al cliente" field="pct_servicio" form={form} setForm={setForm} color="#1aa358" note="Ej: 4 = 4%"/>
                       <NInput label="% Comisión préstamo" field="pct_com_prestamo" form={form} setForm={setForm} color="#b8922e" note="Por defecto 6.5%"/>
-                      <NInput label="Fulfillment $ / Unidad" field="fulfillment_und" form={form} setForm={setForm} note="Base $1.000"/>
+                      <NInput label="Fulfillment $ / Unidad" field="fulfillment_und" form={form} setForm={setForm} note="Base $1.200"/>
                       <NInput label="% Devolución estimada" field="pct_devolucion" form={form} setForm={setForm} note="Ej: 20 = 20%"/>
                     </div>
                     <div style={{borderTop:"1px solid #e2e8f0",paddingTop:12}}>
