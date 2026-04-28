@@ -62,7 +62,7 @@ const PROCESADAS = ["aceptada","pagada_china","en_camino","en_bodega","completad
 const makeDefaultForm = (usuario) => ({
   tipo:"cliente",
   gestor: usuario?.nombre?.toLowerCase()==="luisa" ? "luisa" : "francisco",
-  cliente:"", categoria_cliente:"nuevo", transporte:"maritimo", producto:"", link_alibaba:"",
+  cliente:"", categoria_cliente:"nuevo", transporte:"maritimo", producto:"", link_alibaba:"", imagen_url:"",
   fecha_solicitud: new Date().toISOString().split("T")[0],
   unidades:"", precio_china:"", comision_real:"",
   pct_deposito:30, margen_und:"", pct_servicio:4, pct_com_prestamo:6.5, precio_venta_cliente:"",
@@ -1188,6 +1188,7 @@ Número de seguimiento: ${c.nro}`;
                       </div>
                     )
                   })()}
+                  {p.imagen_url&&<img src={p.imagen_url} alt={p.producto} onError={e=>{e.target.style.display='none'}} style={{width:"100%",maxHeight:220,objectFit:"contain",borderRadius:10,border:"1px solid #e2e8f0",background:"#f8fafc",marginBottom:4}}/>}
                   {p.link_alibaba&&<a href={p.link_alibaba} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,background:"#eff6ff",color:"#2d78c8",border:"1px solid #3b82f633",borderRadius:8,padding:"8px 14px",fontSize:12,textDecoration:"none"}}>🔗 Ver referencia en Alibaba</a>}
                   {p.motivo_no_procesada&&<div style={{background:"#fff1f2",borderRadius:8,padding:12,border:"1px solid #ef444433"}}><div style={{fontSize:10,color:"#c0392b",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Motivo no procesada</div><div style={{fontSize:12,color:"#dc2626"}}>{p.motivo_no_procesada}</div></div>}
                   {(p.negociacion_rondas||[]).length>0&&(
@@ -1237,10 +1238,13 @@ Número de seguimiento: ${c.nro}`;
               </div>
               <div style={{padding:"14px 18px"}}>
                 {/* Info cliente — 2 cols compactas */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 14px",marginBottom:12,paddingBottom:12,borderBottom:"1px solid #f0f0f0"}}>
-                  {[["Cliente",vistaData.cliente],["Producto",vistaData.producto],["Unidades",fmtN(vistaData.unidades)],["Fecha",todayStr()]].map(([l,v])=>(
-                    <div key={l}><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:2}}>{l}</div><div style={{fontSize:13,fontWeight:700,lineHeight:1.3}}>{v}</div></div>
-                  ))}
+                <div style={{display:"flex",gap:12,marginBottom:12,paddingBottom:12,borderBottom:"1px solid #f0f0f0",alignItems:"flex-start"}}>
+                  {vistaData.imagen_url&&<img src={vistaData.imagen_url} alt={vistaData.producto} onError={e=>{e.target.style.display='none'}} style={{width:80,height:80,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 14px",flex:1}}>
+                    {[["Cliente",vistaData.cliente],["Producto",vistaData.producto],["Unidades",fmtN(vistaData.unidades)],["Fecha",todayStr()]].map(([l,v])=>(
+                      <div key={l}><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:2}}>{l}</div><div style={{fontSize:13,fontWeight:700,lineHeight:1.3}}>{v}</div></div>
+                    ))}
+                  </div>
                 </div>
                 {/* Precio */}
                 <div style={{background:"#f8f9ff",border:"1px solid #1a1a2e22",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -1402,6 +1406,13 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{marginBottom:12}}>
                     <label style={{display:"block",fontSize:10,color:"#777",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Link referencia</label>
                     <input value={form.link_alibaba||""} onChange={e=>setForm(p=>({...p,link_alibaba:e.target.value}))} placeholder="https://..." style={{width:"100%",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:8,color:"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                  </div>
+                  <div style={{marginBottom:12}}>
+                    <label style={{display:"block",fontSize:10,color:"#777",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Imagen del producto (URL)</label>
+                    <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                      <input value={form.imagen_url||""} onChange={e=>setForm(p=>({...p,imagen_url:e.target.value}))} placeholder="Clic derecho en la imagen → Copiar dirección de imagen" style={{flex:1,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:8,color:"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                      {form.imagen_url&&<img src={form.imagen_url} onError={e=>{e.target.style.display='none'}} style={{width:44,height:44,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                    </div>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
                     <div>
@@ -2060,6 +2071,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{padding:20,borderLeft:`4px solid ${isPropia?"#3d7fc4":sc}`}}>
                       <div className="cot-card-row" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                         <div style={{flex:1}}>
+                          {c.imagen_url&&<img src={c.imagen_url} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",float:"right",marginLeft:12,marginBottom:6}}/>}
                           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
                             {isPropia?<span style={{background:"#3d7fc422",color:"#3d7fc4",border:"1px solid #8b5cf644",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>🏠 PROPIA</span>:<span style={{fontWeight:700,fontSize:15}}>{c.cliente}</span>}
                             {!isPropia&&c.categoria_cliente==="premium"&&<span style={{background:"#c9a05522",color:"#c9a055",border:"1px solid #f5c84244",borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:700}}>⭐ Premium</span>}

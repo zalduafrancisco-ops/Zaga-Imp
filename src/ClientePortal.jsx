@@ -600,6 +600,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               </span>
                             )}
                           </div>
+                          {c.imagen_url&&<img src={c.imagen_url} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:56,height:56,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",float:"right",marginLeft:10,marginBottom:4}}/>}
                           <div style={{fontSize:15,fontWeight:700,color:isRech?"#94a3b8":"#0f172a",marginBottom:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.producto}</div>
                           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                             {c.unidades&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>📦 {fmtN(c.unidades)} und</span>}
