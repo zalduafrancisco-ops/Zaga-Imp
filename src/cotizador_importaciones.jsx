@@ -250,6 +250,7 @@ export default function App({ supabase, usuario, onLogout }){
   const [notaOculta,setNotaOculta] = useState({});
   const [notaEditando,setNotaEditando] = useState({}); // key: "cotId_i" → {texto, oculta}
   const [gestTab, setGestTab] = useState({});          // tab activa gestionar: "notas"|"cliente"|"china"
+  const [chatOpen, setChatOpen] = useState({});        // mini-chat inline: {cotId: "cliente"|"china"|null}
   const [notaChinaInput, setNotaChinaInput] = useState({});
   const [resumenChina,setResumenChina] = useState(null);
   const [backupModal,setBackupModal] = useState(null); // null | "export" | "import"
@@ -2221,6 +2222,144 @@ Número de seguimiento: ${c.nro}`;
                         }
                         </div>
                       )}
+
+                      {/* ── MINI CHAT INLINE ── */}
+                      {c.tipo!=="propia"&&(
+                        <div style={{marginTop:10}}>
+                          {/* Badges para abrir chat */}
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                            <button onClick={()=>setChatOpen(p=>({...p,[c.id]:p[c.id]==="cliente"?null:"cliente"}))} style={{
+                              display:"flex",alignItems:"center",gap:5,
+                              background:chatOpen[c.id]==="cliente"?"#eff6ff":notasCliNoLeidas>0?"#fef2f2":"#f8fafc",
+                              color:chatOpen[c.id]==="cliente"?"#2d78c8":notasCliNoLeidas>0?"#c0392b":"#64748b",
+                              border:"1px solid "+(chatOpen[c.id]==="cliente"?"#bfdbfe":notasCliNoLeidas>0?"#fecdd3":"#e2e8f0"),
+                              borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer",
+                            }}>
+                              💬 Cliente
+                              {notasCliNoLeidas>0
+                                ? <span style={{background:"#c0392b",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:9,fontWeight:800}}>{notasCliNoLeidas} sin leer</span>
+                                : Array.isArray(c.notas_cliente_historial)&&c.notas_cliente_historial.length>0&&<span style={{fontSize:9,color:"#94a3b8",fontWeight:400}}>{c.notas_cliente_historial.length}</span>
+                              }
+                            </button>
+                            <button onClick={()=>setChatOpen(p=>({...p,[c.id]:p[c.id]==="china"?null:"china"}))} style={{
+                              display:"flex",alignItems:"center",gap:5,
+                              background:chatOpen[c.id]==="china"?"#fef9ec":c.nota_china_nueva?"#fef6e4":"#f8fafc",
+                              color:chatOpen[c.id]==="china"?"#b8922e":c.nota_china_nueva?"#b8922e":"#64748b",
+                              border:"1px solid "+(chatOpen[c.id]==="china"?"#c9a055":c.nota_china_nueva?"#c9a055":"#e2e8f0"),
+                              borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer",
+                            }}>
+                              🇨🇳 China
+                              {c.nota_china_nueva
+                                ? <span style={{background:"#c0392b",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:9,fontWeight:800}}>nueva</span>
+                                : Array.isArray(c.notas_china_historial)&&c.notas_china_historial.length>0&&<span style={{fontSize:9,color:"#94a3b8",fontWeight:400}}>{c.notas_china_historial.length}</span>
+                              }
+                            </button>
+                          </div>
+
+                          {/* Panel chat cliente */}
+                          {chatOpen[c.id]==="cliente"&&(
+                            <div style={{marginTop:8,background:"#f8fbff",border:"1px solid #bfdbfe",borderRadius:10,padding:"12px 14px"}}>
+                              <div style={{fontSize:10,fontWeight:700,color:"#2d78c8",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>💬 Chat con {c.cliente||"cliente"}</div>
+                              {Array.isArray(c.notas_cliente_historial)&&c.notas_cliente_historial.length>0?(
+                                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10,maxHeight:220,overflowY:"auto"}}>
+                                  {c.notas_cliente_historial.slice(-6).map(function(nota,i){
+                                    const esAdmin=nota.autor==="admin";
+                                    const esNoLeida=nota.autor==="cliente"&&!nota.leida_por_admin;
+                                    return(
+                                      <div key={nota.id||i} style={{display:"flex",justifyContent:esAdmin?"flex-start":"flex-end"}}>
+                                        <div style={{maxWidth:"82%",background:esAdmin?"#e8f5e9":(esNoLeida?"#fef2f2":"#e8f0fe"),border:"1px solid "+(esAdmin?"#a5d6a7":(esNoLeida?"#fecdd3":"#c7d7fb")),borderLeft:esAdmin?"3px solid #16a34a":"none",borderRight:esAdmin?"none":"3px solid #2d78c8",borderRadius:esAdmin?"0 8px 8px 8px":"8px 0 8px 8px",padding:"8px 11px"}}>
+                                          <div style={{fontSize:12,color:"#334155",lineHeight:1.5,whiteSpace:"pre-wrap",marginBottom:3}}>{nota.texto}</div>
+                                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6}}>
+                                            <span style={{fontSize:9,fontWeight:700,color:esAdmin?"#16a34a":"#2d78c8"}}>{esAdmin?"ZAGA →":(c.cliente||"Cliente")}</span>
+                                            <span style={{fontSize:9,color:"#94a3b8"}}>{nota.fecha?new Date(nota.fecha).toLocaleDateString("es-CL",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):""}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ):(
+                                <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",padding:"10px 0",marginBottom:8}}>Sin mensajes aún.</div>
+                              )}
+                              <div style={{display:"flex",gap:6}}>
+                                <textarea value={notaClienteInput[c.id]||""} rows={2} maxLength={2000} onChange={e=>setNotaClienteInput(p=>({...p,[c.id]:e.target.value}))} placeholder="Mensaje al cliente..." style={{flex:1,background:"#fff",border:"1px solid #bfdbfe",borderRadius:6,color:"#0f172a",padding:"7px 10px",fontSize:12,outline:"none",resize:"none",boxSizing:"border-box",lineHeight:1.4}}/>
+                                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                                  {notasCliNoLeidas>0&&(
+                                    <button onClick={async()=>{
+                                      const h=(c.notas_cliente_historial||[]).map(n=>n.autor==="cliente"?{...n,leida_por_admin:true}:n);
+                                      await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_cliente_historial:h}:x));
+                                      showToast("✓ Marcados como leídos");
+                                    }} style={{background:"#f1f5f9",color:"#475569",border:"1px solid #e2e8f0",borderRadius:6,padding:"5px 10px",fontSize:10,cursor:"pointer",fontWeight:600,whiteSpace:"nowrap"}}>✓ Leídos</button>
+                                  )}
+                                  <button disabled={!(notaClienteInput[c.id]||"").trim()} onClick={async()=>{
+                                    const txt=(notaClienteInput[c.id]||"").trim(); if(!txt) return;
+                                    const nuevaNota={id:Date.now().toString(),autor:"admin",texto:txt,fecha:new Date().toISOString(),leida_por_admin:true};
+                                    const hist=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
+                                    await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_cliente_historial:[...hist,nuevaNota]}:x));
+                                    setNotaClienteInput(p=>({...p,[c.id]:""}));
+                                    showToast("💬 Enviado al cliente");
+                                  }} style={{background:(notaClienteInput[c.id]||"").trim()?"#2d78c8":"#e2e8f0",color:(notaClienteInput[c.id]||"").trim()?"#fff":"#94a3b8",border:"none",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:(notaClienteInput[c.id]||"").trim()?"pointer":"default",fontWeight:700,whiteSpace:"nowrap",fontFamily:"inherit"}}>
+                                    ↑ Enviar
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Panel chat China */}
+                          {chatOpen[c.id]==="china"&&(
+                            <div style={{marginTop:8,background:"#fffbeb",border:"1px solid #c9a05540",borderRadius:10,padding:"12px 14px"}}>
+                              <div style={{fontSize:10,fontWeight:700,color:"#b8922e",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>🇨🇳 Chat con proveedor</div>
+                              {Array.isArray(c.notas_china_historial)&&c.notas_china_historial.length>0?(
+                                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10,maxHeight:220,overflowY:"auto"}}>
+                                  {c.notas_china_historial.slice(-6).map(function(nota,i,arr){
+                                    const esAdmin=nota.autor==="admin";
+                                    const esNueva=c.nota_china_nueva&&i===arr.length-1&&!esAdmin;
+                                    return(
+                                      <div key={nota.id||i} style={{display:"flex",justifyContent:esAdmin?"flex-start":"flex-end"}}>
+                                        <div style={{maxWidth:"82%",background:esAdmin?"#fef9ec":(esNueva?"#fef6e4":"#fff8ed"),border:"1px solid "+(esNueva?"#c9a055":"#c9a05540"),borderLeft:esAdmin?"3px solid #c9a055":"none",borderRight:esAdmin?"none":"3px solid #b8922e",borderRadius:esAdmin?"0 8px 8px 8px":"8px 0 8px 8px",padding:"8px 11px"}}>
+                                          <div style={{fontSize:12,color:"#334155",lineHeight:1.5,whiteSpace:"pre-wrap",marginBottom:3}}>{nota.texto}</div>
+                                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6}}>
+                                            <span style={{fontSize:9,fontWeight:700,color:"#b8922e"}}>{esAdmin?"ZAGA →":"🇨🇳 Proveedor"}</span>
+                                            <div style={{display:"flex",alignItems:"center",gap:4}}>
+                                              {esNueva&&<span style={{background:"#fdf6e3",color:"#b8922e",fontSize:8,fontWeight:700,borderRadius:3,padding:"1px 5px",border:"1px solid #c9a05540"}}>Nueva</span>}
+                                              <span style={{fontSize:9,color:"#94a3b8"}}>{nota.fecha?new Date(nota.fecha).toLocaleDateString("es-CL",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):""}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ):(
+                                <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",padding:"10px 0",marginBottom:8}}>Sin mensajes aún.</div>
+                              )}
+                              <div style={{display:"flex",gap:6}}>
+                                <textarea value={notaChinaInput[c.id]||""} rows={2} maxLength={2000} onChange={e=>setNotaChinaInput(p=>({...p,[c.id]:e.target.value}))} placeholder="Mensaje al proveedor..." style={{flex:1,background:"#fff",border:"1px solid #c9a05540",borderRadius:6,color:"#0f172a",padding:"7px 10px",fontSize:12,outline:"none",resize:"none",boxSizing:"border-box",lineHeight:1.4}}/>
+                                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                                  {c.nota_china_nueva&&(
+                                    <button onClick={async()=>{
+                                      await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,nota_china_nueva:false}:x));
+                                      showToast("✓ Leída");
+                                    }} style={{background:"#f1f5f9",color:"#475569",border:"1px solid #e2e8f0",borderRadius:6,padding:"5px 10px",fontSize:10,cursor:"pointer",fontWeight:600,whiteSpace:"nowrap"}}>✓ Leída</button>
+                                  )}
+                                  <button disabled={!(notaChinaInput[c.id]||"").trim()} onClick={async()=>{
+                                    const txt=(notaChinaInput[c.id]||"").trim(); if(!txt) return;
+                                    const nuevaNota={id:Date.now().toString(),autor:"admin",texto:txt,fecha:new Date().toISOString()};
+                                    const hist=Array.isArray(c.notas_china_historial)?c.notas_china_historial:[];
+                                    await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_china_historial:[...hist,nuevaNota]}:x));
+                                    setNotaChinaInput(p=>({...p,[c.id]:""}));
+                                    showToast("🇨🇳 Enviado al proveedor");
+                                  }} style={{background:(notaChinaInput[c.id]||"").trim()?"#b8922e":"#e2e8f0",color:(notaChinaInput[c.id]||"").trim()?"#fff":"#94a3b8",border:"none",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:(notaChinaInput[c.id]||"").trim()?"pointer":"default",fontWeight:700,whiteSpace:"nowrap",fontFamily:"inherit"}}>
+                                    ↑ Enviar
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
                         <button onClick={()=>setPreviewId(c.id)} style={{background:"#f8fafc",color:"#475569",border:"1px solid #e2e8f0",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>👁 Ver</button>
                         {c.estado==="solicitud"&&<button onClick={()=>setResumenChina(c)} style={{background:"#6a9fd422",color:"#334155",border:"1px solid #ddd6fe",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📋 Resumen China</button>}
