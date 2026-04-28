@@ -2078,7 +2078,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{padding:20,borderLeft:`4px solid ${isPropia?"#3d7fc4":sc}`}}>
                       <div className="cot-card-row" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                         <div style={{flex:1}}>
-                          {getImagenes(c.imagen_url)[0]&&<img src={getImagenes(c.imagen_url)[0]} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",float:"right",marginLeft:12,marginBottom:6}}/>}
+                          {getImagenes(c.imagen_url)[0]&&<img src={getImagenes(c.imagen_url)[0]} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:90,height:90,objectFit:"cover",borderRadius:10,border:"1px solid #e2e8f0",float:"right",marginLeft:12,marginBottom:6}}/>}
                           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
                             {isPropia?<span style={{background:"#3d7fc422",color:"#3d7fc4",border:"1px solid #8b5cf644",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>🏠 PROPIA</span>:<span style={{fontWeight:700,fontSize:15}}>{c.cliente}</span>}
                             {!isPropia&&c.categoria_cliente==="premium"&&<span style={{background:"#c9a05522",color:"#c9a055",border:"1px solid #f5c84244",borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:700}}>⭐ Premium</span>}
@@ -2413,69 +2413,48 @@ Número de seguimiento: ${c.nro}`;
                       const isTerminal=isNoProcesada||c.estado==="rechazada_cliente"||c.estado==="anulada";
                       return (
                         <div style={{borderTop:"1px solid #e2e8f0",padding:"20px 24px"}}>
-                          {/* Imágenes del producto — carousel */}
-                          {(()=>{
-                            const imgs=getImagenes(c.imagen_url);
-                            const ci=Math.min(imgIdx[c.id]||0,Math.max(0,imgs.length-1));
-                            return (
-                              <div style={{background:"#f8fafc",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0",marginBottom:16}}>
-                                <div style={{fontSize:10,color:"#64748b",marginBottom:8,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>
-                                  🖼️ Imágenes del producto
-                                  {imgs.length>0&&<span style={{background:"#e2e8f0",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,color:"#475569",marginLeft:4}}>{imgs.length}</span>}
-                                </div>
-                                {/* Carousel principal */}
-                                {imgs.length>0&&(
-                                  <div style={{position:"relative",marginBottom:10,borderRadius:10,overflow:"hidden",background:"#e8eef5",border:"1px solid #e2e8f0",minHeight:60}}>
-                                    <img src={imgs[ci]} onError={e=>{e.target.style.opacity='.25'}} style={{width:"100%",maxHeight:260,objectFit:"contain",display:"block",borderRadius:10}}/>
-                                    {/* Flechas prev/next */}
-                                    {imgs.length>1&&<>
-                                      <button onClick={()=>setImgIdx(p=>({...p,[c.id]:((ci-1+imgs.length)%imgs.length)}))} style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,.5)",color:"#fff",border:"none",borderRadius:"50%",width:32,height:32,fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,zIndex:2}}>‹</button>
-                                      <button onClick={()=>setImgIdx(p=>({...p,[c.id]:((ci+1)%imgs.length)}))} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,.5)",color:"#fff",border:"none",borderRadius:"50%",width:32,height:32,fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,zIndex:2}}>›</button>
-                                    </>}
-                                    {/* Contador y dots */}
-                                    {imgs.length>1&&<>
-                                      <div style={{position:"absolute",bottom:8,right:10,background:"rgba(0,0,0,.55)",color:"#fff",borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:700,zIndex:2}}>{ci+1}/{imgs.length}</div>
-                                      <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",display:"flex",gap:5,zIndex:2}}>
-                                        {imgs.map((_,i)=><div key={i} onClick={()=>setImgIdx(p=>({...p,[c.id]:i}))} style={{width:i===ci?16:6,height:6,borderRadius:3,background:i===ci?"#fff":"rgba(255,255,255,.45)",cursor:"pointer",transition:"all .2s"}}/>)}
-                                      </div>
-                                    </>}
-                                    {/* Botón eliminar imagen actual */}
+                          {/* Imágenes del producto — multi */}
+                          <div style={{background:"#f8fafc",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0",marginBottom:16}}>
+                            <div style={{fontSize:10,color:"#64748b",marginBottom:8,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>🖼️ Imágenes del producto {getImagenes(c.imagen_url).length>0&&<span style={{background:"#e2e8f0",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,color:"#475569",marginLeft:4}}>{getImagenes(c.imagen_url).length}</span>}</div>
+                            {/* Miniaturas existentes */}
+                            {getImagenes(c.imagen_url).length>0&&(
+                              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:10}}>
+                                {getImagenes(c.imagen_url).map((url,idx)=>(
+                                  <div key={idx} style={{position:"relative",width:72,height:72}}>
+                                    <img src={url} onError={e=>{e.target.parentNode.style.opacity='.3'}} style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",display:"block"}}/>
                                     <button onClick={async()=>{
-                                      const newImgs=imgs.filter((_,i)=>i!==ci);
-                                      await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:newImgs.join('|||')}:x));
-                                      if(ci>=newImgs.length)setImgIdx(p=>({...p,[c.id]:Math.max(0,newImgs.length-1)}));
-                                    }} title="Eliminar esta imagen" style={{position:"absolute",top:8,right:8,background:"rgba(192,57,43,.85)",color:"#fff",border:"none",borderRadius:"50%",width:26,height:26,cursor:"pointer",fontSize:15,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",zIndex:3}}>×</button>
+                                      const imgs=getImagenes(c.imagen_url).filter((_,i)=>i!==idx);
+                                      await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:imgs.join('|||')}:x));
+                                    }} title="Eliminar imagen" style={{position:"absolute",top:-6,right:-6,width:18,height:18,background:"#c0392b",color:"#fff",border:"none",borderRadius:"50%",cursor:"pointer",fontSize:13,lineHeight:"18px",textAlign:"center",padding:0,fontWeight:900}}>×</button>
                                   </div>
-                                )}
-                                {/* Input agregar nueva */}
-                                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                                  {newImgInput[c.id]&&<img src={newImgInput[c.id]} onError={e=>{e.target.style.display='none'}} style={{width:36,height:36,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0",flexShrink:0}}/>}
-                                  <input
-                                    value={newImgInput[c.id]||""}
-                                    onChange={e=>setNewImgInput(p=>({...p,[c.id]:e.target.value}))}
-                                    onKeyDown={async e=>{
-                                      if(e.key==='Enter'&&newImgInput[c.id]?.trim()){
-                                        const newImgs=[...imgs,newImgInput[c.id].trim()];
-                                        await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:newImgs.join('|||')}:x));
-                                        setImgIdx(p=>({...p,[c.id]:newImgs.length-1}));
-                                        setNewImgInput(p=>({...p,[c.id]:""}));
-                                      }
-                                    }}
-                                    placeholder="Pegar URL de imagen y pulsar Agregar"
-                                    style={{flex:1,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:7,color:"#0f172a",padding:"7px 10px",fontSize:12,outline:"none",boxSizing:"border-box"}}
-                                  />
-                                  <button onClick={async()=>{
-                                    if(!newImgInput[c.id]?.trim())return;
-                                    const newImgs=[...imgs,newImgInput[c.id].trim()];
-                                    await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:newImgs.join('|||')}:x));
-                                    setImgIdx(p=>({...p,[c.id]:newImgs.length-1}));
-                                    setNewImgInput(p=>({...p,[c.id]:""}));
-                                  }} style={{background:"#2d78c8",color:"#fff",border:"none",borderRadius:7,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>➕ Agregar</button>
-                                </div>
-                                {imgs.length===0&&<div style={{fontSize:11,color:"#94a3b8",marginTop:6}}>Sin imágenes — pegá la URL y pulsa Agregar</div>}
+                                ))}
                               </div>
-                            );
-                          })()}
+                            )}
+                            {/* Input agregar nueva */}
+                            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                              {newImgInput[c.id]&&<img src={newImgInput[c.id]} onError={e=>{e.target.style.display='none'}} style={{width:36,height:36,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                              <input
+                                value={newImgInput[c.id]||""}
+                                onChange={e=>setNewImgInput(p=>({...p,[c.id]:e.target.value}))}
+                                onKeyDown={async e=>{
+                                  if(e.key==='Enter'&&newImgInput[c.id]?.trim()){
+                                    const imgs=[...getImagenes(c.imagen_url),newImgInput[c.id].trim()];
+                                    await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:imgs.join('|||')}:x));
+                                    setNewImgInput(p=>({...p,[c.id]:""}));
+                                  }
+                                }}
+                                placeholder="Pegar URL de imagen y pulsar Agregar"
+                                style={{flex:1,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:7,color:"#0f172a",padding:"7px 10px",fontSize:12,outline:"none",boxSizing:"border-box"}}
+                              />
+                              <button onClick={async()=>{
+                                if(!newImgInput[c.id]?.trim())return;
+                                const imgs=[...getImagenes(c.imagen_url),newImgInput[c.id].trim()];
+                                await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:imgs.join('|||')}:x));
+                                setNewImgInput(p=>({...p,[c.id]:""}));
+                              }} style={{background:"#2d78c8",color:"#fff",border:"none",borderRadius:7,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>➕ Agregar</button>
+                            </div>
+                            {getImagenes(c.imagen_url).length===0&&<div style={{fontSize:11,color:"#94a3b8",marginTop:6}}>Sin imágenes — pegá la URL y pulsa Agregar</div>}
+                          </div>
                           {/* Fechas */}
                           <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
                             <div style={{flex:1,minWidth:150}}>

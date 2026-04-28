@@ -602,7 +602,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               </span>
                             )}
                           </div>
-                          {getImagenes(c.imagen_url)[0]&&<img src={getImagenes(c.imagen_url)[0]} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:56,height:56,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",float:"right",marginLeft:10,marginBottom:4}}/>}
+                          {getImagenes(c.imagen_url)[0]&&<img src={getImagenes(c.imagen_url)[0]} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:82,height:82,objectFit:"cover",borderRadius:10,border:"1px solid #e2e8f0",float:"right",marginLeft:10,marginBottom:4}}/>}
                           <div style={{fontSize:15,fontWeight:700,color:isRech?"#94a3b8":"#0f172a",marginBottom:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.producto}</div>
                           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                             {c.unidades&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>📦 {fmtN(c.unidades)} und</span>}
@@ -746,24 +746,6 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                             {/* TAB DETALLE */}
                             {tab==="detalle"&&(
                               <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                                {/* Carousel de imágenes */}
-                                {getImagenes(c.imagen_url).length>0&&(()=>{
-                                  var imgs=getImagenes(c.imagen_url);
-                                  var ci=Math.min(imgIdx[c.id]||0,Math.max(0,imgs.length-1));
-                                  return (
-                                    <div style={{position:"relative",borderRadius:12,overflow:"hidden",background:"#f0f4f8",border:"1px solid #e2e8f0",minHeight:60}}>
-                                      <img src={imgs[ci]} onError={function(e){e.target.style.opacity='.25'}} style={{width:"100%",maxHeight:240,objectFit:"contain",display:"block"}}/>
-                                      {imgs.length>1&&<>
-                                        <button onClick={function(){setImgIdx(function(p){var o={};Object.assign(o,p);o[c.id]=((ci-1+imgs.length)%imgs.length);return o})}} style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,.5)",color:"#fff",border:"none",borderRadius:"50%",width:32,height:32,fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,zIndex:2}}>‹</button>
-                                        <button onClick={function(){setImgIdx(function(p){var o={};Object.assign(o,p);o[c.id]=((ci+1)%imgs.length);return o})}} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,.5)",color:"#fff",border:"none",borderRadius:"50%",width:32,height:32,fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,zIndex:2}}>›</button>
-                                        <div style={{position:"absolute",bottom:8,right:10,background:"rgba(0,0,0,.55)",color:"#fff",borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:700,zIndex:2}}>{ci+1}/{imgs.length}</div>
-                                        <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",display:"flex",gap:5,zIndex:2}}>
-                                          {imgs.map(function(_,i){return <div key={i} onClick={function(){setImgIdx(function(p){var o={};Object.assign(o,p);o[c.id]=i;return o})}} style={{width:i===ci?16:6,height:6,borderRadius:3,background:i===ci?"#fff":"rgba(255,255,255,.45)",cursor:"pointer",transition:"all .2s"}}/>})}
-                                        </div>
-                                      </>}
-                                    </div>
-                                  );
-                                })()}
                                 {isRech&&(
                                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
                                     <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"12px 14px",display:"flex",gap:10,alignItems:"center"}}>
