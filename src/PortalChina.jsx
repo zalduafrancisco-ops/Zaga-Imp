@@ -586,6 +586,7 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
         id: Date.now().toString(),
         texto: nuevaTexto.trim(),
         fecha: new Date().toISOString(),
+        autor: "agente_china",
       }
       await persistirNotas([...hist, nuevaNota], true)
       setNuevaTexto("")
@@ -910,158 +911,70 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
             </Campo>
           )}
 
-          {/* ── NOTAS PARA ZAGA ── */}
-          {/* No mostrar seccion de notas en completadas (historico, solo lectura) */}
+          {/* ── CHAT CON ZAGA ── */}
           {!ESTADOS_COMPLETADAS.includes(est) && (
             <div style={{ borderTop:"1px solid #e2e8f0", paddingTop:16 }}>
-
-              {/* Titulo seccion */}
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-                <span style={{ fontSize:15 }}>📩</span>
+                <span style={{ fontSize:15 }}>💬</span>
                 <div>
                   <div style={{ fontSize:12, fontWeight:700, color:"#040c18", letterSpacing:0.3 }}>
-                    留言给ZAGA / Notas para administracion
+                    与ZAGA对话 / Chat con ZAGA
                   </div>
                   <div style={{ fontSize:10, color:"#94a3b8", marginTop:1 }}>
-                    只有ZAGA管理员可以看到 / Solo visible para administradores ZAGA
+                    发送消息给ZAGA团队 / Envía mensajes al equipo ZAGA
                   </div>
                 </div>
                 {historialChina.length > 0 && (
-                  <span style={{
-                    marginLeft:"auto", background:"#040c18", color:"#c9a055",
-                    borderRadius:20, padding:"2px 10px",
-                    fontSize:11, fontWeight:700,
-                  }}>
+                  <span style={{ marginLeft:"auto", background:"#040c18", color:"#c9a055", borderRadius:20, padding:"2px 10px", fontSize:11, fontWeight:700 }}>
                     {historialChina.length}
                   </span>
                 )}
               </div>
 
-              {/* Error message */}
               {errorMsg && (
-                <div style={{
-                  background:"#fef2f2", border:"1px solid #fecdd3",
-                  borderRadius:8, padding:"10px 14px", marginBottom:12,
-                  fontSize:12, color:"#c0392b", whiteSpace:"pre-wrap", lineHeight:1.6,
-                }}>
+                <div style={{ background:"#fef2f2", border:"1px solid #fecdd3", borderRadius:8, padding:"10px 14px", marginBottom:12, fontSize:12, color:"#c0392b", whiteSpace:"pre-wrap", lineHeight:1.6 }}>
                   {errorMsg}
                 </div>
               )}
 
-              {/* Historial de notas existentes */}
-              {historialChina.length > 0 && (
-                <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:12 }}>
+              {/* Historial chat */}
+              {historialChina.length > 0 ? (
+                <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:12, maxHeight:300, overflowY:"auto" }}>
                   {historialChina.map((nota) => {
-                    const esEditando   = editandoId === nota.id
-                    const esEliminando = eliminandoId === nota.id
+                    const esAdmin = nota.autor === "admin"
                     return (
-                      <div key={nota.id} style={{
-                        background: esEditando ? "#fffbeb" : "#f0f9ff",
-                        border: esEditando ? "1px solid #c9a05560" : "1px solid #06b6d430",
-                        borderLeft: `3px solid ${esEditando ? "#c9a055" : "#2a8aaa"}`,
-                        borderRadius:"0 8px 8px 0",
-                        padding:"10px 14px",
-                        opacity: esEliminando ? 0.5 : 1,
-                        transition:"opacity 0.2s",
-                      }}>
-                        {esEditando ? (
-                          <div>
-                            <textarea
-                              value={editTexto}
-                              onChange={e => setEditTexto(e.target.value)}
-                              rows={3}
-                              autoFocus
-                              style={{
-                                width:"100%", background:"#fff",
-                                border:"1px solid #e2e8f0", borderRadius:6,
-                                color:"#0f172a", padding:"8px 10px",
-                                fontSize:12, outline:"none", resize:"vertical",
-                                boxSizing:"border-box", lineHeight:1.5,
-                                fontFamily:"inherit",
-                              }}
-                            />
-                            <div style={{ display:"flex", gap:6, marginTop:8 }}>
-                              <button
-                                disabled={!editTexto.trim() || guardandoEdit}
-                                onClick={() => handleGuardarEdicion(nota.id)}
-                                style={{
-                                  background: editTexto.trim() && !guardandoEdit ? "#040c18" : "#e2e8f0",
-                                  color: editTexto.trim() && !guardandoEdit ? "#c9a055" : "#94a3b8",
-                                  border:"none", borderRadius:6,
-                                  padding:"6px 14px", fontSize:11,
-                                  cursor: editTexto.trim() && !guardandoEdit ? "pointer" : "default",
-                                  fontWeight:700, fontFamily:"inherit",
-                                }}
-                              >
-                                {guardandoEdit ? "保存中..." : "💾 保存 / Guardar"}
-                              </button>
-                              <button
-                                onClick={() => { setEditandoId(null); setEditTexto(""); }}
-                                style={{
-                                  background:"#f1f5f9", color:"#64748b",
-                                  border:"1px solid #e2e8f0", borderRadius:6,
-                                  padding:"6px 14px", fontSize:11,
-                                  cursor:"pointer", fontFamily:"inherit",
-                                }}
-                              >
-                                取消 / Cancelar
-                              </button>
-                            </div>
+                      <div key={nota.id} style={{ display:"flex", justifyContent:esAdmin?"flex-start":"flex-end" }}>
+                        <div style={{
+                          maxWidth:"82%",
+                          background:esAdmin?"#fffbeb":"#f0f9ff",
+                          border:`1px solid ${esAdmin?"#c9a05540":"#06b6d430"}`,
+                          borderLeft:esAdmin?"4px solid #c9a055":"none",
+                          borderRight:esAdmin?"none":"4px solid #2a8aaa",
+                          borderRadius:esAdmin?"0 10px 10px 10px":"10px 0 10px 10px",
+                          padding:"10px 14px",
+                        }}>
+                          <div style={{ fontSize:13, color:"#0f172a", lineHeight:1.65, whiteSpace:"pre-wrap", marginBottom:6 }}>{nota.texto}</div>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+                            <span style={{ fontSize:10, fontWeight:700, color:esAdmin?"#b8922e":"#2a8aaa" }}>
+                              {esAdmin ? "ZAGA" : "🇨🇳 Agente"}
+                            </span>
+                            <span style={{ fontSize:10, color:"#94a3b8" }}>
+                              {nota.fecha ? fmtDate(nota.fecha) : ""}
+                            </span>
                           </div>
-                        ) : (
-                          <div>
-                            <div style={{ fontSize:13, color:"#0f172a", lineHeight:1.65, whiteSpace:"pre-wrap", marginBottom:6 }}>
-                              {nota.texto}
-                            </div>
-                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:6 }}>
-                              <div style={{ fontSize:10, color:"#94a3b8" }}>
-                                {nota.fecha ? fmtDateZH(nota.fecha) + " — " + fmtDate(nota.fecha) : ""}
-                                {nota.editado && <span style={{ marginLeft:6, fontStyle:"italic" }}>(已编辑)</span>}
-                              </div>
-                              <div style={{ display:"flex", gap:6 }}>
-                                <button
-                                  onClick={() => { setEditandoId(nota.id); setEditTexto(nota.texto); setErrorMsg(""); }}
-                                  style={{
-                                    background:"#f1f5f9", color:"#475569",
-                                    border:"1px solid #e2e8f0", borderRadius:5,
-                                    padding:"3px 10px", fontSize:11,
-                                    cursor:"pointer", fontFamily:"inherit",
-                                  }}
-                                >
-                                  ✏️ 编辑
-                                </button>
-                                <button
-                                  disabled={esEliminando}
-                                  onClick={() => handleEliminar(nota.id)}
-                                  style={{
-                                    background:"#fef2f2", color:"#c0392b",
-                                    border:"1px solid #fecdd3", borderRadius:5,
-                                    padding:"3px 10px", fontSize:11,
-                                    cursor: esEliminando ? "default" : "pointer",
-                                    fontFamily:"inherit",
-                                  }}
-                                >
-                                  🗑️ 删除
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
+                        </div>
                       </div>
                     )
                   })}
                 </div>
+              ) : (
+                <div style={{ textAlign:"center", padding:"18px 12px", fontSize:12, color:"#94a3b8", background:"#f8fafc", borderRadius:8, border:"1px dashed #e2e8f0", marginBottom:12 }}>
+                  暂无消息 / Sin mensajes aún.
+                </div>
               )}
 
-              {/* Formulario nueva nota */}
-              <div style={{
-                background:"#f8fafc",
-                border:"1px solid #e2e8f0",
-                borderRadius:8, padding:"12px 14px",
-              }}>
-                <div style={{ fontSize:10, fontWeight:700, color:"#475569", marginBottom:7, textTransform:"uppercase", letterSpacing:0.5 }}>
-                  + 新留言 / Nueva nota
-                </div>
+              {/* Input enviar mensaje */}
+              <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, padding:"12px 14px" }}>
                 <textarea
                   value={nuevaTexto}
                   onChange={e => { setNuevaTexto(e.target.value); setErrorMsg(""); }}
@@ -1072,8 +985,7 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
                     border:"1px solid #e2e8f0", borderRadius:6,
                     color:"#0f172a", padding:"9px 12px",
                     fontSize:13, outline:"none", resize:"vertical",
-                    boxSizing:"border-box", lineHeight:1.6,
-                    fontFamily:"inherit",
+                    boxSizing:"border-box", lineHeight:1.6, fontFamily:"inherit",
                   }}
                 />
                 <button
@@ -1089,7 +1001,7 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
                     fontWeight:700, fontFamily:"inherit", transition:"all 0.2s",
                   }}
                 >
-                  {guardando ? "发送中... / Enviando..." : "📩 发送留言 / Enviar nota"}
+                  {guardando ? "发送中... / Enviando..." : "💬 发送消息 / Enviar mensaje"}
                 </button>
               </div>
             </div>

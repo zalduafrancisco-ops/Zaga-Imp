@@ -2227,31 +2227,35 @@ Número de seguimiento: ${c.nro}`;
                       {c.tipo!=="propia"&&(
                         <div style={{marginTop:10}}>
                           {/* Badges para abrir chat */}
-                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
                             <button onClick={()=>setChatOpen(p=>({...p,[c.id]:p[c.id]==="cliente"?null:"cliente"}))} style={{
-                              display:"flex",alignItems:"center",gap:5,
-                              background:chatOpen[c.id]==="cliente"?"#eff6ff":notasCliNoLeidas>0?"#fef2f2":"#f8fafc",
-                              color:chatOpen[c.id]==="cliente"?"#2d78c8":notasCliNoLeidas>0?"#c0392b":"#64748b",
-                              border:"1px solid "+(chatOpen[c.id]==="cliente"?"#bfdbfe":notasCliNoLeidas>0?"#fecdd3":"#e2e8f0"),
-                              borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer",
+                              display:"flex",alignItems:"center",gap:7,
+                              background:chatOpen[c.id]==="cliente"?"#2d78c8":notasCliNoLeidas>0?"#c0392b":"#e8f0fe",
+                              color:chatOpen[c.id]==="cliente"||notasCliNoLeidas>0?"#fff":"#2d78c8",
+                              border:"none",
+                              borderRadius:10,padding:"9px 18px",fontSize:13,fontWeight:800,cursor:"pointer",
+                              boxShadow:"0 1px 4px rgba(0,0,0,0.10)",
+                              transition:"all .15s",fontFamily:"inherit",
                             }}>
                               💬 Cliente
                               {notasCliNoLeidas>0
-                                ? <span style={{background:"#c0392b",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:9,fontWeight:800}}>{notasCliNoLeidas} sin leer</span>
-                                : Array.isArray(c.notas_cliente_historial)&&c.notas_cliente_historial.length>0&&<span style={{fontSize:9,color:"#94a3b8",fontWeight:400}}>{c.notas_cliente_historial.length}</span>
+                                ? <span style={{background:"rgba(255,255,255,0.25)",color:"#fff",borderRadius:8,padding:"1px 7px",fontSize:11,fontWeight:800}}>{notasCliNoLeidas} sin leer</span>
+                                : Array.isArray(c.notas_cliente_historial)&&c.notas_cliente_historial.length>0&&<span style={{background:"rgba(255,255,255,0.30)",color:"#2d78c8",borderRadius:8,padding:"1px 7px",fontSize:10,fontWeight:700}}>{c.notas_cliente_historial.length}</span>
                               }
                             </button>
                             <button onClick={()=>setChatOpen(p=>({...p,[c.id]:p[c.id]==="china"?null:"china"}))} style={{
-                              display:"flex",alignItems:"center",gap:5,
-                              background:chatOpen[c.id]==="china"?"#fef9ec":c.nota_china_nueva?"#fef6e4":"#f8fafc",
-                              color:chatOpen[c.id]==="china"?"#b8922e":c.nota_china_nueva?"#b8922e":"#64748b",
-                              border:"1px solid "+(chatOpen[c.id]==="china"?"#c9a055":c.nota_china_nueva?"#c9a055":"#e2e8f0"),
-                              borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer",
+                              display:"flex",alignItems:"center",gap:7,
+                              background:chatOpen[c.id]==="china"?"#b8922e":c.nota_china_nueva?"#c0392b":"#fef3e2",
+                              color:chatOpen[c.id]==="china"||c.nota_china_nueva?"#fff":"#b8922e",
+                              border:"none",
+                              borderRadius:10,padding:"9px 18px",fontSize:13,fontWeight:800,cursor:"pointer",
+                              boxShadow:"0 1px 4px rgba(0,0,0,0.10)",
+                              transition:"all .15s",fontFamily:"inherit",
                             }}>
                               🇨🇳 China
                               {c.nota_china_nueva
-                                ? <span style={{background:"#c0392b",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:9,fontWeight:800}}>nueva</span>
-                                : Array.isArray(c.notas_china_historial)&&c.notas_china_historial.length>0&&<span style={{fontSize:9,color:"#94a3b8",fontWeight:400}}>{c.notas_china_historial.length}</span>
+                                ? <span style={{background:"rgba(255,255,255,0.25)",color:"#fff",borderRadius:8,padding:"1px 7px",fontSize:11,fontWeight:800}}>nueva</span>
+                                : Array.isArray(c.notas_china_historial)&&c.notas_china_historial.length>0&&<span style={{background:"rgba(255,255,255,0.30)",color:"#b8922e",borderRadius:8,padding:"1px 7px",fontSize:10,fontWeight:700}}>{c.notas_china_historial.length}</span>
                               }
                             </button>
                           </div>
