@@ -2260,27 +2260,32 @@ Número de seguimiento: ${c.nro}`;
                           {chatOpen[c.id]==="cliente"&&(
                             <div style={{marginTop:8,background:"#f8fbff",border:"1px solid #bfdbfe",borderRadius:10,padding:"12px 14px"}}>
                               <div style={{fontSize:10,fontWeight:700,color:"#2d78c8",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>💬 Chat con {c.cliente||"cliente"}</div>
-                              {Array.isArray(c.notas_cliente_historial)&&c.notas_cliente_historial.length>0?(
-                                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10,maxHeight:220,overflowY:"auto"}}>
-                                  {c.notas_cliente_historial.slice(-6).map(function(nota,i){
-                                    const esAdmin=nota.autor==="admin";
-                                    const esNoLeida=nota.autor==="cliente"&&!nota.leida_por_admin;
-                                    return(
-                                      <div key={nota.id||i} style={{display:"flex",justifyContent:esAdmin?"flex-start":"flex-end"}}>
-                                        <div style={{maxWidth:"82%",background:esAdmin?"#e8f5e9":(esNoLeida?"#fef2f2":"#e8f0fe"),border:"1px solid "+(esAdmin?"#a5d6a7":(esNoLeida?"#fecdd3":"#c7d7fb")),borderLeft:esAdmin?"3px solid #16a34a":"none",borderRight:esAdmin?"none":"3px solid #2d78c8",borderRadius:esAdmin?"0 8px 8px 8px":"8px 0 8px 8px",padding:"8px 11px"}}>
-                                          <div style={{fontSize:12,color:"#334155",lineHeight:1.5,whiteSpace:"pre-wrap",marginBottom:3}}>{nota.texto}</div>
-                                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6}}>
-                                            <span style={{fontSize:9,fontWeight:700,color:esAdmin?"#16a34a":"#2d78c8"}}>{esAdmin?"ZAGA →":(c.cliente||"Cliente")}</span>
-                                            <span style={{fontSize:9,color:"#94a3b8"}}>{nota.fecha?new Date(nota.fecha).toLocaleDateString("es-CL",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):""}</span>
+                              {(()=>{
+                                var tsOf=function(s){if(!s)return 0;var d=new Date(s);if(!isNaN(d.getTime()))return d.getTime();var m=s.match(/(\d+)\s+(\w+)\s+(\d+)/);if(m){var mes={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11}[m[2].toLowerCase()];if(mes!==undefined)return new Date(Number(m[3]),mes,Number(m[1])).getTime();}return 0;};
+                                var notasEq=(c.notas_historial||[]).filter(function(n){return !n.oculta;}).map(function(n,i){return{_k:"ne"+i,texto:n.texto,fecha:n.fecha,autor:"admin",autorNombre:n.autor||"ZAGA",ts:tsOf(n.fecha)||i};});
+                                var chatMs=(c.notas_cliente_historial||[]).map(function(n,i){return Object.assign({},n,{_k:"cm"+i,ts:tsOf(n.fecha)||(Date.now()+i)});});
+                                var todos=[].concat(notasEq,chatMs).sort(function(a,b){return a.ts-b.ts;}).slice(-8);
+                                if(todos.length===0) return <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",padding:"10px 0",marginBottom:8}}>Sin mensajes aún.</div>;
+                                return (
+                                  <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10,maxHeight:240,overflowY:"auto"}}>
+                                    {todos.map(function(nota){
+                                      var esAdmin=nota.autor==="admin";
+                                      var esNoLeida=nota.autor==="cliente"&&!nota.leida_por_admin;
+                                      return(
+                                        <div key={nota._k||nota.id} style={{display:"flex",justifyContent:esAdmin?"flex-start":"flex-end"}}>
+                                          <div style={{maxWidth:"82%",background:esAdmin?"#e8f5e9":(esNoLeida?"#fef2f2":"#e8f0fe"),border:"1px solid "+(esAdmin?"#a5d6a7":(esNoLeida?"#fecdd3":"#c7d7fb")),borderLeft:esAdmin?"3px solid #16a34a":"none",borderRight:esAdmin?"none":"3px solid #2d78c8",borderRadius:esAdmin?"0 8px 8px 8px":"8px 0 8px 8px",padding:"8px 11px"}}>
+                                            <div style={{fontSize:12,color:"#334155",lineHeight:1.5,whiteSpace:"pre-wrap",marginBottom:3}}>{nota.texto}</div>
+                                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6}}>
+                                              <span style={{fontSize:9,fontWeight:700,color:esAdmin?"#16a34a":"#2d78c8"}}>{esAdmin?(nota.autorNombre||"ZAGA →"):(c.cliente||"Cliente")}</span>
+                                              <span style={{fontSize:9,color:"#94a3b8"}}>{nota.fecha?new Date(nota.fecha).toLocaleDateString("es-CL",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):""}</span>
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ):(
-                                <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",padding:"10px 0",marginBottom:8}}>Sin mensajes aún.</div>
-                              )}
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
                               <div style={{display:"flex",gap:6}}>
                                 <textarea value={notaClienteInput[c.id]||""} rows={2} maxLength={2000} onChange={e=>setNotaClienteInput(p=>({...p,[c.id]:e.target.value}))} placeholder="Mensaje al cliente..." style={{flex:1,background:"#fff",border:"1px solid #bfdbfe",borderRadius:6,color:"#0f172a",padding:"7px 10px",fontSize:12,outline:"none",resize:"none",boxSizing:"border-box",lineHeight:1.4}}/>
                                 <div style={{display:"flex",flexDirection:"column",gap:4}}>
@@ -2653,7 +2658,7 @@ Número de seguimiento: ${c.nro}`;
                           <div style={{marginTop:20,borderTop:"1px solid #e2e8f0",paddingTop:16}}>
                             {/* Selector de tabs */}
                             <div style={{display:"flex",gap:3,marginBottom:14,background:"#f1f5f9",borderRadius:8,padding:3}}>
-                              <button onClick={()=>setGestTab(p=>({...p,[c.id]:"notas"}))} style={{flex:1,background:(gestTab[c.id]||"notas")==="notas"?"#fff":"transparent",color:(gestTab[c.id]||"notas")==="notas"?"#2a8aaa":"#64748b",border:"none",borderRadius:6,padding:"7px 8px",fontSize:11,fontWeight:700,cursor:"pointer",boxShadow:(gestTab[c.id]||"notas")==="notas"?"0 1px 3px rgba(0,0,0,0.1)":"none",transition:"all .15s",fontFamily:"inherit"}}>📝 Notas</button>
+                              <button onClick={()=>setGestTab(p=>({...p,[c.id]:"notas"}))} style={{flex:1,background:(gestTab[c.id]||"notas")==="notas"?"#fff":"transparent",color:(gestTab[c.id]||"notas")==="notas"?"#2a8aaa":"#64748b",border:"none",borderRadius:6,padding:"7px 8px",fontSize:11,fontWeight:700,cursor:"pointer",boxShadow:(gestTab[c.id]||"notas")==="notas"?"0 1px 3px rgba(0,0,0,0.1)":"none",transition:"all .15s",fontFamily:"inherit"}}>🔒 Privadas</button>
                               {c.tipo!=="propia"&&(
                                 <button onClick={()=>setGestTab(p=>({...p,[c.id]:"cliente"}))} style={{flex:1,background:gestTab[c.id]==="cliente"?"#eff6ff":"transparent",color:gestTab[c.id]==="cliente"?"#2d78c8":"#64748b",border:"none",borderRadius:6,padding:"7px 8px",fontSize:11,fontWeight:700,cursor:"pointer",boxShadow:gestTab[c.id]==="cliente"?"0 1px 3px rgba(0,0,0,0.1)":"none",transition:"all .15s",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontFamily:"inherit"}}>
                                   💬 Cliente
@@ -2787,27 +2792,32 @@ Número de seguimiento: ${c.nro}`;
                             {/* ─── TAB CLIENTE ─── */}
                             {gestTab[c.id]==="cliente"&&c.tipo!=="propia"&&(
                               <div>
-                                {Array.isArray(c.notas_cliente_historial)&&c.notas_cliente_historial.length>0?(
-                                  <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
-                                    {c.notas_cliente_historial.map(function(nota,i){
-                                      const esAdmin=nota.autor==="admin";
-                                      const esNoLeida=nota.autor==="cliente"&&!nota.leida_por_admin;
-                                      return(
-                                        <div key={nota.id||i} style={{display:"flex",justifyContent:esAdmin?"flex-start":"flex-end"}}>
-                                          <div style={{maxWidth:"80%",background:esAdmin?"#f0fdf4":(esNoLeida?"#fef2f2":"#eff6ff"),border:"1px solid "+(esAdmin?"#bbf7d0":(esNoLeida?"#fecdd3":"#bfdbfe")),borderLeft:esAdmin?"4px solid #16a34a":(esNoLeida?"4px solid #c0392b":"4px solid #2d78c8"),borderRadius:esAdmin?"0 10px 10px 10px":"10px 0 10px 10px",padding:"10px 14px"}}>
-                                            <div style={{fontSize:13,color:"#334155",lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:6}}>{nota.texto}</div>
-                                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                                              <span style={{fontSize:10,fontWeight:700,color:esAdmin?"#16a34a":"#2d78c8"}}>{esAdmin?"ZAGA →":(c.cliente||"Cliente")}</span>
-                                              <span style={{fontSize:10,color:"#94a3b8"}}>{nota.fecha?new Date(nota.fecha).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}</span>
+                                {(()=>{
+                                  var tsOf=function(s){if(!s)return 0;var d=new Date(s);if(!isNaN(d.getTime()))return d.getTime();var m=s.match(/(\d+)\s+(\w+)\s+(\d+)/);if(m){var mes={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11}[m[2].toLowerCase()];if(mes!==undefined)return new Date(Number(m[3]),mes,Number(m[1])).getTime();}return 0;};
+                                  var notasEq=(c.notas_historial||[]).filter(function(n){return !n.oculta;}).map(function(n,i){return{_k:"ne"+i,texto:n.texto,fecha:n.fecha,autor:"admin",autorNombre:n.autor||"ZAGA",ts:tsOf(n.fecha)||i};});
+                                  var chatMs=(c.notas_cliente_historial||[]).map(function(n,i){return Object.assign({},n,{_k:"cm"+i,ts:tsOf(n.fecha)||(Date.now()+i)});});
+                                  var todos=[].concat(notasEq,chatMs).sort(function(a,b){return a.ts-b.ts;});
+                                  if(todos.length===0) return <div style={{textAlign:"center",padding:"18px 12px",fontSize:12,color:"#94a3b8",background:"#f8fafc",borderRadius:8,border:"1px dashed #bfdbfe",marginBottom:12}}>Sin mensajes aún con este cliente.</div>;
+                                  return (
+                                    <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+                                      {todos.map(function(nota){
+                                        var esAdmin=nota.autor==="admin";
+                                        var esNoLeida=nota.autor==="cliente"&&!nota.leida_por_admin;
+                                        return(
+                                          <div key={nota._k||nota.id} style={{display:"flex",justifyContent:esAdmin?"flex-start":"flex-end"}}>
+                                            <div style={{maxWidth:"80%",background:esAdmin?"#f0fdf4":(esNoLeida?"#fef2f2":"#eff6ff"),border:"1px solid "+(esAdmin?"#bbf7d0":(esNoLeida?"#fecdd3":"#bfdbfe")),borderLeft:esAdmin?"4px solid #16a34a":(esNoLeida?"4px solid #c0392b":"4px solid #2d78c8"),borderRadius:esAdmin?"0 10px 10px 10px":"10px 0 10px 10px",padding:"10px 14px"}}>
+                                              <div style={{fontSize:13,color:"#334155",lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:6}}>{nota.texto}</div>
+                                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                                <span style={{fontSize:10,fontWeight:700,color:esAdmin?"#16a34a":"#2d78c8"}}>{esAdmin?(nota.autorNombre||"ZAGA →"):(c.cliente||"Cliente")}</span>
+                                                <span style={{fontSize:10,color:"#94a3b8"}}>{nota.fecha?new Date(nota.fecha).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}</span>
+                                              </div>
                                             </div>
                                           </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                ):(
-                                  <div style={{textAlign:"center",padding:"18px 12px",fontSize:12,color:"#94a3b8",background:"#f8fafc",borderRadius:8,border:"1px dashed #bfdbfe",marginBottom:12}}>Sin mensajes aún con este cliente.</div>
-                                )}
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
                                 <div style={{background:"#eff6ff",borderRadius:10,padding:"12px 14px",border:"1px solid #bfdbfe"}}>
                                   <textarea value={notaClienteInput[c.id]||""} rows={2} maxLength={2000} onChange={e=>setNotaClienteInput(p=>({...p,[c.id]:e.target.value}))} placeholder="Escribe un mensaje al cliente..." style={{width:"100%",background:"#fff",border:"1px solid #bfdbfe",borderRadius:6,color:"#0f172a",padding:"8px 10px",fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.5}}/>
                                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,gap:8,flexWrap:"wrap"}}>
