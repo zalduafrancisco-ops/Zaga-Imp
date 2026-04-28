@@ -602,7 +602,6 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               </span>
                             )}
                           </div>
-                          {getImagenes(c.imagen_url)[0]&&<img src={getImagenes(c.imagen_url)[0]} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:82,height:82,objectFit:"cover",borderRadius:10,border:"1px solid #e2e8f0",float:"right",marginLeft:10,marginBottom:4}}/>}
                           <div style={{fontSize:15,fontWeight:700,color:isRech?"#94a3b8":"#0f172a",marginBottom:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.producto}</div>
                           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                             {c.unidades&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>📦 {fmtN(c.unidades)} und</span>}
@@ -612,6 +611,8 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                             {c.link_alibaba&&<a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:"#2d78c8",background:"#eff6ff",borderRadius:6,padding:"2px 8px",border:"1px solid #bfdbfe",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:4}}>🔗 Ver referencia</a>}
                           </div>
                         </div>
+                        {/* Imagen — columna propia, centrada verticalmente */}
+                        {getImagenes(c.imagen_url)[0]&&<img src={getImagenes(c.imagen_url)[0]} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:76,height:76,objectFit:"cover",borderRadius:10,border:"1px solid #e2e8f0",flexShrink:0,alignSelf:"center"}}/>}
 
                         <div className="cot-meta" style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
                           {!isRech&&(
