@@ -2259,6 +2259,17 @@ Número de seguimiento: ${c.nro}`;
                       const isTerminal=isNoProcesada||c.estado==="rechazada_cliente"||c.estado==="anulada";
                       return (
                         <div style={{borderTop:"1px solid #e2e8f0",padding:"20px 24px"}}>
+                          {/* Imagen del producto */}
+                          <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:16,background:"#f8fafc",borderRadius:10,padding:"10px 14px",border:"1px solid #e2e8f0"}}>
+                            {c.imagen_url
+                              ? <img src={c.imagen_url} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:56,height:56,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",flexShrink:0}}/>
+                              : <div style={{width:56,height:56,background:"#e2e8f0",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🖼️</div>
+                            }
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:10,color:"#64748b",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>🖼️ Imagen del producto</div>
+                              <input value={c.imagen_url||""} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:e.target.value}:x));}} placeholder="Clic derecho sobre la foto del producto → Copiar dirección de imagen" style={{width:"100%",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:7,color:"#0f172a",padding:"7px 10px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                            </div>
+                          </div>
                           {/* Fechas */}
                           <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
                             <div style={{flex:1,minWidth:150}}>
