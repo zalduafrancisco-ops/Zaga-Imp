@@ -3530,7 +3530,7 @@ Número de seguimiento: ${c.nro}`;
                             )}
                           </div>
                           {appEmail&&appPass&&(
-                            <button onClick={()=>{navigator.clipboard.writeText(`Email: ${appEmail}\nContraseña: ${appPass}`);showToast("Credenciales copiadas ✓");}}
+                            <button onClick={()=>{navigator.clipboard.writeText(`Email: ${appEmail}\nContraseña: ${appPass}\nhttps://zaga-imp.vercel.app/`);showToast("Credenciales copiadas ✓");}}
                               style={{background:"#040c18",color:"#c9a055",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700,alignSelf:"flex-start"}}>
                               📤 Copiar todo para enviar al cliente
                             </button>
