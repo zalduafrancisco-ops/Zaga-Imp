@@ -152,6 +152,8 @@ function calcPropia(d) {
 // ── Format ────────────────────────────────────────────────────────
 const fmt  = n=>!n&&n!==0?"$0":Number(n).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0});
 const fmtN = n=>Number(n).toLocaleString("es-CL",{maximumFractionDigits:0});
+// Parsea imagen_url que puede contener múltiples URLs separadas por "|||"
+const getImagenes = (url) => url ? url.split('|||').filter(Boolean) : [];
 const fmtP = n=>isNaN(n)||n===null?"-":`${Number(n).toFixed(1)}%`;
 const todayStr=()=>new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
 const monthKey=d=>{ try{ const dt=new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`; }catch{ return ""; }};
@@ -252,6 +254,7 @@ export default function App({ supabase, usuario, onLogout }){
   const [gestTab, setGestTab] = useState({});          // tab activa gestionar: "notas"|"cliente"|"china"
   const [chatOpen, setChatOpen] = useState({});        // mini-chat inline: {cotId: "cliente"|"china"|null}
   const [notaChinaInput, setNotaChinaInput] = useState({});
+  const [newImgInput, setNewImgInput] = useState({});    // {cotId: url en progreso}
   const [resumenChina,setResumenChina] = useState(null);
   const [backupModal,setBackupModal] = useState(null); // null | "export" | "import"
   const [simModal,setSimModal]       = useState(false);
@@ -1191,7 +1194,7 @@ Número de seguimiento: ${c.nro}`;
                       </div>
                     )
                   })()}
-                  {p.imagen_url&&<img src={p.imagen_url} alt={p.producto} onError={e=>{e.target.style.display='none'}} style={{width:"100%",maxHeight:220,objectFit:"contain",borderRadius:10,border:"1px solid #e2e8f0",background:"#f8fafc",marginBottom:4}}/>}
+                  {getImagenes(p.imagen_url)[0]&&<img src={getImagenes(p.imagen_url)[0]} alt={p.producto} onError={e=>{e.target.style.display='none'}} style={{width:"100%",maxHeight:220,objectFit:"contain",borderRadius:10,border:"1px solid #e2e8f0",background:"#f8fafc",marginBottom:4}}/>}
                   {p.link_alibaba&&<a href={p.link_alibaba} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,background:"#eff6ff",color:"#2d78c8",border:"1px solid #3b82f633",borderRadius:8,padding:"8px 14px",fontSize:12,textDecoration:"none"}}>🔗 Ver referencia en Alibaba</a>}
                   {p.motivo_no_procesada&&<div style={{background:"#fff1f2",borderRadius:8,padding:12,border:"1px solid #ef444433"}}><div style={{fontSize:10,color:"#c0392b",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Motivo no procesada</div><div style={{fontSize:12,color:"#dc2626"}}>{p.motivo_no_procesada}</div></div>}
                   {(p.negociacion_rondas||[]).length>0&&(
@@ -1242,7 +1245,7 @@ Número de seguimiento: ${c.nro}`;
               <div style={{padding:"14px 18px"}}>
                 {/* Info cliente — 2 cols compactas */}
                 <div style={{display:"flex",gap:12,marginBottom:12,paddingBottom:12,borderBottom:"1px solid #f0f0f0",alignItems:"flex-start"}}>
-                  {vistaData.imagen_url&&<img src={vistaData.imagen_url} alt={vistaData.producto} onError={e=>{e.target.style.display='none'}} style={{width:80,height:80,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                  {getImagenes(vistaData.imagen_url)[0]&&<img src={getImagenes(vistaData.imagen_url)[0]} alt={vistaData.producto} onError={e=>{e.target.style.display='none'}} style={{width:80,height:80,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",flexShrink:0}}/>}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 14px",flex:1}}>
                     {[["Cliente",vistaData.cliente],["Producto",vistaData.producto],["Unidades",fmtN(vistaData.unidades)],["Fecha",todayStr()]].map(([l,v])=>(
                       <div key={l}><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:2}}>{l}</div><div style={{fontSize:13,fontWeight:700,lineHeight:1.3}}>{v}</div></div>
@@ -1414,7 +1417,7 @@ Número de seguimiento: ${c.nro}`;
                     <label style={{display:"block",fontSize:10,color:"#777",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Imagen del producto (URL)</label>
                     <div style={{display:"flex",gap:8,alignItems:"center"}}>
                       <input value={form.imagen_url||""} onChange={e=>setForm(p=>({...p,imagen_url:e.target.value}))} placeholder="Clic derecho en la imagen → Copiar dirección de imagen" style={{flex:1,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:8,color:"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
-                      {form.imagen_url&&<img src={form.imagen_url} onError={e=>{e.target.style.display='none'}} style={{width:44,height:44,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                      {getImagenes(form.imagen_url)[0]&&<img src={getImagenes(form.imagen_url)[0]} onError={e=>{e.target.style.display='none'}} style={{width:44,height:44,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0",flexShrink:0}}/>}
                     </div>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
@@ -2074,7 +2077,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{padding:20,borderLeft:`4px solid ${isPropia?"#3d7fc4":sc}`}}>
                       <div className="cot-card-row" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                         <div style={{flex:1}}>
-                          {c.imagen_url&&<img src={c.imagen_url} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",float:"right",marginLeft:12,marginBottom:6}}/>}
+                          {getImagenes(c.imagen_url)[0]&&<img src={getImagenes(c.imagen_url)[0]} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",float:"right",marginLeft:12,marginBottom:6}}/>}
                           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
                             {isPropia?<span style={{background:"#3d7fc422",color:"#3d7fc4",border:"1px solid #8b5cf644",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>🏠 PROPIA</span>:<span style={{fontWeight:700,fontSize:15}}>{c.cliente}</span>}
                             {!isPropia&&c.categoria_cliente==="premium"&&<span style={{background:"#c9a05522",color:"#c9a055",border:"1px solid #f5c84244",borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:700}}>⭐ Premium</span>}
@@ -2409,16 +2412,47 @@ Número de seguimiento: ${c.nro}`;
                       const isTerminal=isNoProcesada||c.estado==="rechazada_cliente"||c.estado==="anulada";
                       return (
                         <div style={{borderTop:"1px solid #e2e8f0",padding:"20px 24px"}}>
-                          {/* Imagen del producto */}
-                          <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:16,background:"#f8fafc",borderRadius:10,padding:"10px 14px",border:"1px solid #e2e8f0"}}>
-                            {c.imagen_url
-                              ? <img src={c.imagen_url} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:56,height:56,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",flexShrink:0}}/>
-                              : <div style={{width:56,height:56,background:"#e2e8f0",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🖼️</div>
-                            }
-                            <div style={{flex:1}}>
-                              <div style={{fontSize:10,color:"#64748b",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>🖼️ Imagen del producto</div>
-                              <input value={c.imagen_url||""} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:e.target.value}:x));}} placeholder="Clic derecho sobre la foto del producto → Copiar dirección de imagen" style={{width:"100%",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:7,color:"#0f172a",padding:"7px 10px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                          {/* Imágenes del producto — multi */}
+                          <div style={{background:"#f8fafc",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0",marginBottom:16}}>
+                            <div style={{fontSize:10,color:"#64748b",marginBottom:8,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>🖼️ Imágenes del producto {getImagenes(c.imagen_url).length>0&&<span style={{background:"#e2e8f0",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,color:"#475569",marginLeft:4}}>{getImagenes(c.imagen_url).length}</span>}</div>
+                            {/* Miniaturas existentes */}
+                            {getImagenes(c.imagen_url).length>0&&(
+                              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:10}}>
+                                {getImagenes(c.imagen_url).map((url,idx)=>(
+                                  <div key={idx} style={{position:"relative",width:64,height:64}}>
+                                    <img src={url} onError={e=>{e.target.parentNode.style.opacity='.3'}} style={{width:64,height:64,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",display:"block"}}/>
+                                    <button onClick={async()=>{
+                                      const imgs=getImagenes(c.imagen_url).filter((_,i)=>i!==idx);
+                                      await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:imgs.join('|||')}:x));
+                                    }} title="Eliminar imagen" style={{position:"absolute",top:-6,right:-6,width:18,height:18,background:"#c0392b",color:"#fff",border:"none",borderRadius:"50%",cursor:"pointer",fontSize:13,lineHeight:"18px",textAlign:"center",padding:0,fontWeight:900}}>×</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Input agregar nueva */}
+                            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                              {newImgInput[c.id]&&<img src={newImgInput[c.id]} onError={e=>{e.target.style.display='none'}} style={{width:36,height:36,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                              <input
+                                value={newImgInput[c.id]||""}
+                                onChange={e=>setNewImgInput(p=>({...p,[c.id]:e.target.value}))}
+                                onKeyDown={async e=>{
+                                  if(e.key==='Enter'&&newImgInput[c.id]?.trim()){
+                                    const imgs=[...getImagenes(c.imagen_url),newImgInput[c.id].trim()];
+                                    await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:imgs.join('|||')}:x));
+                                    setNewImgInput(p=>({...p,[c.id]:""}));
+                                  }
+                                }}
+                                placeholder="Pegar URL de imagen y pulsar Agregar"
+                                style={{flex:1,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:7,color:"#0f172a",padding:"7px 10px",fontSize:12,outline:"none",boxSizing:"border-box"}}
+                              />
+                              <button onClick={async()=>{
+                                if(!newImgInput[c.id]?.trim())return;
+                                const imgs=[...getImagenes(c.imagen_url),newImgInput[c.id].trim()];
+                                await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:imgs.join('|||')}:x));
+                                setNewImgInput(p=>({...p,[c.id]:""}));
+                              }} style={{background:"#2d78c8",color:"#fff",border:"none",borderRadius:7,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>➕ Agregar</button>
                             </div>
+                            {getImagenes(c.imagen_url).length===0&&<div style={{fontSize:11,color:"#94a3b8",marginTop:6}}>Sin imágenes — pegá la URL y pulsa Agregar</div>}
                           </div>
                           {/* Fechas */}
                           <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
