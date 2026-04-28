@@ -816,44 +816,72 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               </div>
                             )}
 
-                            {/* TAB MENSAJES */}
+                            {/* TAB MENSAJES — historial unificado */}
                             {tab==="mensajes"&&(
                               <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                                <div style={{fontSize:11,color:"#64748b",lineHeight:1.5,background:"#f8fafc",borderRadius:8,padding:"10px 12px",border:"1px solid #e2e8f0"}}>
-                                  💬 Comunicate directamente con el equipo ZAGA sobre esta importación. Las respuestas llegan en tiempo real.
-                                </div>
-
-                                {Array.isArray(c.notas_cliente_historial)&&c.notas_cliente_historial.length>0?(
-                                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                                    {c.notas_cliente_historial.map(function(nota,i){
-                                      var esCliente = nota.autor==="cliente"
-                                      return (
-                                        <div key={nota.id||i} style={{display:"flex",justifyContent:esCliente?"flex-end":"flex-start"}}>
-                                          <div style={{
-                                            maxWidth:"82%",
-                                            background:esCliente?"#eff6ff":"#f0fdf4",
-                                            border:"1px solid "+(esCliente?"#bfdbfe":"#bbf7d0"),
-                                            borderLeft:esCliente?"none":"4px solid #16a34a",
-                                            borderRight:esCliente?"4px solid #2d78c8":"none",
-                                            borderRadius:esCliente?"10px 0 10px 10px":"0 10px 10px 10px",
-                                            padding:"10px 14px",
-                                          }}>
-                                            <div style={{fontSize:13,color:"#334155",lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:6}}>{nota.texto}</div>
-                                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                                              <span style={{fontSize:10,fontWeight:700,color:esCliente?"#2d78c8":"#16a34a"}}>{esCliente?(perfil.nombre||"Tú"):"ZAGA"}</span>
-                                              <span style={{fontSize:10,color:"#94a3b8"}}>{nota.fecha?new Date(nota.fecha).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}</span>
+                                {(()=>{
+                                  // Parsear fecha en formato "28 abr 2026" o ISO
+                                  function parseFecha(str){
+                                    if(!str) return new Date(0);
+                                    var iso=new Date(str); if(!isNaN(iso.getTime())) return iso;
+                                    var meses={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
+                                    var m=str.match(/(\d+)\s+(\w+)\s+(\d+)/);
+                                    if(m){var mes=meses[m[2].toLowerCase()];if(mes!==undefined)return new Date(Number(m[3]),mes,Number(m[1]));}
+                                    return new Date(0);
+                                  }
+                                  // Notas del equipo ZAGA (notas_historial, no ocultas)
+                                  var histNotas=[];
+                                  try{if(Array.isArray(c.notas_historial))histNotas=c.notas_historial;else if(typeof c.notas_historial==="string"&&c.notas_historial)histNotas=JSON.parse(c.notas_historial);}catch(e){histNotas=[];}
+                                  if(histNotas.length===0&&c.notas_internas)histNotas=[{texto:c.notas_internas,fecha:c.fecha_solicitud||"",autor:"Gestor"}];
+                                  var notasZaga=histNotas.filter(function(n){return n.oculta!==true;}).map(function(n,i){
+                                    return {_key:"zn"+i,texto:n.texto,fecha:n.fecha,autorNombre:n.autor||"ZAGA",tipo:"zaga",ts:parseFecha(n.fecha).getTime()||i};
+                                  });
+                                  // Mensajes del chat cliente
+                                  var chatMsgs=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
+                                  var mensajes=chatMsgs.map(function(n,i){
+                                    return {_key:"cm"+i,texto:n.texto,fecha:n.fecha,autor:n.autor,autorNombre:n.autor==="cliente"?(perfil.nombre||"Tú"):"ZAGA",tipo:"chat",ts:parseFecha(n.fecha).getTime()||i};
+                                  });
+                                  // Unificar y ordenar cronológicamente
+                                  var todos=[...notasZaga,...mensajes].sort(function(a,b){return a.ts-b.ts;});
+                                  if(todos.length===0) return (
+                                    <div style={{textAlign:"center",padding:"24px 16px",fontSize:12,color:"#94a3b8",background:"#f8fafc",borderRadius:10,border:"1px dashed #e2e8f0"}}>
+                                      Todavía no hay mensajes. Escribí el primero abajo.
+                                    </div>
+                                  );
+                                  return (
+                                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                                      {todos.map(function(msg){
+                                        var esCliente = msg.tipo==="chat" && msg.autor==="cliente";
+                                        var esZaga = !esCliente;
+                                        var fmtFecha = msg.fecha ? (()=>{
+                                          var d=new Date(msg.fecha);
+                                          return !isNaN(d.getTime())
+                                            ? d.toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})
+                                            : msg.fecha;
+                                        })() : "";
+                                        return (
+                                          <div key={msg._key} style={{display:"flex",justifyContent:esCliente?"flex-end":"flex-start"}}>
+                                            <div style={{
+                                              maxWidth:"82%",
+                                              background:esCliente?"#eff6ff":"#f0fdf4",
+                                              border:"1px solid "+(esCliente?"#bfdbfe":"#bbf7d0"),
+                                              borderLeft:esCliente?"none":"4px solid #16a34a",
+                                              borderRight:esCliente?"4px solid #2d78c8":"none",
+                                              borderRadius:esCliente?"10px 0 10px 10px":"0 10px 10px 10px",
+                                              padding:"10px 14px",
+                                            }}>
+                                              <div style={{fontSize:13,color:"#334155",lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:6}}>{msg.texto}</div>
+                                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                                <span style={{fontSize:10,fontWeight:700,color:esCliente?"#2d78c8":"#16a34a"}}>{esCliente?msg.autorNombre:msg.autorNombre}</span>
+                                                <span style={{fontSize:10,color:"#94a3b8"}}>{fmtFecha}</span>
+                                              </div>
                                             </div>
                                           </div>
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                ):(
-                                  <div style={{textAlign:"center",padding:"24px 16px",fontSize:12,color:"#94a3b8",background:"#f8fafc",borderRadius:10,border:"1px dashed #e2e8f0"}}>
-                                    Todavía no hay mensajes. Escribí el primero abajo.
-                                  </div>
-                                )}
-
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
                                 <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0"}}>
                                   <textarea
                                     value={mensajeInput[c.id]||""}
@@ -872,13 +900,9 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                       style={{
                                         background:((mensajeInput[c.id]||"").trim()&&enviandoId!==c.id)?"#040c18":"#e2e8f0",
                                         color:((mensajeInput[c.id]||"").trim()&&enviandoId!==c.id)?"#c9a055":"#94a3b8",
-                                        border:"none",
-                                        borderRadius:7,
-                                        padding:"9px 20px",
-                                        fontSize:12,
+                                        border:"none",borderRadius:7,padding:"9px 20px",fontSize:12,
                                         cursor:((mensajeInput[c.id]||"").trim()&&enviandoId!==c.id)?"pointer":"default",
-                                        fontWeight:700,
-                                        fontFamily:"inherit",
+                                        fontWeight:700,fontFamily:"inherit",
                                       }}>
                                       {enviandoId===c.id?"Enviando...":"💬 Enviar mensaje"}
                                     </button>
