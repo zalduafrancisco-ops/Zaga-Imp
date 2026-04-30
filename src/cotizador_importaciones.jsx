@@ -598,7 +598,10 @@ export default function App({ supabase, usuario, onLogout }){
   const abrirPrint=(tipo)=>{ setPrintModal(tipo); };
   const cerrarPrint=()=>{ setPrintModal(null); };
 
-  const vistaData=vistaId?cotizaciones.find(c=>c.id===vistaId):null;
+  const _vistaRaw=vistaId?cotizaciones.find(c=>c.id===vistaId):null;
+  // Recalcular calc al renderizar la vista — evita que cotizaciones guardadas con cálculos viejos
+  // (pre-fix de IVA aéreo, etc.) muestren números obsoletos. El calc del storage queda solo como caché.
+  const vistaData=_vistaRaw?{..._vistaRaw,calc:_vistaRaw.tipo==="propia"?calcPropia(_vistaRaw):calcCliente(_vistaRaw)}:null;
 
   // ── Dashboard data ────────────────────────────────────────────
   const dashBase=cotizaciones.filter(c=>dashTipo==="clientes"?c.tipo!=="propia":c.tipo==="propia");
