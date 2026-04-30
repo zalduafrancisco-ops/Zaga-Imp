@@ -3085,26 +3085,10 @@ Número de seguimiento: ${c.nro}`;
                             )}
                           </div>
 
-                          {/* ── TABS: NOTAS / CLIENTE / CHINA ── */}
+                          {/* ── NOTAS PRIVADAS (chats Cliente/China están arriba en mini-chat) ── */}
                           <div style={{marginTop:20,borderTop:"1px solid #e2e8f0",paddingTop:16}}>
-                            {/* Selector de tabs */}
-                            <div style={{display:"flex",gap:3,marginBottom:14,background:"#f1f5f9",borderRadius:8,padding:3}}>
-                              <button onClick={()=>setGestTab(p=>({...p,[c.id]:"notas"}))} style={{flex:1,background:(gestTab[c.id]||"notas")==="notas"?"#fff":"transparent",color:(gestTab[c.id]||"notas")==="notas"?"#2a8aaa":"#64748b",border:"none",borderRadius:6,padding:"7px 8px",fontSize:11,fontWeight:700,cursor:"pointer",boxShadow:(gestTab[c.id]||"notas")==="notas"?"0 1px 3px rgba(0,0,0,0.1)":"none",transition:"all .15s",fontFamily:"inherit"}}>🔒 Privadas</button>
-                              {c.tipo!=="propia"&&(
-                                <button onClick={()=>setGestTab(p=>({...p,[c.id]:"cliente"}))} style={{flex:1,background:gestTab[c.id]==="cliente"?"#eff6ff":"transparent",color:gestTab[c.id]==="cliente"?"#2d78c8":"#64748b",border:"none",borderRadius:6,padding:"7px 8px",fontSize:11,fontWeight:700,cursor:"pointer",boxShadow:gestTab[c.id]==="cliente"?"0 1px 3px rgba(0,0,0,0.1)":"none",transition:"all .15s",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontFamily:"inherit"}}>
-                                  💬 Cliente
-                                  {notasCliNoLeidas>0&&<span style={{background:"#c0392b",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:9,fontWeight:800}}>{notasCliNoLeidas}</span>}
-                                </button>
-                              )}
-                              <button onClick={()=>setGestTab(p=>({...p,[c.id]:"china"}))} style={{flex:1,background:gestTab[c.id]==="china"?"#fef9ec":"transparent",color:gestTab[c.id]==="china"?"#b8922e":"#64748b",border:"none",borderRadius:6,padding:"7px 8px",fontSize:11,fontWeight:700,cursor:"pointer",boxShadow:gestTab[c.id]==="china"?"0 1px 3px rgba(0,0,0,0.1)":"none",transition:"all .15s",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontFamily:"inherit"}}>
-                                🇨🇳 China
-                                {c.nota_china_nueva&&<span style={{background:"#c0392b",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:9,fontWeight:800}}>!</span>}
-                              </button>
-                            </div>
-
-                            {/* ─── TAB NOTAS ─── */}
-                            {(gestTab[c.id]||"notas")==="notas"&&(
-                              <div>
+                            <div style={{fontSize:11,color:"#2a8aaa",fontWeight:700,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>🔒 Notas privadas — solo equipo ZAGA</div>
+                            <div>
                                 {(()=>{
                                   var hist = []; try{ if(Array.isArray(c.notas_historial)) hist=c.notas_historial; else if(typeof c.notas_historial==="string"&&c.notas_historial) hist=JSON.parse(c.notas_historial); }catch(e){ hist=[]; }
                                   if(hist.length===0 && c.notas_internas){ hist = [{texto:c.notas_internas, fecha: c.fecha_solicitud||"Anterior", autor:"Sistema"}] }
@@ -3218,10 +3202,9 @@ Número de seguimiento: ${c.nro}`;
                                   </div>
                                 )}
                               </div>
-                            )}
 
-                            {/* ─── TAB CLIENTE ─── */}
-                            {gestTab[c.id]==="cliente"&&c.tipo!=="propia"&&(
+                            {/* ─── BLOQUE LEGACY CLIENTE — ELIMINADO (mini-chat arriba) ─── */}
+                            {false&&gestTab[c.id]==="cliente"&&c.tipo!=="propia"&&(
                               <div>
                                 {(()=>{
                                   var tsOf=function(s){if(!s)return 0;var d=new Date(s);if(!isNaN(d.getTime()))return d.getTime();var m=s.match(/(\d+)\s+(\w+)\s+(\d+)/);if(m){var mes={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11}[m[2].toLowerCase()];if(mes!==undefined)return new Date(Number(m[3]),mes,Number(m[1])).getTime();}return 0;};
@@ -3280,8 +3263,8 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                             )}
 
-                            {/* ─── TAB CHINA ─── */}
-                            {gestTab[c.id]==="china"&&(
+                            {/* ─── BLOQUE LEGACY CHINA — ELIMINADO (mini-chat arriba) ─── */}
+                            {false&&gestTab[c.id]==="china"&&(
                               <div>
                                 {Array.isArray(c.notas_china_historial)&&c.notas_china_historial.length>0?(
                                   <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
