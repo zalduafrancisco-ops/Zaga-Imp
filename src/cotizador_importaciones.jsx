@@ -158,12 +158,19 @@ function calcCliente(d) {
   // Ganancia base (sin considerar IVA — margen operacional)
   const ganMar=tCl-tChNeto, difCom=comCl-comREff, ganServ=serv, ganCda=cdaCl-cda;
   const ganImp=ganMar+difCom+ganServ+ganCda;
-  // Impacto neto IVA: recupero IVA china (crédito fiscal) contra IVA cliente (débito)
-  const ivaRecuperado=ivaChina;            // crédito fiscal por compra con factura
-  const ivaDebitoCliente=ivaCliente;       // débito fiscal al cobrar con factura
-  const ivaNetoFavor=ivaDebitoCliente-ivaRecuperado; // >0 = pago más de lo que recupero
-  // Ganancia real después de IVA
-  const ganImpConIva=ganImp+(conIva?ivaNetoFavor:0)-(conFact&&!conIva?ivaChina:0);
+  // ── IVA flow correcto ──
+  // Crédito fiscal: TODOS los IVA pagados con factura (China + agente + aduana en aéreo)
+  const ivaAgenteAer = (isAereo && aer) ? aer.ivaAgente : 0;
+  const ivaAduanaAer = (isAereo && aer) ? aer.ivaAduanaReal : 0;
+  const ivaRecuperado = (conFact ? ivaChina : 0) + ivaAgenteAer + ivaAduanaAer;
+  const ivaDebitoCliente = ivaCliente;       // débito fiscal al cobrar con factura
+  const saldoF29 = conIva ? (ivaDebitoCliente - ivaRecuperado) : 0; // <0 = SII paga a ZAGA
+  const ivaNetoFavor = ivaDebitoCliente - (conFact ? ivaChina : 0); // legacy compat — solo China
+  // Ganancia real con IVA:
+  //   Si conIva: IVAs son neutros (se compensan en F29) → ganImp queda igual
+  //   Si !conIva: ZAGA pierde los IVAs que pagó (no puede compensar sin débito)
+  const ivaPerdido = conIva ? 0 : ivaRecuperado;
+  const ganImpConIva = ganImp - ivaPerdido;
 
   const gan1=pago100?ganImp:(dCl-tCh*pDep)+difCom, gan2=pago100?0:(prCl-tCh*(1-pDep))+serv;
   const uDev=Math.round(u*pDev), uFull=u+uDev, ganFull=uFull*fUnd, ganTot=ganImp+ganFull;
@@ -171,7 +178,9 @@ function calcCliente(d) {
   const mgBrut=totCl>0?(ganImp/totCl)*100:0;
   const roi=totCh>0?(ganImp/totCh)*100:0;
   const mult=cRUnd>0?pfUnd/cRUnd:0;
-  return { tChNeto,ivaChina,tCh,dCh,prCh,comR:comREff,p1Ch,p2Ch,totCh,cRUnd,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,ivaCliente,ivaRecuperado,ivaNetoFavor,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult,aer,isAereo };
+  // Costo real NETO por unidad (sin IVAs recuperables) — más honesto para comparar con precio venta
+  const cRUndNeto = u>0 ? (tChNeto + comREff + cda + ivaPerdido) / u : 0;
+  return { tChNeto,ivaChina,tCh,dCh,prCh,comR:comREff,p1Ch,p2Ch,totCh,cRUnd,cRUndNeto,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,ivaCliente,ivaRecuperado,ivaNetoFavor,saldoF29,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult,aer,isAereo };
 }
 
 function calcPropia(d) {
@@ -1916,8 +1925,11 @@ Número de seguimiento: ${c.nro}`;
                       </>
                   }
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:8}}>
-                    <span style={{fontSize:12,color:"#64748b"}}>Costo real por unidad{form.requiere_factura?" (c/IVA China)":""}</span>
-                    <span style={{fontSize:19,fontWeight:800,color:"#2d78c8"}}>{fmt(calcActual.cRUnd)}</span>
+                    <div>
+                      <div style={{fontSize:12,color:"#64748b"}}>Costo real por unidad <span style={{fontSize:10,color:"#94a3b8"}}>(neto, post-F29)</span></div>
+                      {form.con_iva&&calcActual.cRUnd!==calcActual.cRUndNeto&&<div style={{fontSize:10,color:"#94a3b8"}}>Caja desembolsada/und: {fmt(calcActual.cRUnd)} (incluye IVA recuperable)</div>}
+                    </div>
+                    <span style={{fontSize:19,fontWeight:800,color:"#2d78c8"}}>{fmt(form.con_iva?calcActual.cRUndNeto:calcActual.cRUnd)}</span>
                   </div>
                 </BLOCK>
 
@@ -2006,13 +2018,31 @@ Número de seguimiento: ${c.nro}`;
                     <ROW label="GANANCIA IMPORTACIÓN (sin IVA)" value={fmt(calcActual.ganImp)} big topLine/>
                     {(form.requiere_factura||form.con_iva)&&(
                       <div style={{background:"#fff7ed",borderRadius:8,padding:"12px 14px",margin:"10px 0",border:"1px solid #fed7aa"}}>
-                        <div style={{fontSize:10,color:"#92400e",fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>🧾 Impacto IVA (Factura)</div>
-                        {form.requiere_factura&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#64748b"}}>IVA pagado a China (19%)</span><span style={{color:"#c0392b",fontWeight:600}}>−{fmt(calcActual.ivaChina)}</span></div>}
-                        {form.con_iva&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#64748b"}}>IVA cobrado al cliente (19%)</span><span style={{color:"#1aa358",fontWeight:600}}>+{fmt(calcActual.ivaCliente)}</span></div>}
-                        <div style={{borderTop:"1px solid #c9a05530",paddingTop:8,marginTop:4,display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:700}}>
-                          <span style={{color:"#0f172a"}}>GANANCIA REAL (con IVA)</span>
-                          <span style={{color:calcActual.ganImpConIva>=calcActual.ganImp?"#1aa358":"#c0392b",fontSize:16}}>{fmt(calcActual.ganImpConIva)}</span>
+                        <div style={{fontSize:10,color:"#92400e",fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>🧾 Flujo IVA — F29</div>
+                        {/* Débito */}
+                        {form.con_iva&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#64748b"}}>IVA cobrado al cliente (débito fiscal)</span><span style={{color:"#1aa358",fontWeight:600}}>+{fmt(calcActual.ivaCliente)}</span></div>}
+                        {/* Crédito desglosado */}
+                        {form.requiere_factura&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#64748b"}}>· IVA pagado a China (crédito)</span><span style={{color:"#c0392b",fontWeight:600}}>−{fmt(calcActual.ivaChina)}</span></div>}
+                        {calcActual.isAereo&&calcActual.aer&&(<>
+                          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#64748b"}}>· IVA agente aduana (crédito)</span><span style={{color:"#c0392b",fontWeight:600}}>−{fmt(calcActual.aer.ivaAgente)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#64748b"}}>· IVA aduana SII (crédito)</span><span style={{color:"#c0392b",fontWeight:600}}>−{fmt(calcActual.aer.ivaAduanaReal)}</span></div>
+                        </>)}
+                        {/* Saldo F29 */}
+                        {form.con_iva&&(
+                          <div style={{borderTop:"1px dashed #c9a05530",paddingTop:6,marginTop:6,display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:600}}>
+                            <span style={{color:"#0f172a"}}>Saldo F29 ({calcActual.saldoF29>=0?"a pagar SII":"a favor — recupera"})</span>
+                            <span style={{color:calcActual.saldoF29>=0?"#c0392b":"#1aa358"}}>{calcActual.saldoF29>=0?"+":""}{fmt(calcActual.saldoF29)}</span>
+                          </div>
+                        )}
+                        <div style={{borderTop:"1px solid #c9a05530",paddingTop:8,marginTop:6,display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:700}}>
+                          <span style={{color:"#0f172a"}}>GANANCIA REAL {form.con_iva?"(IVA neutro F29)":"(IVA pagado no recuperable)"}</span>
+                          <span style={{color:calcActual.ganImpConIva>=0?"#1aa358":"#c0392b",fontSize:16}}>{fmt(calcActual.ganImpConIva)}</span>
                         </div>
+                        {form.con_iva&&(
+                          <div style={{fontSize:10,color:"#64748b",marginTop:6,fontStyle:"italic"}}>
+                            💡 IVA es <strong>neutro</strong> con factura: lo cobrás al cliente y lo recuperás vía F29. Ganancia real = ganancia operacional.
+                          </div>
+                        )}
                       </div>
                     )}
                     {form.gestor==="luisa"&&calcActual.ganImp>0&&(
