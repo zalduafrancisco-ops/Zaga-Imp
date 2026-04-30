@@ -215,21 +215,67 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     if(!trimmed){ showToast("El mensaje no puede estar vacío","err"); return }
     if(trimmed.length > 2000){ showToast("Máximo 2000 caracteres","err"); return }
     setEnviandoId(cotId)
+
+    // ── OPTIMISTIC UPDATE: agregar el mensaje al historial local al instante ──
+    var tempId = "temp-" + Date.now()
+    var optimisticNote = {
+      id: tempId,
+      texto: trimmed,
+      fecha: new Date().toISOString(),
+      autor: "cliente",
+      _pending: true,  // marca para mostrar estado "enviando..." hasta confirmación
+    }
+    setCotizaciones(function(prev){
+      return prev.map(function(c){
+        if(c.id !== cotId) return c
+        var hist = Array.isArray(c.notas_cliente_historial) ? c.notas_cliente_historial : []
+        return Object.assign({}, c, { notas_cliente_historial: hist.concat([optimisticNote]) })
+      })
+    })
+    setMensajeInput(function(p){ var n=Object.assign({},p); n[cotId]=""; return n })
+
     try{
       var result = await supabase.rpc('add_cliente_nota', { cot_id: cotId, texto: trimmed })
       if(result.error){
         var msg = result.error.message||"Error al enviar"
+        // Rollback: quitar el mensaje optimista
+        setCotizaciones(function(prev){
+          return prev.map(function(c){
+            if(c.id !== cotId) return c
+            var hist = (c.notas_cliente_historial||[]).filter(function(n){ return n.id !== tempId })
+            return Object.assign({}, c, { notas_cliente_historial: hist })
+          })
+        })
+        // Restaurar texto en input
+        setMensajeInput(function(p){ var n=Object.assign({},p); n[cotId]=trimmed; return n })
         if(msg.indexOf("RATE_LIMIT")>=0) showToast("Límite de 20 mensajes por día alcanzado","err")
         else if(msg.indexOf("TEXTO_LARGO")>=0) showToast("Máximo 2000 caracteres","err")
         else if(msg.indexOf("COT_CERRADA")>=0) showToast("Esta cotización está cerrada","err")
         else if(msg.indexOf("NO_AUTORIZADO")>=0) showToast("No autorizado","err")
         else showToast("Error al enviar el mensaje","err")
       } else {
-        setMensajeInput(function(p){ var n=Object.assign({},p); n[cotId]=""; return n })
+        // Confirmar: sacar flag _pending. El real-time eventualmente reemplazará con la nota real.
+        setCotizaciones(function(prev){
+          return prev.map(function(c){
+            if(c.id !== cotId) return c
+            var hist = (c.notas_cliente_historial||[]).map(function(n){
+              return n.id === tempId ? Object.assign({}, n, { _pending: false }) : n
+            })
+            return Object.assign({}, c, { notas_cliente_historial: hist })
+          })
+        })
         showToast("✓ Mensaje enviado")
-        // La real-time subscription refrescará la lista automáticamente
       }
     }catch(e){
+      // Rollback en error de red
+      setCotizaciones(function(prev){
+        return prev.map(function(c){
+          if(c.id !== cotId) return c
+          var hist = (c.notas_cliente_historial||[]).filter(function(n){ return n.id !== tempId })
+          return Object.assign({}, c, { notas_cliente_historial: hist })
+        })
+      })
+      setMensajeInput(function(p){ var n=Object.assign({},p); n[cotId]=trimmed; return n })
       showToast("Error de conexión","err")
     }
     setEnviandoId(null)
@@ -842,7 +888,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                   // Mensajes del chat cliente
                                   var chatMsgs=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
                                   var mensajes=chatMsgs.map(function(n,i){
-                                    return {_key:"cm"+i,texto:n.texto,fecha:n.fecha,autor:n.autor,autorNombre:n.autor==="cliente"?(perfil.nombre||"Tú"):"ZAGA",tipo:"chat",ts:parseFecha(n.fecha).getTime()||i};
+                                    return {_key:"cm"+i,texto:n.texto,fecha:n.fecha,autor:n.autor,autorNombre:n.autor==="cliente"?(perfil.nombre||"Tú"):"ZAGA",tipo:"chat",ts:parseFecha(n.fecha).getTime()||i,pending:n._pending===true};
                                   });
                                   // Unificar y ordenar cronológicamente
                                   var todos=[...notasZaga,...mensajes].sort(function(a,b){return a.ts-b.ts;});
@@ -872,11 +918,12 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                               borderRight:esCliente?"4px solid #2d78c8":"none",
                                               borderRadius:esCliente?"10px 0 10px 10px":"0 10px 10px 10px",
                                               padding:"10px 14px",
+                                              opacity:msg.pending?0.7:1,
                                             }}>
                                               <div style={{fontSize:13,color:"#334155",lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:6}}>{msg.texto}</div>
                                               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                                                 <span style={{fontSize:10,fontWeight:700,color:esCliente?"#2d78c8":"#16a34a"}}>{esCliente?msg.autorNombre:msg.autorNombre}</span>
-                                                <span style={{fontSize:10,color:"#94a3b8"}}>{fmtFecha}</span>
+                                                <span style={{fontSize:10,color:"#94a3b8"}}>{msg.pending?"⏳ enviando…":fmtFecha}</span>
                                               </div>
                                             </div>
                                           </div>
