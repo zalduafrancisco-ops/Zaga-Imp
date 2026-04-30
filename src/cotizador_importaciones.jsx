@@ -96,7 +96,9 @@ function calcCliente(d) {
   const conFact=!!d.requiere_factura, conIva = isAereo ? true : !!d.con_iva, pago100 = isAereo ? true : !!d.pago_100;
   const comREff=pago100?0:comR;
 
-  // ── CDA: aéreo lo auto-calcula (con la "trampa" de aduana sobre venta), marítimo usa los campos manuales ──
+  // ── CDA aéreo: solo NETOS que se trasladan al cliente como ítem en factura ──
+  // El IVA aduana (19% × CIF) NO se cobra al cliente como ítem — ZAGA lo paga en el despacho
+  // y lo recupera como crédito fiscal en F29. Es neutro vs el IVA del producto que cobra al cliente.
   let cda, cdaCl, aer = null;
   if (isAereo) {
     const aforoOn = d.incluir_aforo !== false;
@@ -114,14 +116,14 @@ function calcCliente(d) {
 
     const arancelReal = cifReal * arancelPct;
     const arancelCl   = cifCl   * arancelPct;
-    const ivaAduanaReal = (cifReal + arancelReal + aduFijo) * 0.19;
-    const ivaAduanaCl   = (cifCl   + arancelCl   + aduFijo) * 0.19;
+    // IVA aduana = 19% × (CIF + arancel) — base correcta según Aduana Chile
+    const ivaAduanaReal = (cifReal + arancelReal) * 0.19;  // info: lo que paga ZAGA (recuperable F29)
+    const ivaAduanaCl   = (cifCl   + arancelCl)   * 0.19;  // info: equivalente sobre venta
 
-    // CDA mostrado al cliente: aduana fija + IVA agente + IVA aduana(sobre venta) + arancel(sobre venta)
-    cda   = aduFijo + ivaAgente + ivaAduanaReal + arancelReal;
-    cdaCl = aduFijo + ivaAgente + ivaAduanaCl   + arancelCl;
+    // CDA al cliente: SOLO NETOS (aduana fija + arancel si Form F OFF). IVA agente va aparte como IVA del line.
+    cda   = aduFijo + arancelReal;   // neto que ZAGA traslada como costo
+    cdaCl = aduFijo + arancelCl;     // neto que se cobra al cliente
     aer = { aduFijo, ivaAgente, ivaAduanaReal, ivaAduanaCl, arancelReal, arancelCl, formF, aforoOn, arancelPct,
-            difIvaAduana: ivaAduanaCl - ivaAduanaReal,
             difArancel: arancelCl - arancelReal };
   } else {
     cda = Number(d.cda)||0;
@@ -140,16 +142,16 @@ function calcCliente(d) {
   const pCUnd=pCh+mar, tCl=pCUnd*u;
   const dCl=pago100?0:tCl*pDep, prCl=pago100?0:tCl*(1-pDep);
   const comCl=pago100?0:prCl*((Number(d.pct_com_prestamo)||6.5)/100), serv=tCl*pServ;
-  // IVA cliente: en aéreo cdaCl YA incluye su IVA (no se le suma encima); en marítimo se aplica como antes
+  // IVA cliente: en aéreo se aplica IVA 19% a TODOS los netos (mercadería + gestión aduanera + servicio),
+  // como factura normal. cdaCl ahora es solo neto (sin IVA dentro), entonces se trata igual que marítimo.
   const ivaCliente = isAereo
-    ? (tCl + serv) * 0.19
+    ? (tCl + cdaCl + serv) * 0.19
     : (conIva ? (tCl+comCl+serv+cdaCl)*0.19 : 0);
   const totCl=tCl+comCl+serv+cdaCl;
   const p1Cl=pago100?totCl:dCl+comCl+cdaCl, p2Cl=pago100?0:prCl+serv;
-  // Totales con IVA: aéreo suma ivaCliente directo (cdaCl ya tiene IVA dentro); marítimo multiplica por 1.19
-  const p1ClIva = isAereo ? (totCl + ivaCliente) : (conIva?p1Cl*1.19:p1Cl);
-  const p2ClIva = isAereo ? p2Cl                 : (conIva?p2Cl*1.19:p2Cl);
-  const totClIva = isAereo ? (totCl + ivaCliente) : (conIva?totCl*1.19:totCl);
+  const p1ClIva = isAereo ? p1Cl*1.19 : (conIva?p1Cl*1.19:p1Cl);
+  const p2ClIva = isAereo ? p2Cl*1.19 : (conIva?p2Cl*1.19:p2Cl);
+  const totClIva = isAereo ? totCl*1.19 : (conIva?totCl*1.19:totCl);
   const pfUnd=u>0?totCl/u:0;
 
   // ── Ganancia ──
@@ -1338,10 +1340,10 @@ Número de seguimiento: ${c.nro}`;
                             const aer=vistaData.calc?.aer||{};
                             // Mercadería
                             const mNeto=tCl, mIva=tCl*0.19, mTot=mNeto+mIva;
-                            // Costos aduaneros: neto = aduFijo + arancelCl + ivaAduanaCl; IVA = ivaAgente
-                            const aNeto=(aer.aduFijo||0)+(aer.arancelCl||0)+(aer.ivaAduanaCl||0);
-                            const aIva=aer.ivaAgente||0;
-                            const aTot=cdaCl;
+                            // Gestión aduanera: neto = aduFijo + arancel (solo netos), IVA = 19% sobre neto
+                            const aNeto=cdaCl;
+                            const aIva=aNeto*0.19;
+                            const aTot=aNeto+aIva;
                             // Servicio ZAGA
                             const sNeto=serv, sIva=serv*0.19, sTot=sNeto+sIva;
                             const subtotal=mNeto+aNeto+sNeto;
@@ -1879,17 +1881,25 @@ Número de seguimiento: ${c.nro}`;
                   {!calcActual.isAereo&&Number(form.cda)>0&&<ROW label={`${form.cda_descripcion||"Certificado especial"}`} value={fmt(calcActual.cda)} accent="#c47830"/>}
                   <div style={{height:6}}/>
                   {/* En AÉREO: desglosar A CHINA / A AGENCIA ADUANA / IVA ADUANA AL SII */}
-                  {calcActual.isAereo&&calcActual.aer ? (
-                    <>
-                      <PAYBOX label="✈️ PAGO a China (producto CIP)" amount={fmt(calcActual.tChNeto + calcActual.ivaChina)} color="#2d78c8" detail={`Producto ${fmt(calcActual.tChNeto)}${form.requiere_factura?` + IVA China ${fmt(calcActual.ivaChina)}`:""} — al confirmar`}/>
-                      <PAYBOX label="🏢 PAGO a Agencia Aduana" amount={fmt(calcActual.aer.aduFijo + calcActual.aer.ivaAgente)} color="#c47830" detail={`Honorarios+EDI+despacho+aeropuerto${form.incluir_aforo!==false?"+aforo":""} ${fmt(calcActual.aer.aduFijo)} + IVA agente ${fmt(calcActual.aer.ivaAgente)} — al despacho`}/>
-                      <PAYBOX label="🏛️ IVA Aduana al SII" amount={fmt(calcActual.aer.ivaAduanaReal + calcActual.aer.arancelReal)} color="#7c3aed" detail={`19% × CIF${calcActual.aer.arancelReal>0?" + arancel 6%":""} — al despacho · recuperable como crédito fiscal en F29`}/>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:6,border:"1px dashed #cbd5e1"}}>
-                        <span style={{fontSize:11,color:"#64748b",fontWeight:600}}>Total desembolso (China + Aduana + SII)</span>
-                        <span style={{fontSize:15,fontWeight:800,color:"#0f172a"}}>{fmt(calcActual.totCh)}</span>
-                      </div>
-                    </>
-                  ) : form.pago_100
+                  {calcActual.isAereo&&calcActual.aer ? (()=>{
+                    const aer=calcActual.aer;
+                    const aChina = calcActual.tChNeto + calcActual.ivaChina;
+                    const aAgencia = aer.aduFijo + aer.arancelReal + aer.ivaAgente; // neto + arancel + IVA agente
+                    const aSII = aer.ivaAduanaReal; // recuperable F29
+                    const totalDesembolso = aChina + aAgencia + aSII;
+                    return (
+                      <>
+                        <PAYBOX label="✈️ PAGO a China (producto CIP)" amount={fmt(aChina)} color="#2d78c8" detail={`Producto ${fmt(calcActual.tChNeto)}${form.requiere_factura?` + IVA China ${fmt(calcActual.ivaChina)}`:""} — al confirmar`}/>
+                        <PAYBOX label="🏢 PAGO a Agencia Aduana" amount={fmt(aAgencia)} color="#c47830" detail={`Servicios ${fmt(aer.aduFijo)}${aer.arancelReal>0?` + arancel ${fmt(aer.arancelReal)}`:""} + IVA agente ${fmt(aer.ivaAgente)} — al despacho`}/>
+                        <PAYBOX label="🏛️ IVA Aduana al SII" amount={fmt(aSII)} color="#7c3aed" detail={`19% × CIF${aer.arancelReal>0?" + arancel":""} ${fmt(aer.ivaAduanaReal)} — al despacho · recuperable como crédito fiscal F29`}/>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:6,border:"1px dashed #cbd5e1"}}>
+                          <span style={{fontSize:11,color:"#64748b",fontWeight:600}}>Total desembolso día despacho (caja real)</span>
+                          <span style={{fontSize:15,fontWeight:800,color:"#0f172a"}}>{fmt(totalDesembolso)}</span>
+                        </div>
+                        <div style={{fontSize:10,color:"#64748b",marginTop:4,fontStyle:"italic",textAlign:"center"}}>El IVA Aduana se recupera como crédito fiscal en F29 — no es costo real</div>
+                      </>
+                    );
+                  })() : form.pago_100
                     ? <PAYBOX label="PAGO ÚNICO a China" amount={fmt(calcActual.p1Ch)} color="#2d78c8" detail={`Producto ${fmt(calcActual.tChNeto)}${form.requiere_factura?` + IVA 19% ${fmt(calcActual.ivaChina)}`:""}${Number(form.cda)>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cda)}`:""}`}/>
                     : <>
                         <PAYBOX label="1er PAGO a China" amount={fmt(calcActual.p1Ch)} color="#2d78c8" detail={`Depósito ${fmt(calcActual.dCh)} + Comisión ${fmt(calcActual.comR)}${Number(form.cda)>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cda)}`:""} (sin IVA)`}/>
@@ -1980,11 +1990,8 @@ Número de seguimiento: ${c.nro}`;
                     <ROW label="Ganancia por margen de precio" value={fmt(calcActual.ganMar)} accent="#c9a055"/>
                     <ROW label={`Servicio ZAGA ${form.pct_servicio}%`} value={fmt(calcActual.ganServ)} accent="#c9a055"/>
                     {!form.pago_100&&!calcActual.isAereo&&<ROW label="Diferencia comisión (6.5% − real app)" value={fmt(calcActual.difCom)} accent="#aaa" sub/>}
-                    {calcActual.isAereo&&calcActual.aer&&(
-                      <>
-                        <ROW label="Diferencia IVA aduana (sobre venta − sobre costo)" value={fmt(calcActual.aer.difIvaAduana)} accent={calcActual.aer.difIvaAduana>=0?"#c9a055":"#c0392b"} sub/>
-                        {calcActual.aer.difArancel!==0&&<ROW label="Diferencia arancel (sin Form F)" value={fmt(calcActual.aer.difArancel)} accent={calcActual.aer.difArancel>=0?"#c9a055":"#c0392b"} sub/>}
-                      </>
+                    {calcActual.isAereo&&calcActual.aer&&calcActual.aer.difArancel!==0&&(
+                      <ROW label="Diferencia arancel (sin Form F · sobre venta − sobre costo)" value={fmt(calcActual.aer.difArancel)} accent={calcActual.aer.difArancel>=0?"#c9a055":"#c0392b"} sub/>
                     )}
                     {!calcActual.isAereo&&calcActual.ganCda!==0&&<ROW label={`Diferencia ${form.cda_descripcion||"Certificado"} (cobrado − costo)`} value={fmt(calcActual.ganCda)} accent={calcActual.ganCda>=0?"#c9a055":"#c0392b"} sub/>}
                     <ROW label="GANANCIA IMPORTACIÓN (sin IVA)" value={fmt(calcActual.ganImp)} big topLine/>
