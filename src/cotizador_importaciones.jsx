@@ -1514,7 +1514,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{marginBottom:14}}>
                       <label style={{display:"block",fontSize:10,color:"#777",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Tipo de transporte a cotizar</label>
                       <div style={{display:"flex",gap:6}}>
-                        {[["maritimo","🚢 Marítimo","#2a8aaa"],["aereo","✈️ Aéreo","#c47830"],["ambos","🚢✈️ Ambos","#3d7fc4"]].map(([k,l,col])=>(
+                        {[["maritimo","🚢 Marítimo","#2a8aaa"],["aereo","✈️ Aéreo","#c47830"]].map(([k,l,col])=>(
                           <button key={k} onClick={()=>setForm(p=>{
                             const next={...p,transporte:k};
                             // Al elegir aéreo: forzar pago 100%, factura, servicio 6%; al salir, restaurar defaults marítimos

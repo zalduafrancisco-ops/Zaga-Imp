@@ -149,7 +149,7 @@ export default function PortalChina({ supabase, onLogout }) {
   // Aplicar filtros (Premium y/o Aéreo)
   let shown = listaBruta
   if (soloPremium) shown = shown.filter(c => c.categoria_cliente === "premium")
-  if (soloAereo)   shown = shown.filter(c => c.transporte === "aereo" || c.transporte === "ambos")
+  if (soloAereo)   shown = shown.filter(c => c.transporte === "aereo")
   // Por defecto los aéreos suben al top (prioridad operativa)
   shown = [...shown].sort((a, b) => {
     const aAer = a.transporte === "aereo" ? 0 : 1
@@ -164,7 +164,7 @@ export default function PortalChina({ supabase, onLogout }) {
   )
   // Hay aéreos en tabs activas?
   const hayAereo = cots.some(c =>
-    (c.transporte === "aereo" || c.transporte === "ambos") &&
+    c.transporte === "aereo" &&
     [...ESTADOS_PEND_COT, ...ESTADOS_PEND_CLIENTE, ...ESTADOS_CONFIRMADAS, ...ESTADOS_CAMINO].includes(c.estado)
   )
 
