@@ -174,12 +174,14 @@ function calcCliente(d) {
 
   const gan1=pago100?ganImp:(dCl-tCh*pDep)+difCom, gan2=pago100?0:(prCl-tCh*(1-pDep))+serv;
   const uDev=Math.round(u*pDev), uFull=u+uDev, ganFull=uFull*fUnd, ganTot=ganImp+ganFull;
+  // Costo real NETO total (sin IVAs recuperables si conIva, incluyendo IVAs perdidos si !conIva)
+  const costoNetoReal = tChNeto + comREff + cda + ivaPerdido;
+  const cRUndNeto = u>0 ? costoNetoReal / u : 0;
   const markup=pCh>0?((pCUnd-pCh)/pCh)*100:0;
   const mgBrut=totCl>0?(ganImp/totCl)*100:0;
-  const roi=totCh>0?(ganImp/totCh)*100:0;
+  // ROI sobre costo neto real (excluye IVAs recuperables) — métrica más honesta
+  const roi = costoNetoReal>0 ? (ganImp/costoNetoReal)*100 : 0;
   const mult=cRUnd>0?pfUnd/cRUnd:0;
-  // Costo real NETO por unidad (sin IVAs recuperables) — más honesto para comparar con precio venta
-  const cRUndNeto = u>0 ? (tChNeto + comREff + cda + ivaPerdido) / u : 0;
   return { tChNeto,ivaChina,tCh,dCh,prCh,comR:comREff,p1Ch,p2Ch,totCh,cRUnd,cRUndNeto,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,ivaCliente,ivaRecuperado,ivaNetoFavor,saldoF29,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult,aer,isAereo };
 }
 
@@ -2065,7 +2067,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,margin:"14px 0"}}>
                       <METRIC label="Markup precio" value={fmtP(calcActual.markup)} sub={`${fmt(calcActual.pCUnd-(Number(form.precio_china)||0))} / und`} color="#c9a055"/>
                       <METRIC label="Margen bruto" value={fmtP(calcActual.mgBrut)} sub="Sobre total cliente" color="#c9a055"/>
-                      <METRIC label="ROI sobre costo China" value={fmtP(calcActual.roi)} color="#1aa358"/>
+                      <METRIC label="ROI sobre costo neto" value={fmtP(calcActual.roi)} color="#1aa358"/>
                       <METRIC label="Multiplicador" value={isNaN(calcActual.mult)||!calcActual.mult?"—":`${calcActual.mult.toFixed(2)}×`} color="#1aa358"/>
                     </div>
                     <div style={{background:"#fefce8",borderRadius:9,padding:"12px 14px",marginBottom:14,border:"1px dashed #fde047"}}>
