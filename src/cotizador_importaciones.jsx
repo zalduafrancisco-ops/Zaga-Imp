@@ -1578,6 +1578,10 @@ Número de seguimiento: ${c.nro}`;
                         <span style={{fontSize:11,color:"#92400e",fontWeight:700}}>Subtotal aduana neto</span>
                         <span style={{fontSize:14,fontWeight:800,color:"#c47830"}}>{fmt((Number(form.aer_honorarios)||0)+(Number(form.aer_edi)||0)+(Number(form.aer_despacho)||0)+(Number(form.aer_aeropuerto)||0)+(form.incluir_aforo!==false?(Number(form.aer_aforo)||0):0))}</span>
                       </div>
+                      {/* Recordatorio dólar aduanero */}
+                      <div style={{marginTop:10,background:"#fef9c3",border:"1px solid #fde68a",borderRadius:7,padding:"8px 12px",fontSize:10,color:"#854d0e",lineHeight:1.5}}>
+                        💡 <strong>Dólar aduanero:</strong> el IVA aduana real puede variar según el dólar aduanero del mes (fijado por Aduana). Verificar con la agente antes del despacho. <a href="https://www.aduana.cl/indicadores-equivalencias/aduana/2025-12-30/115957.html" target="_blank" rel="noopener noreferrer" style={{color:"#854d0e",textDecoration:"underline",fontWeight:700}}>Ver dólar del mes →</a>
+                      </div>
                     </div>
                   )}
                   <div style={{marginBottom:12}}>
