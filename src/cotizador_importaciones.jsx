@@ -1517,10 +1517,11 @@ Número de seguimiento: ${c.nro}`;
                         {[["maritimo","🚢 Marítimo","#2a8aaa"],["aereo","✈️ Aéreo","#c47830"]].map(([k,l,col])=>(
                           <button key={k} onClick={()=>setForm(p=>{
                             const next={...p,transporte:k};
-                            // Al elegir aéreo: forzar pago 100%, factura, servicio 6%; al salir, restaurar defaults marítimos
+                            // Al elegir aéreo: forzar pago 100%, factura, IVA cliente, servicio 6%
                             if(k==="aereo"){
                               next.pago_100=true;
                               next.con_iva=true;
+                              next.requiere_factura=true;
                               if(!p.pct_servicio||Number(p.pct_servicio)===4) next.pct_servicio=6;
                             }
                             return next;
