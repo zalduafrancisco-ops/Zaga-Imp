@@ -1874,10 +1874,21 @@ Número de seguimiento: ${c.nro}`;
                   {form.requiere_factura&&<ROW label="Total producto con IVA" value={fmt(calcActual.tCh)} accent="#c47830" big/>}
                   {!form.pago_100&&<ROW label={`Depósito ${form.pct_deposito}%`} value={fmt(calcActual.dCh)} sub/>}
                   {!form.pago_100&&<ROW label={`Préstamo ${100-Number(form.pct_deposito)}%`} value={fmt(calcActual.prCh)} sub/>}
-                  {!form.pago_100&&<ROW label="Comisión real según APP" value={fmt(calcActual.comR)} accent="#b8922e"/>}
-                  {Number(form.cda)>0&&<ROW label={`${form.cda_descripcion||"Certificado especial"}`} value={fmt(calcActual.cda)} accent="#c47830"/>}
+                  {!form.pago_100&&!calcActual.isAereo&&<ROW label="Comisión real según APP" value={fmt(calcActual.comR)} accent="#b8922e"/>}
+                  {!calcActual.isAereo&&Number(form.cda)>0&&<ROW label={`${form.cda_descripcion||"Certificado especial"}`} value={fmt(calcActual.cda)} accent="#c47830"/>}
                   <div style={{height:6}}/>
-                  {form.pago_100
+                  {/* En AÉREO: desglosar A CHINA / A AGENCIA ADUANA / IVA ADUANA AL SII */}
+                  {calcActual.isAereo&&calcActual.aer ? (
+                    <>
+                      <PAYBOX label="✈️ PAGO a China (producto CIP)" amount={fmt(calcActual.tChNeto + calcActual.ivaChina)} color="#2d78c8" detail={`Producto ${fmt(calcActual.tChNeto)}${form.requiere_factura?` + IVA China ${fmt(calcActual.ivaChina)}`:""} — al confirmar`}/>
+                      <PAYBOX label="🏢 PAGO a Agencia Aduana" amount={fmt(calcActual.aer.aduFijo + calcActual.aer.ivaAgente)} color="#c47830" detail={`Honorarios+EDI+despacho+aeropuerto${form.incluir_aforo!==false?"+aforo":""} ${fmt(calcActual.aer.aduFijo)} + IVA agente ${fmt(calcActual.aer.ivaAgente)} — al despacho`}/>
+                      <PAYBOX label="🏛️ IVA Aduana al SII" amount={fmt(calcActual.aer.ivaAduanaReal + calcActual.aer.arancelReal)} color="#7c3aed" detail={`19% × CIF${calcActual.aer.arancelReal>0?" + arancel 6%":""} — al despacho · recuperable como crédito fiscal en F29`}/>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:6,border:"1px dashed #cbd5e1"}}>
+                        <span style={{fontSize:11,color:"#64748b",fontWeight:600}}>Total desembolso (China + Aduana + SII)</span>
+                        <span style={{fontSize:15,fontWeight:800,color:"#0f172a"}}>{fmt(calcActual.totCh)}</span>
+                      </div>
+                    </>
+                  ) : form.pago_100
                     ? <PAYBOX label="PAGO ÚNICO a China" amount={fmt(calcActual.p1Ch)} color="#2d78c8" detail={`Producto ${fmt(calcActual.tChNeto)}${form.requiere_factura?` + IVA 19% ${fmt(calcActual.ivaChina)}`:""}${Number(form.cda)>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cda)}`:""}`}/>
                     : <>
                         <PAYBOX label="1er PAGO a China" amount={fmt(calcActual.p1Ch)} color="#2d78c8" detail={`Depósito ${fmt(calcActual.dCh)} + Comisión ${fmt(calcActual.comR)}${Number(form.cda)>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cda)}`:""} (sin IVA)`}/>
