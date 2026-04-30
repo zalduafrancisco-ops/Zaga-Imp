@@ -100,6 +100,7 @@ export default function PortalChina({ supabase, onLogout }) {
   const [loading, setLoading]       = useState(true)
   const [pulse, setPulse]           = useState(false)
   const [soloPremium, setSoloPremium] = useState(false)
+  const [soloAereo, setSoloAereo]     = useState(false)
 
   useEffect(() => {
     loadData()
@@ -145,13 +146,25 @@ export default function PortalChina({ supabase, onLogout }) {
   }
 
   const listaBruta = tabMap[tab] || []
-  const shown = soloPremium
-    ? listaBruta.filter(c => c.categoria_cliente === "premium")
-    : listaBruta
+  // Aplicar filtros (Premium y/o Aéreo)
+  let shown = listaBruta
+  if (soloPremium) shown = shown.filter(c => c.categoria_cliente === "premium")
+  if (soloAereo)   shown = shown.filter(c => c.transporte === "aereo" || c.transporte === "ambos")
+  // Por defecto los aéreos suben al top (prioridad operativa)
+  shown = [...shown].sort((a, b) => {
+    const aAer = a.transporte === "aereo" ? 0 : 1
+    const bAer = b.transporte === "aereo" ? 0 : 1
+    return aAer - bAer
+  })
 
   // Hay premium en tabs activas (no completadas/dashboard)?
   const hayPremium = cots.some(c =>
     c.categoria_cliente === "premium" &&
+    [...ESTADOS_PEND_COT, ...ESTADOS_PEND_CLIENTE, ...ESTADOS_CONFIRMADAS, ...ESTADOS_CAMINO].includes(c.estado)
+  )
+  // Hay aéreos en tabs activas?
+  const hayAereo = cots.some(c =>
+    (c.transporte === "aereo" || c.transporte === "ambos") &&
     [...ESTADOS_PEND_COT, ...ESTADOS_PEND_CLIENTE, ...ESTADOS_CONFIRMADAS, ...ESTADOS_CAMINO].includes(c.estado)
   )
 
@@ -305,22 +318,40 @@ export default function PortalChina({ supabase, onLogout }) {
         </div>
       </div>
 
-      {/* ── FILTRO PREMIUM ──────────────────────────────────────────── */}
-      {tab !== "dashboard" && hayPremium && (
-        <div style={{ maxWidth:900, margin:"12px auto 0", padding:"0 16px" }}>
-          <button
-            onClick={() => setSoloPremium(!soloPremium)}
-            style={{
-              background: soloPremium ? "#c9a055" : "#fff",
-              color: soloPremium ? "#040c18" : "#94a3b8",
-              border: `1px solid ${soloPremium ? "#c9a055" : "#e2e8f0"}`,
-              borderRadius:20, padding:"5px 14px",
-              fontSize:12, cursor:"pointer", fontWeight:700,
-              transition:"all 0.15s", fontFamily:"inherit",
-            }}
-          >
-            ⭐ {soloPremium ? "⭐ Solo Premium — activo (quitar filtro)" : "Filtrar: solo clientes Premium"}
-          </button>
+      {/* ── FILTROS PREMIUM / AÉREO ───────────────────────────────── */}
+      {tab !== "dashboard" && (hayPremium || hayAereo) && (
+        <div style={{ maxWidth:900, margin:"12px auto 0", padding:"0 16px", display:"flex", gap:8, flexWrap:"wrap" }}>
+          {hayPremium && (
+            <button
+              onClick={() => setSoloPremium(!soloPremium)}
+              style={{
+                background: soloPremium ? "#c9a055" : "#fff",
+                color: soloPremium ? "#040c18" : "#94a3b8",
+                border: `1px solid ${soloPremium ? "#c9a055" : "#e2e8f0"}`,
+                borderRadius:20, padding:"5px 14px",
+                fontSize:12, cursor:"pointer", fontWeight:700,
+                transition:"all 0.15s", fontFamily:"inherit",
+              }}
+            >
+              ⭐ {soloPremium ? "Solo Premium — activo" : "Filtrar: solo Premium"}
+            </button>
+          )}
+          {hayAereo && (
+            <button
+              onClick={() => setSoloAereo(!soloAereo)}
+              style={{
+                background: soloAereo ? "#c47830" : "#fff",
+                color: soloAereo ? "#fff" : "#c47830",
+                border: `1px solid ${soloAereo ? "#c47830" : "#fed7aa"}`,
+                borderRadius:20, padding:"5px 14px",
+                fontSize:12, cursor:"pointer", fontWeight:700,
+                transition:"all 0.15s", fontFamily:"inherit",
+              }}
+              title="空运优先 / Aéreo prioritario"
+            >
+              ✈️ {soloAereo ? "空运 Sólo Aéreo — activo" : "空运 Sólo aéreos (prioritario)"}
+            </button>
+          )}
         </div>
       )}
 
@@ -691,6 +722,18 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
                 fontSize:11, fontWeight:800,
               }}>
                 ⭐ Premium
+              </span>
+            )}
+            {(c.transporte === "aereo" || c.transporte === "ambos") && (
+              <span style={{
+                background:c.transporte==="aereo"?"#c47830":"#3d7fc4",
+                color:"#fff",
+                border:`1px solid ${c.transporte==="aereo"?"#c47830":"#3d7fc4"}`,
+                borderRadius:20, padding:"3px 10px",
+                fontSize:11, fontWeight:800,
+                boxShadow:"0 1px 4px rgba(196,120,48,0.3)",
+              }}>
+                {c.transporte==="aereo" ? "✈️ 空运 AÉREO — Prioritario" : "🚢✈️ 海运+空运"}
               </span>
             )}
             {isUrg && (

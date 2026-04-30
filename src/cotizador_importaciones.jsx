@@ -68,6 +68,9 @@ const makeDefaultForm = (usuario) => ({
   pct_deposito:30, margen_und:"", pct_servicio:4, pct_com_prestamo:6.5, precio_venta_cliente:"",
   fulfillment_und:1200, pct_devolucion:20,
   cda:0, cda_cl:0, cda_descripcion:"", con_iva:false, pago_100:false, notas:"", requiere_factura:false,
+  // Aéreo — costos aduaneros (editables, prefijados según agente)
+  form_f_incluido:true, incluir_aforo:true,
+  aer_honorarios:150000, aer_edi:15000, aer_despacho:50000, aer_aeropuerto:68000, aer_aforo:48000,
   nro_factura_cliente:"", link_factura_cliente:"",
   variantes:"", // colores, tallas, cantidades por variante
   fecha_llegada_real:"", sku_china:"",
@@ -82,12 +85,48 @@ const makeDefaultForm = (usuario) => ({
 
 // ── Calculations ─────────────────────────────────────────────────
 function calcCliente(d) {
+  const isAereo = d.transporte === "aereo";
   const u=Number(d.unidades)||0, pCh=Number(d.precio_china)||0, comR=Number(d.comision_real)||0;
-  const pDep=(Number(d.pct_deposito)||30)/100, mar=Number(d.margen_und)||0;
-  const pServ=(Number(d.pct_servicio)||4)/100, fUnd=Number(d.fulfillment_und)||1200;
-  const pDev=(Number(d.pct_devolucion)||20)/100, cda=Number(d.cda)||0, cdaCl=Number(d.cda_cl)||cda;
-  const conFact=!!d.requiere_factura, conIva=!!d.con_iva, pago100=!!d.pago_100;
+  // En aéreo: forzar pago 100%, sin comisión préstamo, servicio default 6%, con factura
+  const pDep = isAereo ? 1 : (Number(d.pct_deposito)||30)/100;
+  const mar=Number(d.margen_und)||0;
+  const pctServDefault = isAereo ? 6 : 4;
+  const pServ=(Number(d.pct_servicio)||pctServDefault)/100, fUnd=Number(d.fulfillment_und)||1200;
+  const pDev=(Number(d.pct_devolucion)||20)/100;
+  const conFact=!!d.requiere_factura, conIva = isAereo ? true : !!d.con_iva, pago100 = isAereo ? true : !!d.pago_100;
   const comREff=pago100?0:comR;
+
+  // ── CDA: aéreo lo auto-calcula (con la "trampa" de aduana sobre venta), marítimo usa los campos manuales ──
+  let cda, cdaCl, aer = null;
+  if (isAereo) {
+    const aforoOn = d.incluir_aforo !== false;
+    const aduFijo = (Number(d.aer_honorarios)||150000) +
+                    (Number(d.aer_edi)||15000) +
+                    (Number(d.aer_despacho)||50000) +
+                    (Number(d.aer_aeropuerto)||68000) +
+                    (aforoOn ? (Number(d.aer_aforo)||48000) : 0);
+    const formF = d.form_f_incluido !== false;
+    const arancelPct = formF ? 0 : 0.06;
+    const ivaAgente = aduFijo * 0.19;
+
+    const cifReal = pCh * u;          // mi CIF real (lo que pago a China)
+    const cifCl   = (pCh + mar) * u;  // CIF mostrado al cliente (precio venta)
+
+    const arancelReal = cifReal * arancelPct;
+    const arancelCl   = cifCl   * arancelPct;
+    const ivaAduanaReal = (cifReal + arancelReal + aduFijo) * 0.19;
+    const ivaAduanaCl   = (cifCl   + arancelCl   + aduFijo) * 0.19;
+
+    // CDA mostrado al cliente: aduana fija + IVA agente + IVA aduana(sobre venta) + arancel(sobre venta)
+    cda   = aduFijo + ivaAgente + ivaAduanaReal + arancelReal;
+    cdaCl = aduFijo + ivaAgente + ivaAduanaCl   + arancelCl;
+    aer = { aduFijo, ivaAgente, ivaAduanaReal, ivaAduanaCl, arancelReal, arancelCl, formF, aforoOn, arancelPct,
+            difIvaAduana: ivaAduanaCl - ivaAduanaReal,
+            difArancel: arancelCl - arancelReal };
+  } else {
+    cda = Number(d.cda)||0;
+    cdaCl = Number(d.cda_cl)||cda;
+  }
 
   // ── Lado China ──
   const tChNeto=pCh*u;                          // costo producto sin IVA
@@ -101,11 +140,16 @@ function calcCliente(d) {
   const pCUnd=pCh+mar, tCl=pCUnd*u;
   const dCl=pago100?0:tCl*pDep, prCl=pago100?0:tCl*(1-pDep);
   const comCl=pago100?0:prCl*((Number(d.pct_com_prestamo)||6.5)/100), serv=tCl*pServ;
-  const ivaCliente=conIva?(tCl+comCl+serv+cdaCl)*0.19:0; // IVA que cobro al cliente
+  // IVA cliente: en aéreo cdaCl YA incluye su IVA (no se le suma encima); en marítimo se aplica como antes
+  const ivaCliente = isAereo
+    ? (tCl + serv) * 0.19
+    : (conIva ? (tCl+comCl+serv+cdaCl)*0.19 : 0);
   const totCl=tCl+comCl+serv+cdaCl;
   const p1Cl=pago100?totCl:dCl+comCl+cdaCl, p2Cl=pago100?0:prCl+serv;
-  const p1ClIva=conIva?p1Cl*1.19:p1Cl, p2ClIva=conIva?p2Cl*1.19:p2Cl;
-  const totClIva=conIva?totCl*1.19:totCl;
+  // Totales con IVA: aéreo suma ivaCliente directo (cdaCl ya tiene IVA dentro); marítimo multiplica por 1.19
+  const p1ClIva = isAereo ? (totCl + ivaCliente) : (conIva?p1Cl*1.19:p1Cl);
+  const p2ClIva = isAereo ? p2Cl                 : (conIva?p2Cl*1.19:p2Cl);
+  const totClIva = isAereo ? (totCl + ivaCliente) : (conIva?totCl*1.19:totCl);
   const pfUnd=u>0?totCl/u:0;
 
   // ── Ganancia ──
@@ -125,7 +169,7 @@ function calcCliente(d) {
   const mgBrut=totCl>0?(ganImp/totCl)*100:0;
   const roi=totCh>0?(ganImp/totCh)*100:0;
   const mult=cRUnd>0?pfUnd/cRUnd:0;
-  return { tChNeto,ivaChina,tCh,dCh,prCh,comR:comREff,p1Ch,p2Ch,totCh,cRUnd,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,ivaCliente,ivaRecuperado,ivaNetoFavor,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult };
+  return { tChNeto,ivaChina,tCh,dCh,prCh,comR:comREff,p1Ch,p2Ch,totCh,cRUnd,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,ivaCliente,ivaRecuperado,ivaNetoFavor,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult,aer,isAereo };
 }
 
 function calcPropia(d) {
@@ -1270,7 +1314,79 @@ Número de seguimiento: ${c.nro}`;
                 {/* Estructura de Pago */}
                 <div style={{marginBottom:10}}>
                   <div style={{fontSize:12,fontWeight:700,marginBottom:8,color:"#0f172a"}}>Estructura de Pago</div>
-                  {(vistaData.pago_100||Number(vistaData.pct_deposito)>=100) ? (
+                  {/* ── COTIZACIÓN AÉREA: tabla de 3 líneas (Mercadería · Costos aduaneros · Servicio ZAGA) ── */}
+                  {vistaData.transporte==="aereo" ? (
+                    <div style={{background:"#fff7ed",border:"2px solid #fed7aa",borderRadius:10,padding:"12px 14px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                        <span style={{fontWeight:700,fontSize:13,color:"#c47830"}}>✈️ Cotización aérea — Pago 100% al confirmar</span>
+                        <span style={{fontSize:10,color:"#92400e",fontStyle:"italic"}}>CIP Santiago + gestión aduanera</span>
+                      </div>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                        <thead>
+                          <tr style={{background:"#fef3c7"}}>
+                            <th style={{textAlign:"left",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Concepto</th>
+                            <th style={{textAlign:"right",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Cant</th>
+                            <th style={{textAlign:"right",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>P. Unit</th>
+                            <th style={{textAlign:"right",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Neto</th>
+                            <th style={{textAlign:"right",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>IVA 19%</th>
+                            <th style={{textAlign:"right",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(()=>{
+                            const tCl=vistaData.calc?.tCl||0, serv=vistaData.calc?.serv||0, cdaCl=vistaData.calc?.cdaCl||0;
+                            const aer=vistaData.calc?.aer||{};
+                            // Mercadería
+                            const mNeto=tCl, mIva=tCl*0.19, mTot=mNeto+mIva;
+                            // Costos aduaneros: neto = aduFijo + arancelCl + ivaAduanaCl; IVA = ivaAgente
+                            const aNeto=(aer.aduFijo||0)+(aer.arancelCl||0)+(aer.ivaAduanaCl||0);
+                            const aIva=aer.ivaAgente||0;
+                            const aTot=cdaCl;
+                            // Servicio ZAGA
+                            const sNeto=serv, sIva=serv*0.19, sTot=sNeto+sIva;
+                            const subtotal=mNeto+aNeto+sNeto;
+                            const totIva=mIva+aIva+sIva;
+                            const totGen=mTot+aTot+sTot;
+                            return (<>
+                              <tr style={{borderBottom:"1px solid #fed7aa"}}>
+                                <td style={{padding:"6px 8px",color:"#0f172a"}}>{vistaData.producto||"Mercadería"}</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f172a"}}>{fmtN(vistaData.unidades||0)}</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f172a"}}>{fmt(vistaData.calc?.pCUnd||0)}</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f172a",fontWeight:600}}>{fmt(mNeto)}</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#92400e"}}>{fmt(mIva)}</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f7040",fontWeight:700}}>{fmt(mTot)}</td>
+                              </tr>
+                              <tr style={{borderBottom:"1px solid #fed7aa"}}>
+                                <td style={{padding:"6px 8px",color:"#0f172a"}}>Gestión aduanera y despacho</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#94a3b8"}}>—</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#94a3b8"}}>—</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f172a",fontWeight:600}}>{fmt(aNeto)}</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#92400e"}}>{fmt(aIva)}</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f7040",fontWeight:700}}>{fmt(aTot)}</td>
+                              </tr>
+                              <tr style={{borderBottom:"1px solid #fed7aa"}}>
+                                <td style={{padding:"6px 8px",color:"#0f172a"}}>Servicio ZAGA ({vistaData.pct_servicio||6}%)</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#94a3b8"}}>—</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#94a3b8"}}>—</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f172a",fontWeight:600}}>{fmt(sNeto)}</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#92400e"}}>{fmt(sIva)}</td>
+                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f7040",fontWeight:700}}>{fmt(sTot)}</td>
+                              </tr>
+                              <tr style={{background:"#fef3c7"}}>
+                                <td colSpan={3} style={{padding:"8px",fontWeight:800,color:"#92400e",textTransform:"uppercase",fontSize:10,letterSpacing:.8}}>Total</td>
+                                <td style={{textAlign:"right",padding:"8px",fontWeight:800,color:"#0f172a"}}>{fmt(subtotal)}</td>
+                                <td style={{textAlign:"right",padding:"8px",fontWeight:800,color:"#92400e"}}>{fmt(totIva)}</td>
+                                <td style={{textAlign:"right",padding:"8px",fontWeight:900,color:"#0f7040",fontSize:13}}>{fmt(totGen)}</td>
+                              </tr>
+                            </>);
+                          })()}
+                        </tbody>
+                      </table>
+                      <div style={{fontSize:10,color:"#92400e",marginTop:10,lineHeight:1.6}}>
+                        <strong>Condiciones:</strong> Pago 100% anticipado · Plazo 5-10 días hábiles desde confirmación · Form F {vistaData.form_f_incluido!==false?"incluido (TLC Chile-China)":"NO incluido (arancel 6% trasladado)"} · Cotización válida 15 días corridos.
+                      </div>
+                    </div>
+                  ) : (vistaData.pago_100||Number(vistaData.pct_deposito)>=100) ? (
                     <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:"10px 14px"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontWeight:700,fontSize:13,color:"#0f7040"}}>💰 Pago Único — Al confirmar la orden</span><span style={{fontWeight:800,fontSize:17,color:"#0f7040"}}>{vistaData.con_iva?fmt((vistaData.calc?.totCl||0)*1.19):fmt(vistaData.calc?.totCl)}</span></div>
                       <div style={{fontSize:11,color:"#666"}}>
@@ -1399,10 +1515,68 @@ Número de seguimiento: ${c.nro}`;
                       <label style={{display:"block",fontSize:10,color:"#777",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Tipo de transporte a cotizar</label>
                       <div style={{display:"flex",gap:6}}>
                         {[["maritimo","🚢 Marítimo","#2a8aaa"],["aereo","✈️ Aéreo","#c47830"],["ambos","🚢✈️ Ambos","#3d7fc4"]].map(([k,l,col])=>(
-                          <button key={k} onClick={()=>setForm(p=>({...p,transporte:k}))} style={{flex:1,background:form.transporte===k?col+"18":"#f8fafc",color:form.transporte===k?col:"#64748b",border:`1px solid ${form.transporte===k?col+"66":"#e2e8f0"}`,borderRadius:8,padding:"7px 6px",fontSize:11,cursor:"pointer",fontWeight:form.transporte===k?700:400,textAlign:"center"}}>
+                          <button key={k} onClick={()=>setForm(p=>{
+                            const next={...p,transporte:k};
+                            // Al elegir aéreo: forzar pago 100%, factura, servicio 6%; al salir, restaurar defaults marítimos
+                            if(k==="aereo"){
+                              next.pago_100=true;
+                              next.con_iva=true;
+                              if(!p.pct_servicio||Number(p.pct_servicio)===4) next.pct_servicio=6;
+                            }
+                            return next;
+                          })} style={{flex:1,background:form.transporte===k?col+"18":"#f8fafc",color:form.transporte===k?col:"#64748b",border:`1px solid ${form.transporte===k?col+"66":"#e2e8f0"}`,borderRadius:8,padding:"7px 6px",fontSize:11,cursor:"pointer",fontWeight:form.transporte===k?700:400,textAlign:"center"}}>
                             {l}
                           </button>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── BLOQUE CONFIGURACIÓN AÉREA — solo visible si transporte === "aereo" ── */}
+                  {form.tipo==="cliente"&&form.transporte==="aereo"&&(
+                    <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                        <div style={{fontSize:11,color:"#c47830",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>✈️ Configuración aérea</div>
+                        <div style={{fontSize:10,color:"#92400e",fontStyle:"italic"}}>Pago 100% · Sin comisión préstamo · Con factura</div>
+                      </div>
+                      {/* Form F toggle */}
+                      <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:10,padding:"7px 10px",background:form.form_f_incluido!==false?"#f0fdf4":"#fef2f2",borderRadius:7,border:"1px solid "+(form.form_f_incluido!==false?"#bbf7d0":"#fecaca")}}>
+                        <input type="checkbox" checked={form.form_f_incluido!==false} onChange={e=>setForm(p=>({...p,form_f_incluido:e.target.checked}))} style={{margin:0}}/>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:12,fontWeight:700,color:form.form_f_incluido!==false?"#15803d":"#dc2626"}}>Form F (TLC Chile-China) incluido</div>
+                          <div style={{fontSize:10,color:"#64748b"}}>{form.form_f_incluido!==false?"Arancel 0% sobre CIF ✅":"Arancel 6% sobre CIF — se traslada al cliente dentro de costos aduaneros"}</div>
+                        </div>
+                      </label>
+                      {/* Costos aduaneros editables */}
+                      <div style={{fontSize:10,color:"#92400e",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Costos aduaneros (editables)</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                        {[
+                          ["aer_honorarios","Honorarios aduana"],
+                          ["aer_edi","Transmisión EDI"],
+                          ["aer_despacho","Gastos despacho"],
+                          ["aer_aeropuerto","Gastos aeropuerto"],
+                        ].map(([k,l])=>(
+                          <div key={k}>
+                            <label style={{display:"block",fontSize:9,color:"#92400e",marginBottom:3}}>{l}</label>
+                            <input type="number" value={form[k]??""} onChange={e=>setForm(p=>({...p,[k]:e.target.value===""?"":Number(e.target.value)}))} style={{width:"100%",background:"#ffffff",border:"1px solid #fed7aa",borderRadius:6,color:"#0f172a",padding:"6px 9px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Aforo con checkbox */}
+                      <div style={{display:"flex",gap:10,alignItems:"flex-end",marginBottom:8}}>
+                        <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",padding:"6px 10px",background:form.incluir_aforo!==false?"#fff7ed":"#f8fafc",borderRadius:6,border:"1px solid #fed7aa",flex:"0 0 auto"}}>
+                          <input type="checkbox" checked={form.incluir_aforo!==false} onChange={e=>setForm(p=>({...p,incluir_aforo:e.target.checked}))} style={{margin:0}}/>
+                          <span style={{fontSize:11,color:"#92400e",fontWeight:600}}>Incluir aforo</span>
+                        </label>
+                        <div style={{flex:1}}>
+                          <label style={{display:"block",fontSize:9,color:"#92400e",marginBottom:3}}>Aforo (condicional)</label>
+                          <input type="number" disabled={form.incluir_aforo===false} value={form.aer_aforo??""} onChange={e=>setForm(p=>({...p,aer_aforo:e.target.value===""?"":Number(e.target.value)}))} style={{width:"100%",background:form.incluir_aforo===false?"#f1f5f9":"#ffffff",border:"1px solid #fed7aa",borderRadius:6,color:"#0f172a",padding:"6px 9px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                        </div>
+                      </div>
+                      {/* Total prefijado */}
+                      <div style={{background:"#fff",borderRadius:7,padding:"8px 12px",border:"1px solid #fed7aa",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{fontSize:11,color:"#92400e",fontWeight:700}}>Subtotal aduana neto</span>
+                        <span style={{fontSize:14,fontWeight:800,color:"#c47830"}}>{fmt((Number(form.aer_honorarios)||0)+(Number(form.aer_edi)||0)+(Number(form.aer_despacho)||0)+(Number(form.aer_aeropuerto)||0)+(form.incluir_aforo!==false?(Number(form.aer_aforo)||0):0))}</span>
                       </div>
                     </div>
                   )}
@@ -1739,8 +1913,14 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{fontSize:11,color:"#c9a055",letterSpacing:2,fontWeight:700,marginBottom:14,textTransform:"uppercase"}}>⭐ Tabla 3 — Resumen Ganancia ZAGA</div>
                     <ROW label="Ganancia por margen de precio" value={fmt(calcActual.ganMar)} accent="#c9a055"/>
                     <ROW label={`Servicio ZAGA ${form.pct_servicio}%`} value={fmt(calcActual.ganServ)} accent="#c9a055"/>
-                    {!form.pago_100&&<ROW label="Diferencia comisión (6.5% − real app)" value={fmt(calcActual.difCom)} accent="#aaa" sub/>}
-                    {calcActual.ganCda!==0&&<ROW label={`Diferencia ${form.cda_descripcion||"Certificado"} (cobrado − costo)`} value={fmt(calcActual.ganCda)} accent={calcActual.ganCda>=0?"#c9a055":"#c0392b"} sub/>}
+                    {!form.pago_100&&!calcActual.isAereo&&<ROW label="Diferencia comisión (6.5% − real app)" value={fmt(calcActual.difCom)} accent="#aaa" sub/>}
+                    {calcActual.isAereo&&calcActual.aer&&(
+                      <>
+                        <ROW label="Diferencia IVA aduana (sobre venta − sobre costo)" value={fmt(calcActual.aer.difIvaAduana)} accent={calcActual.aer.difIvaAduana>=0?"#c9a055":"#c0392b"} sub/>
+                        {calcActual.aer.difArancel!==0&&<ROW label="Diferencia arancel (sin Form F)" value={fmt(calcActual.aer.difArancel)} accent={calcActual.aer.difArancel>=0?"#c9a055":"#c0392b"} sub/>}
+                      </>
+                    )}
+                    {!calcActual.isAereo&&calcActual.ganCda!==0&&<ROW label={`Diferencia ${form.cda_descripcion||"Certificado"} (cobrado − costo)`} value={fmt(calcActual.ganCda)} accent={calcActual.ganCda>=0?"#c9a055":"#c0392b"} sub/>}
                     <ROW label="GANANCIA IMPORTACIÓN (sin IVA)" value={fmt(calcActual.ganImp)} big topLine/>
                     {(form.requiere_factura||form.con_iva)&&(
                       <div style={{background:"#fff7ed",borderRadius:8,padding:"12px 14px",margin:"10px 0",border:"1px solid #fed7aa"}}>
