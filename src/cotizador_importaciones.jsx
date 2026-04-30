@@ -1308,8 +1308,14 @@ Número de seguimiento: ${c.nro}`;
                   </div>
                   <div style={{textAlign:"right"}}>
                     <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:2}}>Precio final / unidad (todo incluido)</div>
-                    <div style={{fontSize:22,fontWeight:800,color:"#0f7040"}}>{fmt(vistaData.calc?.pfUnd)}<span style={{fontSize:11,color:"#64748b",fontWeight:400,marginLeft:3}}>neto</span></div>
-                    {vistaData.con_iva&&<div style={{fontSize:15,fontWeight:700,color:"#1a6644"}}>{fmt((vistaData.calc?.pfUnd||0)*1.19)}<span style={{fontSize:10,color:"#64748b",fontWeight:400,marginLeft:3}}>c/IVA</span></div>}
+                    {vistaData.con_iva ? (
+                      <>
+                        <div style={{fontSize:22,fontWeight:800,color:"#0f7040"}}>{fmt((vistaData.calc?.pfUnd||0)*1.19)}<span style={{fontSize:11,color:"#64748b",fontWeight:400,marginLeft:3}}>c/IVA</span></div>
+                        <div style={{fontSize:13,fontWeight:600,color:"#64748b"}}>{fmt(vistaData.calc?.pfUnd)}<span style={{fontSize:10,color:"#94a3b8",fontWeight:400,marginLeft:3}}>neto</span></div>
+                      </>
+                    ) : (
+                      <div style={{fontSize:22,fontWeight:800,color:"#0f7040"}}>{fmt(vistaData.calc?.pfUnd)}<span style={{fontSize:11,color:"#64748b",fontWeight:400,marginLeft:3}}>neto</span></div>
+                    )}
                     <div style={{fontSize:10,color:"#64748b"}}>Incluye comisiones y servicio</div>
                   </div>
                 </div>
@@ -1385,7 +1391,7 @@ Número de seguimiento: ${c.nro}`;
                         </tbody>
                       </table>
                       <div style={{fontSize:10,color:"#92400e",marginTop:10,lineHeight:1.6}}>
-                        <strong>Condiciones:</strong> Pago 100% anticipado · Plazo 5-10 días hábiles desde confirmación · Form F {vistaData.form_f_incluido!==false?"incluido (TLC Chile-China)":"NO incluido (arancel 6% trasladado)"} · Cotización válida 15 días corridos.
+                        <strong>Condiciones:</strong> Pago 100% anticipado.
                       </div>
                     </div>
                   ) : (vistaData.pago_100||Number(vistaData.pct_deposito)>=100) ? (
@@ -1427,7 +1433,7 @@ Número de seguimiento: ${c.nro}`;
                   <span style={{color:"#64748b",fontSize:12}}>TOTAL IMPORTACIÓN</span>
                   <div style={{textAlign:"right"}}>
                     <div style={{color:"#0f172a",fontSize:20,fontWeight:800}}>{vistaData.con_iva?fmt((vistaData.calc?.totCl||0)*1.19):fmt(vistaData.calc?.totCl)}</div>
-                    <div style={{color:"#64748b",fontSize:10}}>{fmtN(vistaData.unidades)} und · {fmt(vistaData.calc?.pfUnd)}/und</div>
+                    <div style={{color:"#64748b",fontSize:10}}>{fmtN(vistaData.unidades)} und · {vistaData.con_iva?fmt((vistaData.calc?.pfUnd||0)*1.19):fmt(vistaData.calc?.pfUnd)}/und{vistaData.con_iva?" c/IVA":""}</div>
                   </div>
                 </div>
                 {/* Consideraciones compactas */}
