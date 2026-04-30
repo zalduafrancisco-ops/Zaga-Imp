@@ -2086,6 +2086,104 @@ Número de seguimiento: ${c.nro}`;
                   </div>
                 )}
 
+                {/* ── PANEL VERIFICACIÓN AÉREO — desglose paso a paso ── */}
+                {form.tipo==="cliente"&&calcActual.isAereo&&calcActual.aer&&(()=>{
+                  const c=calcActual, aer=c.aer;
+                  // Caja in (cobrado al cliente)
+                  const ivaProducto = c.tCl * 0.19;
+                  const ivaAduCl   = c.cdaCl * 0.19;
+                  const ivaServ    = c.serv * 0.19;
+                  const cajaIn = c.tCl + ivaProducto + c.cdaCl + ivaAduCl + c.serv + ivaServ;
+                  // Caja out (pagado)
+                  const aChina   = c.tChNeto + c.ivaChina;
+                  const aAgencia = aer.aduFijo + aer.arancelReal + aer.ivaAgente;
+                  const aSII     = aer.ivaAduanaReal;
+                  const cajaOut  = aChina + aAgencia + aSII;
+                  // Saldo F29
+                  const debitoF29  = ivaProducto + ivaAduCl + ivaServ;
+                  const creditoF29 = c.ivaChina + aer.ivaAgente + aer.ivaAduanaReal;
+                  const saldoF29   = debitoF29 - creditoF29;
+                  // Verificación
+                  const cajaInmediata = cajaIn - cajaOut;
+                  const ganCalculada  = cajaInmediata - saldoF29;
+                  const matchOk = Math.abs(ganCalculada - c.ganImp) < 1;
+                  return (
+                    <div style={{background:"#fff",border:"2px solid #c47830",borderRadius:12,padding:18,marginBottom:16}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,paddingBottom:10,borderBottom:"1px solid #fed7aa"}}>
+                        <div style={{fontSize:12,color:"#c47830",fontWeight:800,letterSpacing:2,textTransform:"uppercase"}}>🔍 Verificación matemática — Aéreo</div>
+                        <div style={{fontSize:11,color:matchOk?"#15803d":"#c0392b",fontWeight:800,background:matchOk?"#f0fdf4":"#fef2f2",border:`1px solid ${matchOk?"#bbf7d0":"#fecaca"}`,borderRadius:20,padding:"3px 12px"}}>
+                          {matchOk?"✓ Cuadra":"✗ No cuadra"}
+                        </div>
+                      </div>
+                      {/* Datos base */}
+                      <div style={{background:"#f8fafc",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+                        <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Datos base</div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,fontSize:11}}>
+                          <div><div style={{color:"#94a3b8",fontSize:9}}>Unidades</div><div style={{fontWeight:700,color:"#0f172a"}}>{fmtN(form.unidades||0)}</div></div>
+                          <div><div style={{color:"#94a3b8",fontSize:9}}>Costo China/und</div><div style={{fontWeight:700,color:"#0f172a"}}>{fmt(Number(form.precio_china)||0)}</div></div>
+                          <div><div style={{color:"#94a3b8",fontSize:9}}>Venta/und</div><div style={{fontWeight:700,color:"#0f172a"}}>{fmt(c.pCUnd)}</div></div>
+                          <div><div style={{color:"#94a3b8",fontSize:9}}>Margen/und</div><div style={{fontWeight:700,color:"#1aa358"}}>{fmt(c.pCUnd-(Number(form.precio_china)||0))}</div></div>
+                        </div>
+                      </div>
+                      {/* CAJA IN */}
+                      <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"10px 12px",marginBottom:8}}>
+                        <div style={{fontSize:10,color:"#15803d",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>💰 Caja IN — Cobrado al cliente</div>
+                        <div style={{fontSize:11}}>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{color:"#475569"}}>Mercadería neta ({fmtN(form.unidades||0)} × {fmt(c.pCUnd)})</span><span style={{fontWeight:600}}>{fmt(c.tCl)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{color:"#475569"}}>+ IVA mercadería 19%</span><span style={{fontWeight:600}}>{fmt(ivaProducto)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{color:"#475569"}}>+ Gestión aduanera neta</span><span style={{fontWeight:600}}>{fmt(c.cdaCl)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{color:"#475569"}}>+ IVA aduana 19%</span><span style={{fontWeight:600}}>{fmt(ivaAduCl)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{color:"#475569"}}>+ Servicio ZAGA neto ({form.pct_servicio||6}%)</span><span style={{fontWeight:600}}>{fmt(c.serv)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{color:"#475569"}}>+ IVA servicio 19%</span><span style={{fontWeight:600}}>{fmt(ivaServ)}</span></div>
+                          <div style={{borderTop:"1px solid #bbf7d0",marginTop:5,paddingTop:5,display:"flex",justifyContent:"space-between"}}><span style={{fontWeight:700,color:"#15803d"}}>Total caja in</span><span style={{fontWeight:800,color:"#15803d",fontSize:13}}>{fmt(cajaIn)}</span></div>
+                        </div>
+                      </div>
+                      {/* CAJA OUT */}
+                      <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,padding:"10px 12px",marginBottom:8}}>
+                        <div style={{fontSize:10,color:"#dc2626",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>💸 Caja OUT — Pagado por ZAGA</div>
+                        <div style={{fontSize:11}}>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{color:"#475569"}}>A China: producto {fmt(c.tChNeto)}{form.requiere_factura?` + IVA ${fmt(c.ivaChina)}`:""}</span><span style={{fontWeight:600}}>{fmt(aChina)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{color:"#475569"}}>A Agencia Aduana: {fmt(aer.aduFijo)}{aer.arancelReal>0?` + arancel ${fmt(aer.arancelReal)}`:""} + IVA {fmt(aer.ivaAgente)}</span><span style={{fontWeight:600}}>{fmt(aAgencia)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{color:"#475569"}}>Al SII: IVA aduana 19% × CIF real</span><span style={{fontWeight:600}}>{fmt(aSII)}</span></div>
+                          <div style={{borderTop:"1px solid #fecaca",marginTop:5,paddingTop:5,display:"flex",justifyContent:"space-between"}}><span style={{fontWeight:700,color:"#dc2626"}}>Total caja out</span><span style={{fontWeight:800,color:"#dc2626",fontSize:13}}>{fmt(cajaOut)}</span></div>
+                        </div>
+                      </div>
+                      {/* CAJA INMEDIATA */}
+                      <div style={{background:"#fef9c3",border:"1px solid #fde68a",borderRadius:8,padding:"8px 12px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{fontSize:12,fontWeight:700,color:"#854d0e"}}>= Caja inmediata (in − out)</span>
+                        <span style={{fontSize:14,fontWeight:800,color:cajaInmediata>=0?"#15803d":"#dc2626"}}>{fmt(cajaInmediata)}</span>
+                      </div>
+                      {/* F29 */}
+                      <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"10px 12px",marginBottom:8}}>
+                        <div style={{fontSize:10,color:"#1d4ed8",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>📋 F29 — mes siguiente</div>
+                        <div style={{fontSize:11}}>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span style={{color:"#475569"}}>Débito IVA (cobrado al cliente)</span><span style={{fontWeight:600,color:"#dc2626"}}>+{fmt(debitoF29)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span style={{color:"#475569"}}>Crédito IVA China</span><span style={{fontWeight:600,color:"#15803d"}}>−{fmt(c.ivaChina)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span style={{color:"#475569"}}>Crédito IVA agente</span><span style={{fontWeight:600,color:"#15803d"}}>−{fmt(aer.ivaAgente)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span style={{color:"#475569"}}>Crédito IVA aduana</span><span style={{fontWeight:600,color:"#15803d"}}>−{fmt(aer.ivaAduanaReal)}</span></div>
+                          <div style={{borderTop:"1px solid #bfdbfe",marginTop:5,paddingTop:5,display:"flex",justifyContent:"space-between"}}><span style={{fontWeight:700,color:"#1d4ed8"}}>Saldo F29 ({saldoF29>=0?"a pagar SII":"a favor — recupero"})</span><span style={{fontWeight:800,fontSize:13,color:saldoF29>=0?"#dc2626":"#15803d"}}>{saldoF29>=0?"+":""}{fmt(saldoF29)}</span></div>
+                        </div>
+                      </div>
+                      {/* RESULTADO FINAL */}
+                      <div style={{background:matchOk?"#040c18":"#fef2f2",borderRadius:10,padding:"14px 16px",marginTop:10}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                          <span style={{fontSize:11,color:matchOk?"#94a3b8":"#dc2626"}}>Caja inmediata − Saldo F29</span>
+                          <span style={{fontSize:13,fontWeight:700,color:matchOk?"#c9a055":"#dc2626"}}>{fmt(cajaInmediata)} − ({fmt(saldoF29)}) = {fmt(ganCalculada)}</span>
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${matchOk?"#f5c84444":"#fecaca"}`,paddingTop:10,marginTop:6}}>
+                          <span style={{fontSize:13,color:matchOk?"#e2e8f0":"#0f172a",fontWeight:700}}>Ganancia verificada</span>
+                          <span style={{fontSize:22,fontWeight:800,color:matchOk?"#c9a055":"#dc2626"}}>{fmt(ganCalculada)}</span>
+                        </div>
+                        <div style={{fontSize:10,color:matchOk?"#94a3b8":"#dc2626",marginTop:8,fontStyle:"italic",textAlign:"center"}}>
+                          {matchOk
+                            ? `✓ Coincide con "GANANCIA IMPORTACIÓN" de Tabla 3 (${fmt(c.ganImp)})`
+                            : `⚠️ NO coincide con Tabla 3 (${fmt(c.ganImp)}) — diferencia: ${fmt(ganCalculada-c.ganImp)}`}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
               </div>
             </div>
 
