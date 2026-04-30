@@ -76,7 +76,7 @@ const makeDefaultForm = (usuario) => ({
   fecha_llegada_real:"", sku_china:"",
   fulfillment_cliente:true, sku_bodega:"", fulfillment_producto_creado:false,
   fulfillment_costo_real:"", fulfillment_notas:"",
-  dim_largo:"", dim_ancho:"", dim_alto:"", dim_m3:"", dim_und_caja:"", dim_tipo:"caja",
+  dim_largo:"", dim_ancho:"", dim_alto:"", dim_m3:"", dim_und_caja:"", dim_tipo:"caja", peso_kg:"",
   negociacion_rondas:[], // [{fecha, nota, unidades_prop, precio_prop, estado:"pendiente"|"aplicada"|"rechazada"}]
   // propia
   precio_venta_und:"", pct_margen_objetivo:"",
@@ -1637,10 +1637,15 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
                       <NInput label="Unidades" field="unidades" form={form} setForm={setForm} placeholder="0"/>
                       <NInput label="Precio China / Unid $" field="precio_china" form={form} setForm={setForm} placeholder="0"/>
-                      <NInput label="% Depósito" field="pct_deposito" form={form} setForm={setForm} note="Ej: 30 = 30%"/>
-                      <NInput label="⚡ Comisión real APP $" field="comision_real" form={form} setForm={setForm} color="#b8922e" placeholder="0" note="Copia de la app"/>
+                      {form.transporte!=="aereo"&&<>
+                        <NInput label="% Depósito" field="pct_deposito" form={form} setForm={setForm} note="Ej: 30 = 30%"/>
+                        <NInput label="⚡ Comisión real APP $" field="comision_real" form={form} setForm={setForm} color="#b8922e" placeholder="0" note="Copia de la app"/>
+                      </>}
                     </div>
-                    {Number(form.comision_real)>0&&Number(form.precio_china)>0&&Number(form.unidades)>0&&(
+                    {form.transporte==="aereo"&&(
+                      <div style={{fontSize:11,color:"#92400e",background:"#fff7ed",borderRadius:7,padding:"6px 10px",border:"1px solid #fed7aa",marginBottom:8}}>✈️ Aéreo: pago 100% — depósito y comisión préstamo no aplican</div>
+                    )}
+                    {form.transporte!=="aereo"&&Number(form.comision_real)>0&&Number(form.precio_china)>0&&Number(form.unidades)>0&&(
                       <div style={{fontSize:11,color:"#666",background:"#f8fafc",borderRadius:7,padding:"6px 10px"}}>Tasa implícita: <span style={{color:"#334155"}}>{(Number(form.comision_real)/(Number(form.precio_china)*Number(form.unidades)*(1-Number(form.pct_deposito)/100))*100).toFixed(2)}%</span></div>
                     )}
 
@@ -1722,6 +1727,51 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                             </div>
                           )}
+
+                          {/* ── PESO (importante en aéreo) ── */}
+                          {(()=>{
+                            const pesoReal=Number(form.peso_kg)||0;
+                            // Volumen total cm³ → kg volumétrico (÷ 6000 estándar aéreo)
+                            const volCm3 = esCaja
+                              ? (Number(form.dim_largo)||0) * (Number(form.dim_ancho)||0) * (Number(form.dim_alto)||0) * (nCajas||0)
+                              : (Number(form.dim_largo)||0) * (Number(form.dim_ancho)||0) * (Number(form.dim_alto)||0) * unidades;
+                            const pesoVol = volCm3 / 6000;
+                            const pesoCobrable = Math.max(pesoReal, pesoVol);
+                            const isAereoForm = form.transporte === "aereo";
+                            return (
+                              <div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed "+(isAereoForm?"#fed7aa":"#e2e8f0")}}>
+                                <div style={{fontSize:9,color:isAereoForm?"#c47830":"#64748b",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>
+                                  ⚖️ Peso de la carga {isAereoForm?"(crítico en aéreo)":"(opcional)"}
+                                </div>
+                                <div style={{display:"grid",gridTemplateColumns:isAereoForm&&pesoReal>0&&pesoVol>0?"1fr 1fr 1fr":"1fr",gap:6,marginBottom:6}}>
+                                  <div>
+                                    <div style={{fontSize:9,color:"#64748b",marginBottom:3}}>Peso real total (kg)</div>
+                                    <input type="number" value={form.peso_kg||""} onChange={e=>setForm(p=>({...p,peso_kg:e.target.value}))} placeholder="Ej: 17" style={{width:"100%",background:"#f1f5f9",border:"1px solid "+(isAereoForm?"#c4783055":"#2d78c833"),borderRadius:6,color:isAereoForm?"#c47830":"#2d78c8",padding:"6px 8px",fontSize:12,outline:"none",boxSizing:"border-box",fontWeight:700}}/>
+                                  </div>
+                                  {isAereoForm&&pesoReal>0&&pesoVol>0&&(<>
+                                    <div>
+                                      <div style={{fontSize:9,color:"#64748b",marginBottom:3}}>Peso volumétrico (kg)</div>
+                                      <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:6,color:"#c47830",padding:"6px 8px",fontSize:12,fontWeight:700}}>{pesoVol.toFixed(2)} kg</div>
+                                      <div style={{fontSize:8,color:"#92400e",marginTop:2}}>L×A×H ÷ 6000</div>
+                                    </div>
+                                    <div>
+                                      <div style={{fontSize:9,color:"#64748b",marginBottom:3}}>Peso cobrable</div>
+                                      <div style={{background:pesoVol>pesoReal?"#fef3c7":"#f0fdf4",border:"1px solid "+(pesoVol>pesoReal?"#fde68a":"#bbf7d0"),borderRadius:6,color:pesoVol>pesoReal?"#92400e":"#15803d",padding:"6px 8px",fontSize:13,fontWeight:800,textAlign:"center"}}>{pesoCobrable.toFixed(2)} kg</div>
+                                      <div style={{fontSize:8,color:pesoVol>pesoReal?"#92400e":"#15803d",marginTop:2,fontWeight:700}}>{pesoVol>pesoReal?"⚠ Volumétrico manda":"✓ Real manda"}</div>
+                                    </div>
+                                  </>)}
+                                </div>
+                                {isAereoForm&&pesoReal>0&&pesoVol>pesoReal*1.15&&(
+                                  <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:6,padding:"6px 10px",fontSize:10,color:"#dc2626",lineHeight:1.5}}>
+                                    ⚠ Peso volumétrico mucho mayor que el real ({(pesoVol/pesoReal*100-100).toFixed(0)}% más). Verificar con el proveedor que el precio CIP cubra el flete por peso volumétrico.
+                                  </div>
+                                )}
+                                {isAereoForm&&pesoReal===0&&(
+                                  <div style={{fontSize:10,color:"#92400e",fontStyle:"italic"}}>💡 Pedirle el peso al proveedor para validar el flete CIP</div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })()}
