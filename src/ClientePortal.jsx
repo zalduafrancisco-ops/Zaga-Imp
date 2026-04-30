@@ -145,6 +145,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   }
 
   var STORAGE_KEY = "zaga_estados_"+perfil.id
+  var MSGS_KEY    = "zaga_msgs_leidos_"+perfil.id   // {[cotId]: timestamp ms del último mensaje admin leído}
 
   // Leer estados guardados en localStorage
   var leerEstadosGuardados = function(){
@@ -157,6 +158,29 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
       lista.forEach(function(c){ snap[c.id] = c.estado })
       localStorage.setItem(STORAGE_KEY, JSON.stringify(snap))
     }catch(e){}
+  }
+  // Mensajes admin leídos por cotización (timestamp ms)
+  var leerMsgsLeidos = function(){
+    try{ return JSON.parse(localStorage.getItem(MSGS_KEY)||"{}") }catch(e){ return {} }
+  }
+  var marcarMsgsLeidos = function(cotId, ts){
+    try{
+      var data = leerMsgsLeidos()
+      data[cotId] = ts || Date.now()
+      localStorage.setItem(MSGS_KEY, JSON.stringify(data))
+    }catch(e){}
+  }
+  // Calcula mensajes admin nuevos para una cotización (no leídos)
+  var contarMsgsNuevos = function(c, leidosMap){
+    var hist = Array.isArray(c.notas_cliente_historial) ? c.notas_cliente_historial : []
+    var ultimoLeidoTs = (leidosMap||{})[c.id] || 0
+    var nuevos = hist.filter(function(n){
+      if(n.autor !== "admin") return false
+      var t = n.fecha ? new Date(n.fecha).getTime() : 0
+      if(isNaN(t)) t = 0
+      return t > ultimoLeidoTs
+    })
+    return nuevos.length
   }
 
   useEffect(function(){
@@ -289,6 +313,35 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   }
   var setTab = function(id,t){ setTabs(function(p){ var n=Object.assign({},p); n[id]=t; return n }) }
 
+  // ── Cotizaciones con mensajes nuevos no leídos ────────────────
+  var msgsLeidosMap = leerMsgsLeidos()
+  var cotsConMsgsNuevos = cotizaciones
+    .map(function(c){ return { c: c, n: contarMsgsNuevos(c, msgsLeidosMap) } })
+    .filter(function(x){ return x.n > 0 })
+
+  // Helper: abre cotización en tab Mensajes y marca como leídos
+  var abrirCotEnMensajes = function(cotId){
+    setOpenId(cotId)
+    setTab(cotId, "mensajes")
+    // Marcar todos los mensajes admin como leídos
+    var cot = cotizaciones.find(function(x){ return x.id === cotId })
+    if(cot){
+      var hist = Array.isArray(cot.notas_cliente_historial) ? cot.notas_cliente_historial : []
+      var ultimoTs = hist
+        .filter(function(n){ return n.autor === "admin" && n.fecha })
+        .map(function(n){ var t=new Date(n.fecha).getTime(); return isNaN(t)?0:t })
+        .reduce(function(a,b){ return Math.max(a,b) }, 0)
+      if(ultimoTs > 0) marcarMsgsLeidos(cotId, ultimoTs)
+    }
+    // Forzar re-render para que el contador se actualice (cambiar referencia de cotizaciones)
+    setTimeout(function(){ setCotizaciones(function(p){ return p.slice() }) }, 50)
+    // Scroll a la cot
+    setTimeout(function(){
+      var el = document.getElementById("cot-"+cotId)
+      if(el) el.scrollIntoView({behavior:"smooth", block:"start"})
+    }, 200)
+  }
+
   // ── Totales sobre TODAS las cotizaciones ──────────────────────
   var todas = cotizaciones
   var activas = todas.filter(function(c){ return !RECHAZADAS_EST.includes(c.estado)&&!['completada','solicitud'].includes(c.estado) })
@@ -392,6 +445,44 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
           </div>
         ) : (
           <div>
+
+            {/* ── BANNER MENSAJES NUEVOS DE ZAGA ── */}
+            {cotsConMsgsNuevos.length>0&&(
+              <div style={{background:"linear-gradient(135deg,#040c18,#0f1e3a)",borderRadius:14,padding:"16px 18px",marginBottom:20,border:"1px solid rgba(201,160,85,0.4)",boxShadow:"0 4px 20px rgba(201,160,85,0.15)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                  <div style={{width:38,height:38,borderRadius:10,background:"#c9a055",border:"1px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0,color:"#040c18"}}>📬</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:800,color:"#c9a055"}}>
+                      {cotsConMsgsNuevos.length===1
+                        ? "1 cotización con mensaje nuevo de ZAGA"
+                        : cotsConMsgsNuevos.length+" cotizaciones con mensajes nuevos"}
+                    </div>
+                    <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Hacé click para ir directo a la conversación</div>
+                  </div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {cotsConMsgsNuevos.map(function(item){
+                    var c=item.c, count=item.n
+                    var hist=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[]
+                    var ultMsg=hist.filter(function(n){return n.autor==="admin"}).slice(-1)[0]
+                    var preview=ultMsg?(ultMsg.texto||"").slice(0,80):""
+                    var autorNombre=ultMsg&&ultMsg.autorNombre?"ZAGA — "+ultMsg.autorNombre:"ZAGA"
+                    return (
+                      <button key={c.id} onClick={function(){ abrirCotEnMensajes(c.id) }}
+                        style={{textAlign:"left",background:"rgba(201,160,85,0.10)",border:"1px solid rgba(201,160,85,0.3)",borderRadius:10,padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",fontFamily:"inherit",transition:"all .15s"}}
+                        onMouseEnter={function(e){e.currentTarget.style.background="rgba(201,160,85,0.18)"}}
+                        onMouseLeave={function(e){e.currentTarget.style.background="rgba(201,160,85,0.10)"}}>
+                        <span style={{background:"#c9a055",color:"#040c18",fontSize:11,fontWeight:800,borderRadius:6,padding:"2px 9px",flexShrink:0}}>{c.nro||"COT"}</span>
+                        <span style={{fontSize:12,color:"#e2e8f0",fontWeight:600,flex:1,minWidth:80}}>{c.producto}</span>
+                        <span style={{background:"#c0392b",color:"#fff",fontSize:10,fontWeight:800,borderRadius:20,padding:"2px 8px",flexShrink:0}}>{count} nuevo{count!==1?"s":""}</span>
+                        <span style={{fontSize:14,color:"#c9a055",flexShrink:0}}>→</span>
+                        {preview&&<div style={{fontSize:11,color:"#94a3b8",fontStyle:"italic",width:"100%",marginTop:4,paddingTop:6,borderTop:"1px solid rgba(255,255,255,0.05)"}}><strong style={{color:"#c9a055"}}>{autorNombre}:</strong> "{preview}{(ultMsg&&ultMsg.texto&&ultMsg.texto.length>80)?"...":""}"</div>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* ── BANNER CAMBIOS DE ESTADO ── */}
             {alertas.length>0&&!alertaVista&&(
@@ -682,7 +773,15 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               ? [["detalle","📋 Detalle"]]
                               : [["timeline","🗺️ Seguimiento"],["pagos","💳 Pagos"],["detalle","📋 Detalle"],["mensajes","💬 Mensajes"]]
                             ).map(function(item){
-                              return <button key={item[0]} className={"ztab"+(tab===item[0]?" on":"")} onClick={function(){ setTab(c.id,item[0]) }}>{item[1]}</button>
+                              return <button key={item[0]} className={"ztab"+(tab===item[0]?" on":"")} onClick={function(){
+                                setTab(c.id,item[0])
+                                // Si abre tab Mensajes: marcar todos los mensajes admin como leídos
+                                if(item[0]==="mensajes"){
+                                  var hist=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[]
+                                  var ultimoTs=hist.filter(function(n){return n.autor==="admin"&&n.fecha}).map(function(n){var t=new Date(n.fecha).getTime();return isNaN(t)?0:t}).reduce(function(a,b){return Math.max(a,b)},0)
+                                  if(ultimoTs>0){ marcarMsgsLeidos(c.id, ultimoTs); setTimeout(function(){ setCotizaciones(function(p){ return p.slice() }) }, 50) }
+                                }
+                              }}>{item[1]}{item[0]==="mensajes"&&contarMsgsNuevos(c, msgsLeidosMap)>0&&<span style={{background:"#c0392b",color:"#fff",fontSize:9,fontWeight:800,borderRadius:10,padding:"1px 6px",marginLeft:5}}>{contarMsgsNuevos(c, msgsLeidosMap)}</span>}</button>
                             })}
                           </div>
 
