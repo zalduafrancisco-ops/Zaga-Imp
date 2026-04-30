@@ -1431,10 +1431,10 @@ Número de seguimiento: ${c.nro}`;
                 {/* Consideraciones compactas */}
                 <div style={{background:"#f9f9f9",borderRadius:8,padding:"8px 12px",fontSize:11,color:"#666"}}>
                   <div style={{fontWeight:700,color:"#333",marginBottom:5}}>Consideraciones</div>
-                  <div style={{marginBottom:3}}>• Llegada estimada: <strong>90 días</strong> desde confirmación y pago.</div>
+                  <div style={{marginBottom:3}}>• Llegada estimada: <strong>{vistaData.transporte==="aereo"?"30 días":"90 días"}</strong> desde confirmación y pago.</div>
                   {!vistaData.pago_100&&Number(vistaData.pct_deposito)<100&&<div style={{marginBottom:3}}>• El {100-Number(vistaData.pct_deposito)}% del valor queda financiado hasta la recepción.</div>}
                   {(vistaData.pago_100||Number(vistaData.pct_deposito)>=100)&&<div style={{marginBottom:3}}>• Pago 100% al confirmar la orden (sin financiamiento).</div>}
-                  <div style={{marginBottom:3}}>• Fulfillment disponible desde <strong>$1.200</strong> según necesidad.</div>
+                  <div style={{marginBottom:3}}>• Fulfillment disponible desde <strong>$1.200 + IVA</strong> según necesidad.</div>
                   {vistaData.notas&&<div style={{marginBottom:3}}>• {vistaData.notas}</div>}
                   <div>• Valores <strong>{vistaData.con_iva?"con IVA incluido":"sin IVA"}</strong>.</div>
                 </div>
