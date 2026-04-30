@@ -888,7 +888,10 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                   // Mensajes del chat cliente
                                   var chatMsgs=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
                                   var mensajes=chatMsgs.map(function(n,i){
-                                    return {_key:"cm"+i,texto:n.texto,fecha:n.fecha,autor:n.autor,autorNombre:n.autor==="cliente"?(perfil.nombre||"Tú"):"ZAGA",tipo:"chat",ts:parseFecha(n.fecha).getTime()||i,pending:n._pending===true};
+                                    var nombre = n.autor==="cliente"
+                                      ? (perfil.nombre||"Tú")
+                                      : (n.autorNombre ? "ZAGA — "+n.autorNombre : "ZAGA");
+                                    return {_key:"cm"+i,texto:n.texto,fecha:n.fecha,autor:n.autor,autorNombre:nombre,tipo:"chat",ts:parseFecha(n.fecha).getTime()||i,pending:n._pending===true};
                                   });
                                   // Unificar y ordenar cronológicamente
                                   var todos=[...notasZaga,...mensajes].sort(function(a,b){return a.ts-b.ts;});

@@ -2698,7 +2698,7 @@ Número de seguimiento: ${c.nro}`;
                                   )}
                                   <button disabled={!(notaClienteInput[c.id]||"").trim()} onClick={async()=>{
                                     const txt=(notaClienteInput[c.id]||"").trim(); if(!txt) return;
-                                    const nuevaNota={id:Date.now().toString(),autor:"admin",texto:txt,fecha:new Date().toISOString(),leida_por_admin:true};
+                                    const nuevaNota={id:Date.now().toString(),autor:"admin",autorNombre:usuario?.nombre||"ZAGA",texto:txt,fecha:new Date().toISOString(),leida_por_admin:true};
                                     const hist=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
                                     await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_cliente_historial:[...hist,nuevaNota]}:x));
                                     setNotaClienteInput(p=>({...p,[c.id]:""}));
@@ -3266,7 +3266,7 @@ Número de seguimiento: ${c.nro}`;
                                       <button disabled={!(notaClienteInput[c.id]||"").trim()} onClick={async()=>{
                                         const txt=(notaClienteInput[c.id]||"").trim(); if(!txt) return;
                                         if(txt.length>2000){showToast("Máximo 2000 caracteres","err");return;}
-                                        const nuevaNota={id:Date.now().toString(),autor:"admin",texto:txt,fecha:new Date().toISOString(),leida_por_admin:true};
+                                        const nuevaNota={id:Date.now().toString(),autor:"admin",autorNombre:usuario?.nombre||"ZAGA",texto:txt,fecha:new Date().toISOString(),leida_por_admin:true};
                                         const hist=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
                                         await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_cliente_historial:[...hist,nuevaNota]}:x));
                                         setNotaClienteInput(p=>({...p,[c.id]:""}));
