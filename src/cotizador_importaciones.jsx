@@ -132,7 +132,10 @@ function calcCliente(d) {
 
   // ── Lado China ──
   const tChNeto=pCh*u;                          // costo producto sin IVA
-  const ivaChina=conFact?tChNeto*0.19:0;        // IVA que pago al final (2do pago)
+  // En aéreo (importación) China NO emite factura con IVA chileno → ivaChina siempre 0.
+  // El IVA chileno se paga una sola vez en aduana al SII sobre el CIF declarado.
+  // Para marítimo o compras locales con factura, ivaChina aplica normal.
+  const ivaChina = (conFact && !isAereo) ? tChNeto*0.19 : 0;
   const tCh=tChNeto+ivaChina;                   // total real pagado a China
   const totCh=tChNeto+comREff+ivaChina+cda, cRUnd=u>0?totCh/u:0;
   const dCh=pago100?0:tChNeto*pDep, prCh=pago100?0:tChNeto*(1-pDep); // split 30/70 solo si NO pago 100%
@@ -1893,8 +1896,8 @@ Número de seguimiento: ${c.nro}`;
                   <ROW label="Unidades" value={fmtN(form.unidades||0)}/>
                   <ROW label="Precio China por unidad" value={fmt(form.precio_china||0)}/>
                   <ROW label="Total producto (neto)" value={fmt(calcActual.tChNeto)} big/>
-                  {form.requiere_factura&&<ROW label="IVA 19% (compra con factura a China)" value={fmt(calcActual.ivaChina)} accent="#c0392b"/>}
-                  {form.requiere_factura&&<ROW label="Total producto con IVA" value={fmt(calcActual.tCh)} accent="#c47830" big/>}
+                  {form.requiere_factura&&!calcActual.isAereo&&<ROW label="IVA 19% (compra con factura a China)" value={fmt(calcActual.ivaChina)} accent="#c0392b"/>}
+                  {form.requiere_factura&&!calcActual.isAereo&&<ROW label="Total producto con IVA" value={fmt(calcActual.tCh)} accent="#c47830" big/>}
                   {!form.pago_100&&<ROW label={`Depósito ${form.pct_deposito}%`} value={fmt(calcActual.dCh)} sub/>}
                   {!form.pago_100&&<ROW label={`Préstamo ${100-Number(form.pct_deposito)}%`} value={fmt(calcActual.prCh)} sub/>}
                   {!form.pago_100&&!calcActual.isAereo&&<ROW label="Comisión real según APP" value={fmt(calcActual.comR)} accent="#b8922e"/>}
@@ -1909,7 +1912,7 @@ Número de seguimiento: ${c.nro}`;
                     const totalDesembolso = aChina + aAgencia + aSII;
                     return (
                       <>
-                        <PAYBOX label="✈️ PAGO a China (producto CIP)" amount={fmt(aChina)} color="#2d78c8" detail={`Producto ${fmt(calcActual.tChNeto)}${form.requiere_factura?` + IVA China ${fmt(calcActual.ivaChina)}`:""} — al confirmar`}/>
+                        <PAYBOX label="✈️ PAGO a China (producto CIP)" amount={fmt(aChina)} color="#2d78c8" detail={`Producto CIP Santiago ${fmt(calcActual.tChNeto)} — sin IVA chileno (importación) — al confirmar`}/>
                         <PAYBOX label="🏢 PAGO a Agencia Aduana" amount={fmt(aAgencia)} color="#c47830" detail={`Servicios ${fmt(aer.aduFijo)}${aer.arancelReal>0?` + arancel ${fmt(aer.arancelReal)}`:""} + IVA agente ${fmt(aer.ivaAgente)} — al despacho`}/>
                         <PAYBOX label="🏛️ IVA Aduana al SII" amount={fmt(aSII)} color="#7c3aed" detail={`19% × CIF${aer.arancelReal>0?" + arancel":""} ${fmt(aer.ivaAduanaReal)} — al despacho · recuperable como crédito fiscal F29`}/>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:6,border:"1px dashed #cbd5e1"}}>
@@ -2024,7 +2027,8 @@ Número de seguimiento: ${c.nro}`;
                         {/* Débito */}
                         {form.con_iva&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#64748b"}}>IVA cobrado al cliente (débito fiscal)</span><span style={{color:"#1aa358",fontWeight:600}}>+{fmt(calcActual.ivaCliente)}</span></div>}
                         {/* Crédito desglosado */}
-                        {form.requiere_factura&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#64748b"}}>· IVA pagado a China (crédito)</span><span style={{color:"#c0392b",fontWeight:600}}>−{fmt(calcActual.ivaChina)}</span></div>}
+                        {form.requiere_factura&&!calcActual.isAereo&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#64748b"}}>· IVA pagado a China (crédito)</span><span style={{color:"#c0392b",fontWeight:600}}>−{fmt(calcActual.ivaChina)}</span></div>}
+                        {calcActual.isAereo&&form.requiere_factura&&<div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4,fontStyle:"italic"}}><span style={{color:"#94a3b8"}}>· China (importación) — sin IVA chileno</span><span style={{color:"#94a3b8"}}>$0</span></div>}
                         {calcActual.isAereo&&calcActual.aer&&(<>
                           <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#64748b"}}>· IVA agente aduana (crédito)</span><span style={{color:"#c0392b",fontWeight:600}}>−{fmt(calcActual.aer.ivaAgente)}</span></div>
                           <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#64748b"}}>· IVA aduana SII (crédito)</span><span style={{color:"#c0392b",fontWeight:600}}>−{fmt(calcActual.aer.ivaAduanaReal)}</span></div>
