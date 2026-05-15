@@ -3479,7 +3479,7 @@ Número de seguimiento: ${c.nro}`;
                 const nuevoNro="OP-"+String(operaciones.length+1).padStart(3,"0");
                 setOpForm({
                   nro:nuevoNro, cliente:"", estado:"borrador", cotizaciones:[],
-                  costos_china:{ comision_pct:5, flete_usd_kg:9.55, peso_kg:0, cbm:0, logistica_rmb:350, otros_usd:200, form_f_usd_por_producto:25, seguro_pct:0.2 },
+                  costos_china:{ productos_rmb:0, comision_pct:5, flete_usd_kg:9.55, peso_kg:0, cbm:0, logistica_rmb:350, otros_usd:200, form_f_usd_por_producto:25, seguro_pct:0.2 },
                   costos_chile:{ aduana_neta:331000, iva_agente:62890, aforo_incluido:true },
                   pago:{ tc_efectivo:980, comisiones_wu:65000, metodo_pago:"WU" },
                   distribucion:"cbm",
@@ -3559,6 +3559,7 @@ Número de seguimiento: ${c.nro}`;
                 <div style={{borderTop:"1px solid #e2e8f0",paddingTop:14,marginBottom:14}}>
                   <div style={{fontSize:12,fontWeight:700,color:"#2d78c8",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>🇨🇳 Costos China</div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10}}>
+                    <div><label style={{fontSize:10,color:"#64748b"}}><b>Productos total RMB</b></label><input type="number" value={opForm.costos_china.productos_rmb||0} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,productos_rmb:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #2d78c8",borderRadius:6,marginTop:2,outline:"none",background:"#eff6ff"}}/></div>
                     <div><label style={{fontSize:10,color:"#64748b"}}>Comisión agente %</label><input type="number" step="0.1" value={opForm.costos_china.comision_pct} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,comision_pct:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
                     <div><label style={{fontSize:10,color:"#64748b"}}>Flete USD/kg</label><input type="number" step="0.01" value={opForm.costos_china.flete_usd_kg} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,flete_usd_kg:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
                     <div><label style={{fontSize:10,color:"#64748b"}}>Peso total (kg)</label><input type="number" step="0.1" value={opForm.costos_china.peso_kg} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,peso_kg:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
@@ -3585,20 +3586,22 @@ Número de seguimiento: ${c.nro}`;
                   const cots=cotizaciones.filter(c=>opForm.cotizaciones.includes(c.id));
                   const cc=opForm.costos_china, ch=opForm.costos_chile, pg=opForm.pago;
                   const tc=Number(pg.tc_efectivo)||950, tcRmb=tc/7.2;
-                  // Costos en CLP
-                  const totalProductosRmb=cots.reduce((s,c)=>s+(Number(c.precio_china)||0)*(Number(c.unidades)||0),0);
-                  const productosCLP=totalProductosRmb*tcRmb;
-                  const comisionCLP=productosCLP*(cc.comision_pct/100);
+                  // Productos en RMB (ingresado manualmente por el agente)
+                  const productosRMB=Number(cc.productos_rmb)||0;
+                  const productosCLP=productosRMB*tcRmb;
+                  const comisionRMB=productosRMB*(cc.comision_pct/100);
+                  const comisionCLP=comisionRMB*tcRmb;
                   const fleteCLP=(Number(cc.flete_usd_kg)||0)*(Number(cc.peso_kg)||0)*tc;
                   const logisticaCLP=(Number(cc.logistica_rmb)||0)*tcRmb;
                   const otrosCLP=(Number(cc.otros_usd)||0)*tc;
                   const formFCLP=(Number(cc.form_f_usd_por_producto)||0)*cots.length*tc;
-                  const seguroCLP=productosCLP*(cc.seguro_pct/100);
+                  const seguroRMB=productosRMB*(cc.seguro_pct/100);
+                  const seguroCLP=seguroRMB*tcRmb;
                   const aduanaCLP=(Number(ch.aduana_neta)||0)+(Number(ch.iva_agente)||0);
                   const wuCLP=Number(pg.comisiones_wu)||0;
                   const costoTotal=productosCLP+comisionCLP+fleteCLP+logisticaCLP+otrosCLP+formFCLP+seguroCLP+aduanaCLP+wuCLP;
                   const totalUnidades=cots.reduce((s,c)=>s+(Number(c.unidades)||0),0);
-                  const totalCBM=Number(cc.cbm)||cots.reduce((s,c)=>s+(Number(c.dim_m3)||0)*(Number(c.unidades)||0),0)/1;
+                  const totalCBM=Number(cc.cbm)||0;
                   const margen=Number(opForm.margen_objetivo)/100;
                   const ventaNetaObj=costoTotal/(1-margen);
                   const ventaCIvaObj=ventaNetaObj*1.19;
