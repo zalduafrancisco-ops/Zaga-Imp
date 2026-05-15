@@ -288,6 +288,12 @@ export default function App({ supabase, usuario, onLogout }){
   const [form,setForm]                   = useState(defaultForm);
   const [cotizaciones,setCotizaciones]   = useState([]);
   const cotizacionesRef = useRef([]);
+  // Operaciones consolidadas (aéreas)
+  const [operaciones, setOperaciones] = useState([]);
+  const [opEditId, setOpEditId] = useState(null);          // operación en edición
+  const [opOpenId, setOpOpenId] = useState(null);          // operación expandida en lista
+  const [opForm, setOpForm] = useState(null);              // formulario operación
+  const [opDistribucion, setOpDistribucion] = useState("cbm"); // cbm | unidades
   const [editId,setEditId]               = useState(null);
   const [openId,setOpenId]               = useState(null);
   const [filterEstado,setFilterEstado]   = useState("todos");
@@ -364,6 +370,13 @@ export default function App({ supabase, usuario, onLogout }){
         try{ const r=localStorage.getItem("zaga_v6"); if(r){ const d=JSON.parse(r); cotizacionesRef.current=d; setCotizaciones(d); } }catch(_){}
         showToast("Error de conexión — usando datos locales","err");
       }
+      // Cargar operaciones consolidadas
+      try{
+        const {data:opData}=await supabase.from("operaciones").select("id,datos,created_at,updated_at").order("created_at",{ascending:false});
+        if(opData&&Array.isArray(opData)){
+          setOperaciones(opData.map(r=>({...r.datos,id:r.id,_created:r.created_at,_updated:r.updated_at})));
+        }
+      }catch(e){ /* tabla operaciones puede no existir aún */ }
       setCargando(false);
     };
     cargar();
@@ -793,7 +806,7 @@ export default function App({ supabase, usuario, onLogout }){
 
         {/* NAV TABS */}
         <div className="nav-tabs" style={{maxWidth:1280,margin:"0 auto",padding:"0 24px",display:"flex",gap:0,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-          {[["calc","Calculadora"],["tracker",`Tracker (${cotizaciones.length})`],["dashboard","Dashboard"],["clientes","Clientes"],["luisa","Luisa"]].map(([k,l])=>(
+          {[["calc","Calculadora"],["tracker",`Tracker (${cotizaciones.length})`],["operaciones",`✈️ Operaciones${operaciones.length>0?` (${operaciones.length})`:""}`],["dashboard","Dashboard"],["clientes","Clientes"],["luisa","Luisa"]].map(([k,l])=>(
             <button key={k} onClick={()=>setTab(k)} style={{
               background:"transparent",
               color:tab2===k?"#ffffff":"rgba(255,255,255,0.4)",
@@ -3450,6 +3463,264 @@ Número de seguimiento: ${c.nro}`;
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* ══ OPERACIONES CONSOLIDADAS AÉREAS ══ */}
+        {tab2==="operaciones"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            {/* Header + crear nueva */}
+            <div style={{background:"#fff",borderRadius:12,padding:"18px 22px",border:"1px solid #e2e8f0",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+              <div>
+                <div style={{fontSize:18,fontWeight:800,color:"#040c18"}}>✈️ Operaciones Consolidadas Aéreas</div>
+                <div style={{fontSize:12,color:"#64748b",marginTop:4}}>Agrupa varias cotizaciones en un solo envío con costos compartidos (China + flete + aduana)</div>
+              </div>
+              <button onClick={()=>{
+                const nuevoNro="OP-"+String(operaciones.length+1).padStart(3,"0");
+                setOpForm({
+                  nro:nuevoNro, cliente:"", estado:"borrador", cotizaciones:[],
+                  costos_china:{ comision_pct:5, flete_usd_kg:9.55, peso_kg:0, cbm:0, logistica_rmb:350, otros_usd:200, form_f_usd_por_producto:25, seguro_pct:0.2 },
+                  costos_chile:{ aduana_neta:331000, iva_agente:62890, aforo_incluido:true },
+                  pago:{ tc_efectivo:980, comisiones_wu:65000, metodo_pago:"WU" },
+                  distribucion:"cbm",
+                  margen_objetivo:25,
+                  notas:""
+                });
+                setOpEditId(null);
+              }} style={{background:"#040c18",color:"#c9a055",border:"none",borderRadius:8,padding:"10px 22px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                + Nueva operación
+              </button>
+            </div>
+
+            {/* Formulario crear/editar */}
+            {opForm&&(
+              <div style={{background:"#fff",borderRadius:12,padding:"20px 24px",border:"1px solid #c9a05544"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                  <div style={{fontSize:15,fontWeight:800,color:"#040c18"}}>{opEditId?"Editar":"Nueva"} operación · <span style={{color:"#c9a055"}}>{opForm.nro}</span></div>
+                  <button onClick={()=>{setOpForm(null);setOpEditId(null);}} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:7,padding:"5px 12px",fontSize:12,cursor:"pointer"}}>Cancelar</button>
+                </div>
+
+                {/* Datos base */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
+                  <div>
+                    <label style={{fontSize:10,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Cliente</label>
+                    <select value={opForm.cliente} onChange={e=>setOpForm(p=>({...p,cliente:e.target.value,cotizaciones:[]}))} style={{width:"100%",padding:"8px 10px",fontSize:13,border:"1px solid #e2e8f0",borderRadius:7,marginTop:3,outline:"none"}}>
+                      <option value="">Seleccionar cliente...</option>
+                      {[...new Set(cotizaciones.filter(c=>c.tipo!=="propia"&&c.transporte==="aereo"&&!c.operacion_id).map(c=>c.cliente).filter(Boolean))].sort().map(cl=>(
+                        <option key={cl} value={cl}>{cl}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Estado</label>
+                    <select value={opForm.estado} onChange={e=>setOpForm(p=>({...p,estado:e.target.value}))} style={{width:"100%",padding:"8px 10px",fontSize:13,border:"1px solid #e2e8f0",borderRadius:7,marginTop:3,outline:"none"}}>
+                      <option value="borrador">📝 Borrador</option>
+                      <option value="cotizada">💬 Cotizada al cliente</option>
+                      <option value="aceptada">✅ Aceptada</option>
+                      <option value="pagada">💰 Pagada por cliente</option>
+                      <option value="en_china">🇨🇳 En China</option>
+                      <option value="en_camino">✈️ En camino</option>
+                      <option value="en_chile">🇨🇱 En Chile</option>
+                      <option value="completada">✓ Completada</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Margen objetivo %</label>
+                    <input type="number" value={opForm.margen_objetivo} onChange={e=>setOpForm(p=>({...p,margen_objetivo:Number(e.target.value)||25}))} style={{width:"100%",padding:"8px 10px",fontSize:13,border:"1px solid #e2e8f0",borderRadius:7,marginTop:3,outline:"none"}}/>
+                  </div>
+                </div>
+
+                {/* Selección de cotizaciones */}
+                {opForm.cliente&&(
+                  <div style={{marginBottom:14}}>
+                    <div style={{fontSize:11,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Cotizaciones aéreas disponibles del cliente</div>
+                    <div style={{background:"#f8fafc",borderRadius:8,padding:10,maxHeight:180,overflowY:"auto",border:"1px solid #e2e8f0"}}>
+                      {cotizaciones.filter(c=>c.cliente===opForm.cliente&&c.transporte==="aereo"&&(!c.operacion_id||opForm.cotizaciones.includes(c.id))).map(c=>{
+                        const selected=opForm.cotizaciones.includes(c.id);
+                        return (
+                          <div key={c.id} onClick={()=>setOpForm(p=>({...p,cotizaciones:selected?p.cotizaciones.filter(x=>x!==c.id):[...p.cotizaciones,c.id]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",background:selected?"#eef6ff":"transparent",borderRadius:6,cursor:"pointer",marginBottom:3,border:`1px solid ${selected?"#3d7fc4":"transparent"}`}}>
+                            <div style={{width:16,height:16,borderRadius:4,background:selected?"#3d7fc4":"#fff",border:`2px solid ${selected?"#3d7fc4":"#cbd5e1"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:900}}>{selected?"✓":""}</div>
+                            <div style={{flex:1}}>
+                              <span style={{fontSize:11,fontWeight:700,color:"#0f172a"}}>{c.nro}</span> · <span style={{fontSize:12,color:"#334155"}}>{c.producto}</span>
+                              <span style={{fontSize:10,color:"#64748b",marginLeft:8}}>· {fmtN(c.unidades||0)} und</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {cotizaciones.filter(c=>c.cliente===opForm.cliente&&c.transporte==="aereo").length===0&&(
+                        <div style={{textAlign:"center",padding:14,fontSize:12,color:"#94a3b8"}}>El cliente no tiene cotizaciones aéreas disponibles.</div>
+                      )}
+                    </div>
+                    <div style={{fontSize:11,color:"#64748b",marginTop:6}}>Seleccionadas: <strong>{opForm.cotizaciones.length}</strong> · Unidades totales: <strong>{fmtN(cotizaciones.filter(c=>opForm.cotizaciones.includes(c.id)).reduce((s,c)=>s+Number(c.unidades||0),0))}</strong></div>
+                  </div>
+                )}
+
+                {/* Costos consolidados */}
+                <div style={{borderTop:"1px solid #e2e8f0",paddingTop:14,marginBottom:14}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#2d78c8",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>🇨🇳 Costos China</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10}}>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Comisión agente %</label><input type="number" step="0.1" value={opForm.costos_china.comision_pct} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,comision_pct:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Flete USD/kg</label><input type="number" step="0.01" value={opForm.costos_china.flete_usd_kg} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,flete_usd_kg:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Peso total (kg)</label><input type="number" step="0.1" value={opForm.costos_china.peso_kg} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,peso_kg:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>CBM total (m³)</label><input type="number" step="0.001" value={opForm.costos_china.cbm} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,cbm:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Logística RMB</label><input type="number" value={opForm.costos_china.logistica_rmb} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,logistica_rmb:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Otros gastos USD</label><input type="number" value={opForm.costos_china.otros_usd} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,otros_usd:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Form F USD/producto</label><input type="number" value={opForm.costos_china.form_f_usd_por_producto} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,form_f_usd_por_producto:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Seguro %</label><input type="number" step="0.01" value={opForm.costos_china.seguro_pct} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,seguro_pct:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                  </div>
+                </div>
+
+                <div style={{borderTop:"1px solid #e2e8f0",paddingTop:14,marginBottom:14}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#c47830",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>🇨🇱 Costos Chile + Pago</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10}}>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Aduana neta CLP</label><input type="number" value={opForm.costos_chile.aduana_neta} onChange={e=>setOpForm(p=>({...p,costos_chile:{...p.costos_chile,aduana_neta:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>IVA agente CLP</label><input type="number" value={opForm.costos_chile.iva_agente} onChange={e=>setOpForm(p=>({...p,costos_chile:{...p.costos_chile,iva_agente:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>TC efectivo (CLP/USD)</label><input type="number" value={opForm.pago.tc_efectivo} onChange={e=>setOpForm(p=>({...p,pago:{...p.pago,tc_efectivo:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Comisiones WU CLP</label><input type="number" value={opForm.pago.comisiones_wu} onChange={e=>setOpForm(p=>({...p,pago:{...p.pago,comisiones_wu:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                  </div>
+                </div>
+
+                {/* Resumen calculado */}
+                {opForm.cotizaciones.length>0&&(()=>{
+                  const cots=cotizaciones.filter(c=>opForm.cotizaciones.includes(c.id));
+                  const cc=opForm.costos_china, ch=opForm.costos_chile, pg=opForm.pago;
+                  const tc=Number(pg.tc_efectivo)||950, tcRmb=tc/7.2;
+                  // Costos en CLP
+                  const totalProductosRmb=cots.reduce((s,c)=>s+(Number(c.precio_china)||0)*(Number(c.unidades)||0),0);
+                  const productosCLP=totalProductosRmb*tcRmb;
+                  const comisionCLP=productosCLP*(cc.comision_pct/100);
+                  const fleteCLP=(Number(cc.flete_usd_kg)||0)*(Number(cc.peso_kg)||0)*tc;
+                  const logisticaCLP=(Number(cc.logistica_rmb)||0)*tcRmb;
+                  const otrosCLP=(Number(cc.otros_usd)||0)*tc;
+                  const formFCLP=(Number(cc.form_f_usd_por_producto)||0)*cots.length*tc;
+                  const seguroCLP=productosCLP*(cc.seguro_pct/100);
+                  const aduanaCLP=(Number(ch.aduana_neta)||0)+(Number(ch.iva_agente)||0);
+                  const wuCLP=Number(pg.comisiones_wu)||0;
+                  const costoTotal=productosCLP+comisionCLP+fleteCLP+logisticaCLP+otrosCLP+formFCLP+seguroCLP+aduanaCLP+wuCLP;
+                  const totalUnidades=cots.reduce((s,c)=>s+(Number(c.unidades)||0),0);
+                  const totalCBM=Number(cc.cbm)||cots.reduce((s,c)=>s+(Number(c.dim_m3)||0)*(Number(c.unidades)||0),0)/1;
+                  const margen=Number(opForm.margen_objetivo)/100;
+                  const ventaNetaObj=costoTotal/(1-margen);
+                  const ventaCIvaObj=ventaNetaObj*1.19;
+                  const gananciaObj=ventaNetaObj-costoTotal;
+                  return (
+                    <div style={{background:"#040c18",borderRadius:10,padding:"16px 18px",marginBottom:14}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#c9a055",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>📊 Resumen calculado</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,fontSize:12,color:"#e2e8f0"}}>
+                        <div>
+                          <div style={{color:"#94a3b8",fontSize:10,marginBottom:3}}>Costo total ZAGA</div>
+                          <div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{fmt(costoTotal)}</div>
+                        </div>
+                        <div>
+                          <div style={{color:"#94a3b8",fontSize:10,marginBottom:3}}>Venta NETA objetivo (margen {opForm.margen_objetivo}%)</div>
+                          <div style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(ventaNetaObj)}</div>
+                        </div>
+                        <div>
+                          <div style={{color:"#94a3b8",fontSize:10,marginBottom:3}}>Venta c/IVA objetivo</div>
+                          <div style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(ventaCIvaObj)}</div>
+                        </div>
+                        <div>
+                          <div style={{color:"#94a3b8",fontSize:10,marginBottom:3}}>Ganancia objetivo</div>
+                          <div style={{fontSize:16,fontWeight:700,color:"#c9a055"}}>{fmt(gananciaObj)}</div>
+                        </div>
+                        <div>
+                          <div style={{color:"#94a3b8",fontSize:10,marginBottom:3}}>Total unidades</div>
+                          <div style={{fontSize:16,fontWeight:700,color:"#fff"}}>{fmtN(totalUnidades)}</div>
+                        </div>
+                        <div>
+                          <div style={{color:"#94a3b8",fontSize:10,marginBottom:3}}>CBM total</div>
+                          <div style={{fontSize:16,fontWeight:700,color:"#fff"}}>{totalCBM.toFixed(3)} m³</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Botones acción */}
+                <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                  <button onClick={()=>{setOpForm(null);setOpEditId(null);}} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:7,padding:"9px 18px",fontSize:13,cursor:"pointer"}}>Cancelar</button>
+                  <button onClick={async()=>{
+                    if(!opForm.cliente||opForm.cotizaciones.length===0){showToast("Selecciona cliente y al menos 1 cotización","err");return;}
+                    try{
+                      if(opEditId){
+                        await supabase.from("operaciones").update({datos:opForm,updated_at:new Date().toISOString()}).eq("id",opEditId);
+                        setOperaciones(prev=>prev.map(o=>o.id===opEditId?{...opForm,id:opEditId}:o));
+                      } else {
+                        const {data,error}=await supabase.from("operaciones").insert({datos:opForm}).select("id").single();
+                        if(error)throw error;
+                        setOperaciones(prev=>[{...opForm,id:data.id},...prev]);
+                        // Marcar cotizaciones con operacion_id
+                        await Promise.all(opForm.cotizaciones.map(async cotId=>{
+                          const cot=cotizaciones.find(c=>c.id===cotId);
+                          if(cot){
+                            await supabase.from("cotizaciones").update({datos:{...cot,operacion_id:data.id}}).eq("id",cotId);
+                          }
+                        }));
+                        setCotizaciones(prev=>prev.map(c=>opForm.cotizaciones.includes(c.id)?{...c,operacion_id:data.id}:c));
+                      }
+                      showToast(`✓ Operación ${opEditId?"actualizada":"creada"}`);
+                      setOpForm(null);setOpEditId(null);
+                    }catch(e){
+                      showToast("Error al guardar operación: "+e.message,"err");
+                    }
+                  }} style={{background:"#040c18",color:"#c9a055",border:"none",borderRadius:7,padding:"9px 22px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                    💾 Guardar operación
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Lista de operaciones */}
+            {!opForm&&operaciones.length===0&&(
+              <div style={{textAlign:"center",padding:60,color:"#94a3b8",background:"#fff",borderRadius:12,border:"1px solid #e2e8f0"}}>
+                <div style={{fontSize:40,marginBottom:10}}>✈️</div>
+                <div style={{fontSize:14,fontWeight:600,marginBottom:4,color:"#475569"}}>Sin operaciones consolidadas aún</div>
+                <div style={{fontSize:12}}>Crea la primera para agrupar cotizaciones aéreas con costos compartidos.</div>
+              </div>
+            )}
+
+            {!opForm&&operaciones.length>0&&(
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {operaciones.map(op=>{
+                  const cots=cotizaciones.filter(c=>op.cotizaciones?.includes(c.id));
+                  const totalUnd=cots.reduce((s,c)=>s+Number(c.unidades||0),0);
+                  return (
+                    <div key={op.id} style={{background:"#fff",borderRadius:10,border:"1px solid #e2e8f0",padding:"14px 18px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+                        <div>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}>
+                            <span style={{fontSize:14,fontWeight:800,color:"#c9a055"}}>{op.nro}</span>
+                            <span style={{fontSize:14,fontWeight:700,color:"#040c18"}}>{op.cliente}</span>
+                            <span style={{fontSize:10,fontWeight:700,background:"#f1f5f9",color:"#64748b",padding:"2px 8px",borderRadius:10,textTransform:"uppercase"}}>{op.estado}</span>
+                          </div>
+                          <div style={{fontSize:11,color:"#64748b",marginTop:4}}>{op.cotizaciones?.length||0} cotizaciones · {fmtN(totalUnd)} unidades · Margen {op.margen_objetivo}%</div>
+                        </div>
+                        <div style={{display:"flex",gap:6}}>
+                          <button onClick={()=>{setOpForm(op);setOpEditId(op.id);}} style={{background:"#eef6ff",color:"#2d78c8",border:"1px solid #bfdbfe",borderRadius:6,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>✏️ Editar</button>
+                          <button onClick={async()=>{
+                            if(!confirm(`¿Eliminar operación ${op.nro}?`))return;
+                            try{
+                              await supabase.from("operaciones").delete().eq("id",op.id);
+                              // Limpiar operacion_id de cotizaciones asociadas
+                              await Promise.all((op.cotizaciones||[]).map(async cotId=>{
+                                const cot=cotizaciones.find(c=>c.id===cotId);
+                                if(cot){
+                                  const {operacion_id,...rest}=cot;
+                                  await supabase.from("cotizaciones").update({datos:rest}).eq("id",cotId);
+                                }
+                              }));
+                              setOperaciones(prev=>prev.filter(o=>o.id!==op.id));
+                              setCotizaciones(prev=>prev.map(c=>(op.cotizaciones||[]).includes(c.id)?(()=>{const{operacion_id,...rest}=c;return rest;})():c));
+                              showToast("✓ Operación eliminada");
+                            }catch(e){showToast("Error: "+e.message,"err");}
+                          }} style={{background:"#fef2f2",color:"#c0392b",border:"1px solid #fecaca",borderRadius:6,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>🗑️ Eliminar</button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
