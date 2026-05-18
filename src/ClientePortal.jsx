@@ -138,6 +138,8 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   var [enviandoId, setEnviandoId] = useState(null)     // cotización con envío en curso
   var [toast, setToast] = useState(null)                // toast efímero para notificaciones
   var prevCotsRef = useRef([])                          // snapshot previo para detectar notas nuevas del admin
+  var [operaciones, setOperaciones] = useState([])     // operaciones consolidadas del cliente
+  var [opOpenId, setOpOpenId] = useState(null)         // operación expandida
 
   var showToast = function(msg, type){
     setToast({ msg: msg, type: type||"ok" })
@@ -229,6 +231,22 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
         setCotizaciones(lista)
         guardarEstados(lista)
       }
+      // ── Cargar operaciones consolidadas donde el cliente tenga al menos 1 cotización ──
+      try{
+        var opRes = await supabase.from('operaciones').select('id,datos,created_at,updated_at').order('created_at',{ascending:false})
+        if(opRes.data && !opRes.error){
+          var ops = opRes.data.map(function(r){
+            var d = typeof r.datos==='string' ? JSON.parse(r.datos) : r.datos
+            return Object.assign({}, d, { id: r.id })
+          })
+          // IDs de cotizaciones del cliente actual (RLS ya filtró a las suyas)
+          var idsCliente = lista.map(function(c){ return c.id })
+          ops = ops.filter(function(o){
+            return Array.isArray(o.cotizaciones) && o.cotizaciones.some(function(cid){ return idsCliente.indexOf(cid)>=0 })
+          })
+          setOperaciones(ops)
+        }
+      }catch(e){ /* tabla operaciones puede no existir */ }
     }catch(e){ console.warn("Error cargando cotizaciones:", e) }
     if(miId === fetchIdRef.current) setLoading(false)
   }
@@ -374,6 +392,103 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     var q = busqueda.trim().toLowerCase()
     return pF&&(!q||(c.producto&&c.producto.toLowerCase().includes(q))||(c.nro&&c.nro.toLowerCase().includes(q)))
   })
+
+  // ── CBM individual de una cotización (m³ totales) ─────────────
+  var cbmDeCot = function(c){
+    var m3 = Number(c.dim_m3)||0
+    if(!m3) return 0
+    var u = Number(c.unidades)||0
+    if(c.dim_tipo==="caja" && Number(c.dim_und_caja)>0){
+      return m3 * Math.ceil(u/Number(c.dim_und_caja))
+    }
+    return m3 * u
+  }
+
+  // ── Calcular costos + precios consolidados de una operación ──
+  // Multi-cliente: el cliente actual solo ve SUS cotizaciones, pero el prorrateo
+  // se hace contra el CBM/peso TOTAL de la operación (declarado por el admin).
+  var calcOp = function(op){
+    if(!op || !Array.isArray(op.cotizaciones) || op.cotizaciones.length===0) return null
+    var cc = op.costos_china||{}, ch = op.costos_chile||{}, pg = op.pago||{}
+    var tc = Number(pg.tc_efectivo)||980
+    var tcRmb = tc/7.2
+    // Cotizaciones del cliente actual presentes en la operación (RLS ya filtró)
+    var misCots = cotizaciones.filter(function(c){ return op.cotizaciones.indexOf(c.id)>=0 })
+    if(misCots.length===0) return null
+
+    // Cantidad TOTAL de cotizaciones en la operación (incluye otros clientes)
+    var totalCotsOp = op.cotizaciones.length
+
+    var productosRMB = Number(cc.productos_rmb)||0
+    var productosCLP = productosRMB * tcRmb
+    var comisionCLP  = productosRMB * (Number(cc.comision_pct||0)/100) * tcRmb
+    var fleteCLP     = (Number(cc.flete_usd_kg)||0)*(Number(cc.peso_kg)||0)*tc
+    var logisticaCLP = (Number(cc.logistica_rmb)||0)*tcRmb
+    var otrosCLP     = (Number(cc.otros_usd)||0)*tc
+    var formFCLP     = (Number(cc.form_f_usd_por_producto)||0)*totalCotsOp*tc
+    var seguroCLP    = productosRMB*(Number(cc.seguro_pct||0)/100)*tcRmb
+    var aduanaCLP    = (Number(ch.aduana_neta)||0)+(Number(ch.iva_agente)||0)
+    var wuCLP        = Number(pg.comisiones_wu)||0
+    var costoTotal   = productosCLP+comisionCLP+fleteCLP+logisticaCLP+otrosCLP+formFCLP+seguroCLP+aduanaCLP+wuCLP
+
+    var margen = (Number(op.margen_objetivo)||25)/100
+    var ventaNetaTotal = costoTotal/(1-margen)
+    var ventaCIvaTotal = ventaNetaTotal*1.19
+
+    // Distribución por CBM/unidades — base TOTAL declarada en la operación
+    var distribucion = op.distribucion||"cbm"
+    var totalDist = 0
+    if(distribucion==="cbm"){
+      totalDist = Number(cc.cbm)||0
+      // fallback: si admin no cargó CBM total, usar suma de las mías (subestima si hay otros clientes)
+      if(totalDist===0) misCots.forEach(function(c){ totalDist += cbmDeCot(c) })
+    } else {
+      // distribucion=unidades: no tenemos unidades totales declaradas → fallback razonable
+      misCots.forEach(function(c){ totalDist += Number(c.unidades)||0 })
+    }
+
+    var porCot = misCots.map(function(c){
+      var partVal = distribucion==="cbm" ? cbmDeCot(c) : (Number(c.unidades)||0)
+      var pct = totalDist>0 ? partVal/totalDist : (1/totalCotsOp)
+      var ventaCIvaCot = ventaCIvaTotal * pct
+      var und = Number(c.unidades)||0
+      var precioCIvaUnit = und>0 ? ventaCIvaCot/und : 0
+      // Precio standalone c/IVA — desde calc o desde precio_venta_cliente
+      var cl = c.calc
+      var standaloneTotal = 0
+      if(cl){
+        standaloneTotal = c.con_iva ? (cl.totClIva||cl.totCl||0) : (cl.totCl||0)
+        if(!c.con_iva && standaloneTotal>0) standaloneTotal = standaloneTotal*1.19
+      } else if(Number(c.precio_venta_cliente)>0){
+        standaloneTotal = Number(c.precio_venta_cliente)*und*1.19
+      }
+      var standaloneUnit = und>0 ? standaloneTotal/und : 0
+      var ahorroUnit = standaloneUnit>0 ? (standaloneUnit-precioCIvaUnit) : 0
+      var ahorroTotal = ahorroUnit*und
+      var ahorroPct = standaloneUnit>0 ? (ahorroUnit/standaloneUnit)*100 : 0
+      return {
+        cot: c, cbm: cbmDeCot(c), pct: pct,
+        ventaCIvaCot: ventaCIvaCot, precioCIvaUnit: precioCIvaUnit,
+        standaloneTotal: standaloneTotal, standaloneUnit: standaloneUnit,
+        ahorroUnit: ahorroUnit, ahorroTotal: ahorroTotal, ahorroPct: ahorroPct,
+      }
+    })
+
+    // Totales DEL CLIENTE (solo sus cotizaciones)
+    var miVentaCIva = porCot.reduce(function(s,x){ return s+x.ventaCIvaCot }, 0)
+
+    return { costoTotal: costoTotal, ventaNetaTotal: ventaNetaTotal, ventaCIvaTotal: ventaCIvaTotal,
+             miVentaCIva: miVentaCIva, porCot: porCot, distribucion: distribucion,
+             cotsOp: misCots, margen: margen, totalCotsOp: totalCotsOp,
+             esMultiCliente: totalCotsOp > misCots.length }
+  }
+
+  // Labels y colores para estado de operación
+  var OP_EST_LABEL = {
+    borrador:"📝 Borrador", cotizada:"💬 Cotizada", aceptada:"✅ Aceptada",
+    pagada:"💰 Pagada", en_china:"🇨🇳 En China", en_camino:"✈️ En camino",
+    en_chile:"🇨🇱 En Chile", completada:"✓ Completada",
+  }
 
   return (
     <div style={{background:"#f1f5f9",minHeight:"100vh",fontFamily:"'Inter','Segoe UI',sans-serif",color:"#0f172a"}}>
@@ -639,6 +754,110 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
               </div>
             )}
 
+            {/* ── OPERACIONES CONSOLIDADAS ───────────────────────────── */}
+            {operaciones.length>0 && (
+              <div style={{marginBottom:20}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:8}}>
+                  <div style={{fontSize:15,fontWeight:800,color:"#0f172a",display:"flex",alignItems:"center",gap:8}}>
+                    ✈️ Operaciones consolidadas
+                    <span style={{background:"#c9a055",color:"#040c18",fontSize:11,fontWeight:800,borderRadius:20,padding:"2px 10px"}}>{operaciones.length}</span>
+                  </div>
+                  <div style={{fontSize:11,color:"#94a3b8"}}>Consolidando varias cotizaciones obtienes mejor precio por unidad</div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {operaciones.map(function(op){
+                    var calc = calcOp(op)
+                    if(!calc) return null
+                    var isOpenOp = opOpenId===op.id
+                    var ahorroOpTotal = calc.porCot.reduce(function(s,x){ return s+(x.ahorroTotal>0?x.ahorroTotal:0) }, 0)
+                    var undTotal = calc.cotsOp.reduce(function(s,c){ return s+(Number(c.unidades)||0) }, 0)
+                    var estLabel = OP_EST_LABEL[op.estado]||op.estado||"borrador"
+                    return (
+                      <div key={op.id} style={{background:"#fff",borderRadius:14,border:"1px solid #c9a05544",overflow:"hidden",boxShadow:"0 1px 4px rgba(201,160,85,0.08)"}}>
+                        {/* Header operación */}
+                        <div onClick={function(){ setOpOpenId(isOpenOp?null:op.id) }}
+                          style={{padding:"14px 18px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,flexWrap:"wrap",background:"linear-gradient(90deg,#ffffff,#fffbeb)"}}>
+                          <div style={{flex:1,minWidth:180}}>
+                            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6,flexWrap:"wrap"}}>
+                              <span style={{background:"#040c18",color:"#c9a055",fontSize:12,fontWeight:800,borderRadius:6,padding:"3px 10px"}}>{op.nro}</span>
+                              <span style={{fontSize:11,fontWeight:700,background:"#fef3c7",color:"#92400e",padding:"3px 10px",borderRadius:10}}>{estLabel}</span>
+                              {calc.esMultiCliente && (
+                                <span style={{background:"#eef6ff",color:"#2d78c8",fontSize:10,fontWeight:700,borderRadius:10,padding:"3px 9px",border:"1px solid #bfdbfe"}}>
+                                  Consolidado con otros clientes
+                                </span>
+                              )}
+                              {ahorroOpTotal>0 && (
+                                <span style={{background:"#dcfce7",color:"#16a34a",fontSize:11,fontWeight:800,borderRadius:10,padding:"3px 10px"}}>
+                                  💚 Ahorras {fmt(ahorroOpTotal)}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{fontSize:12,color:"#475569"}}>
+                              {calc.cotsOp.length} producto{calc.cotsOp.length!==1?"s":""} tuyo{calc.cotsOp.length!==1?"s":""} · <b>{fmtN(undTotal)}</b> unidades
+                            </div>
+                          </div>
+                          <div style={{textAlign:"right",flexShrink:0}}>
+                            <div style={{fontSize:20,fontWeight:800,color:"#040c18",lineHeight:1}}>{fmt(calc.miVentaCIva)}</div>
+                            <div style={{fontSize:10,color:"#94a3b8",marginTop:3}}>Tu total c/IVA</div>
+                          </div>
+                          <div style={{fontSize:18,color:"#cbd5e1",transition:"transform .2s",transform:isOpenOp?"rotate(180deg)":"none",flexShrink:0}}>⌄</div>
+                        </div>
+
+                        {/* Detalle expandido — comparativa por producto */}
+                        {isOpenOp && (
+                          <div style={{padding:"14px 18px 16px",borderTop:"1px solid #f1f5f9",background:"#fafbfc"}}>
+                            <div style={{fontSize:11,color:"#64748b",marginBottom:10,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>
+                              Comparativa por producto
+                            </div>
+                            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                              {calc.porCot.map(function(x){
+                                var img = getImagenes(x.cot.imagen_url)[0]
+                                return (
+                                  <div key={x.cot.id} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"12px 14px"}}>
+                                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}}>
+                                      {img && <img src={img} alt={x.cot.producto} onError={function(e){e.target.style.display='none'}} style={{width:48,height:48,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                                      <div style={{flex:1,minWidth:140}}>
+                                        <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{x.cot.producto}</div>
+                                        <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{x.cot.nro} · {fmtN(x.cot.unidades||0)} unidades</div>
+                                      </div>
+                                      {x.ahorroUnit>0 && (
+                                        <span style={{background:"#dcfce7",color:"#16a34a",fontSize:11,fontWeight:800,borderRadius:8,padding:"4px 10px",flexShrink:0}}>
+                                          −{x.ahorroPct.toFixed(0)}% · ahorras {fmt(x.ahorroTotal)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{display:"grid",gridTemplateColumns:x.standaloneUnit>0?"1fr 1fr":"1fr",gap:8}}>
+                                      {x.standaloneUnit>0 && (
+                                        <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 12px",border:"1px solid #e2e8f0",position:"relative"}}>
+                                          <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700}}>Solo este producto</div>
+                                          <div style={{fontSize:17,fontWeight:800,color:"#475569",lineHeight:1}}>{fmt(x.standaloneUnit)}</div>
+                                          <div style={{fontSize:10,color:"#94a3b8",marginTop:3}}>por unidad c/IVA</div>
+                                          <div style={{fontSize:11,color:"#64748b",marginTop:6,paddingTop:6,borderTop:"1px solid #e2e8f0"}}>Total: <b>{fmt(x.standaloneTotal)}</b></div>
+                                        </div>
+                                      )}
+                                      <div style={{background:"linear-gradient(135deg,#fffbeb,#fef3c7)",borderRadius:10,padding:"10px 12px",border:"1px solid #fde68a",position:"relative"}}>
+                                        <div style={{fontSize:9,color:"#92400e",textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700}}>Consolidado contigo</div>
+                                        <div style={{fontSize:17,fontWeight:800,color:"#92400e",lineHeight:1}}>{fmt(x.precioCIvaUnit)}</div>
+                                        <div style={{fontSize:10,color:"#a16207",marginTop:3}}>por unidad c/IVA</div>
+                                        <div style={{fontSize:11,color:"#92400e",marginTop:6,paddingTop:6,borderTop:"1px solid #fde68a"}}>Total: <b>{fmt(x.ventaCIvaCot)}</b></div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            <div style={{fontSize:10,color:"#94a3b8",marginTop:10,fontStyle:"italic",textAlign:"center"}}>
+                              Distribución: por {calc.distribucion==="cbm"?"volumen (m³)":"unidades"} · Precios finales c/IVA · Operación aérea con Form F · Plazo 20–25 días
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* FILTROS + BUSQUEDA */}
             <div style={{marginBottom:12}}>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
@@ -744,6 +963,11 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                             {c.unidades&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>📦 {fmtN(c.unidades)} und</span>}
                             {c.transporte&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>{c.transporte==='aereo'?'✈️ Aereo':c.transporte==='ambos'?'🚢✈️ Ambos':'🚢 Maritimo'}</span>}
                             {c.fecha_solicitud&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>📅 {fmtDate(c.fecha_solicitud)}</span>}
+                            {c.operacion_id&&(function(){
+                              var opMatch = operaciones.find(function(o){ return o.id===c.operacion_id })
+                              if(!opMatch) return null
+                              return <span onClick={function(e){ e.stopPropagation(); setOpOpenId(opMatch.id); setTimeout(function(){ window.scrollTo({top:0,behavior:'smooth'}) }, 50) }} style={{fontSize:11,color:"#92400e",background:"#fef3c7",borderRadius:6,padding:"2px 8px",border:"1px solid #fde68a",cursor:"pointer",fontWeight:700}}>✈️ En {opMatch.nro}</span>
+                            })()}
                             {isRech&&c.motivo_no_procesada&&<span style={{fontSize:11,color:"#94a3b8",background:"#fef2f2",borderRadius:6,padding:"2px 8px",border:"1px solid #fecaca"}}>Motivo: {c.motivo_no_procesada}</span>}
                             {c.link_alibaba&&<a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:"#2d78c8",background:"#eff6ff",borderRadius:6,padding:"2px 8px",border:"1px solid #bfdbfe",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:4}}>🔗 Ver referencia</a>}
                           </div>

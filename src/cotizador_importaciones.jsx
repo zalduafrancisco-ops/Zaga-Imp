@@ -433,21 +433,17 @@ export default function App({ supabase, usuario, onLogout }){
     }catch(e){ showToast("JSON inválido — revisa el texto pegado","err"); }
   };
 
-  // ── PERSIST: guarda en Supabase + localStorage como backup ────
+  // ── PERSIST: solo UPSERT. NUNCA borra cotizaciones de otros usuarios.
+  // BUG histórico: antes hacía DELETE de los IDs que no estaban en memoria local,
+  // lo que borraba el trabajo de quien estuviera editando en paralelo.
+  // Para borrar, usar handleDelete (DELETE explícito por ID).
   const persist=useCallback(async list=>{
     cotizacionesRef.current=list;
     setCotizaciones(list);
     // Guardar en localStorage como respaldo offline
     try{ localStorage.setItem("zaga_v6",JSON.stringify(list)); }catch(_){}
-    // Guardar en Supabase
+    // Guardar en Supabase — solo UPSERT, jamás DELETE masivo
     try{
-      // IDs actuales en memoria
-      const idsNuevos=new Set(list.map(c=>c.id));
-      // IDs que estaban antes (para detectar eliminaciones)
-      const {data:existentes}=await supabase.from("cotizaciones").select("id");
-      const idsExistentes=(existentes||[]).map(r=>r.id);
-      const idsEliminar=idsExistentes.filter(id=>!idsNuevos.has(id));
-      // Upsert toda la lista
       if(list.length>0){
         const rows=list.map(c=>({
           id:c.id,
@@ -459,10 +455,6 @@ export default function App({ supabase, usuario, onLogout }){
           datos:c
         }));
         await supabase.from("cotizaciones").upsert(rows,{onConflict:"id"});
-      }
-      // Eliminar las que ya no existen
-      if(idsEliminar.length>0){
-        await supabase.from("cotizaciones").delete().in("id",idsEliminar);
       }
     }catch(e){ console.warn("Supabase sync error:",e); }
   },[supabase]);
@@ -526,7 +518,25 @@ export default function App({ supabase, usuario, onLogout }){
 
   const handleMotivo=async(id,motivo)=>{ await persist(cotizaciones.map(c=>c.id===id?{...c,motivo_no_procesada:motivo}:c)); };
   const handleEdit=(c)=>{ setForm({...defaultForm,...c}); setEditId(c.id); setTab("calc"); };
-  const handleDelete=async id=>{ await persist(cotizaciones.filter(c=>c.id!==id)); showToast("Eliminada"); };
+  // DELETE explícito por ID (única forma autorizada de borrar). Confirma antes.
+  const handleDelete=async id=>{
+    const cot=cotizaciones.find(c=>c.id===id);
+    const nro=cot?.nro||id;
+    if(!confirm(`¿Eliminar definitivamente la cotización ${nro}? Esta acción no se puede deshacer.`)) return;
+    try{
+      // 1) Borrar en Supabase por ID exacto
+      const {error}=await supabase.from("cotizaciones").delete().eq("id",id);
+      if(error) throw error;
+      // 2) Quitar de memoria local + localStorage
+      const nueva=cotizaciones.filter(c=>c.id!==id);
+      cotizacionesRef.current=nueva;
+      setCotizaciones(nueva);
+      try{ localStorage.setItem("zaga_v6",JSON.stringify(nueva)); }catch(_){}
+      showToast(`✓ ${nro} eliminada`);
+    }catch(e){
+      showToast("Error al eliminar: "+(e.message||""),"err");
+    }
+  };
 
 
   const handleRenameCliente=async(nombreViejo,nombreNuevo)=>{
@@ -3501,16 +3511,7 @@ Número de seguimiento: ${c.nro}`;
                 </div>
 
                 {/* Datos base */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
-                  <div>
-                    <label style={{fontSize:10,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Cliente</label>
-                    <select value={opForm.cliente} onChange={e=>setOpForm(p=>({...p,cliente:e.target.value,cotizaciones:[]}))} style={{width:"100%",padding:"8px 10px",fontSize:13,border:"1px solid #e2e8f0",borderRadius:7,marginTop:3,outline:"none"}}>
-                      <option value="">Seleccionar cliente...</option>
-                      {[...new Set(cotizaciones.filter(c=>c.tipo!=="propia"&&c.transporte==="aereo"&&!c.operacion_id).map(c=>c.cliente).filter(Boolean))].sort().map(cl=>(
-                        <option key={cl} value={cl}>{cl}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
                   <div>
                     <label style={{fontSize:10,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Estado</label>
                     <select value={opForm.estado} onChange={e=>setOpForm(p=>({...p,estado:e.target.value}))} style={{width:"100%",padding:"8px 10px",fontSize:13,border:"1px solid #e2e8f0",borderRadius:7,marginTop:3,outline:"none"}}>
@@ -3530,30 +3531,48 @@ Número de seguimiento: ${c.nro}`;
                   </div>
                 </div>
 
-                {/* Selección de cotizaciones */}
-                {opForm.cliente&&(
-                  <div style={{marginBottom:14}}>
-                    <div style={{fontSize:11,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Cotizaciones aéreas disponibles del cliente</div>
-                    <div style={{background:"#f8fafc",borderRadius:8,padding:10,maxHeight:180,overflowY:"auto",border:"1px solid #e2e8f0"}}>
-                      {cotizaciones.filter(c=>c.cliente===opForm.cliente&&c.transporte==="aereo"&&(!c.operacion_id||opForm.cotizaciones.includes(c.id))).map(c=>{
-                        const selected=opForm.cotizaciones.includes(c.id);
-                        return (
-                          <div key={c.id} onClick={()=>setOpForm(p=>({...p,cotizaciones:selected?p.cotizaciones.filter(x=>x!==c.id):[...p.cotizaciones,c.id]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",background:selected?"#eef6ff":"transparent",borderRadius:6,cursor:"pointer",marginBottom:3,border:`1px solid ${selected?"#3d7fc4":"transparent"}`}}>
-                            <div style={{width:16,height:16,borderRadius:4,background:selected?"#3d7fc4":"#fff",border:`2px solid ${selected?"#3d7fc4":"#cbd5e1"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:900}}>{selected?"✓":""}</div>
-                            <div style={{flex:1}}>
-                              <span style={{fontSize:11,fontWeight:700,color:"#0f172a"}}>{c.nro}</span> · <span style={{fontSize:12,color:"#334155"}}>{c.producto}</span>
-                              <span style={{fontSize:10,color:"#64748b",marginLeft:8}}>· {fmtN(c.unidades||0)} und</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {cotizaciones.filter(c=>c.cliente===opForm.cliente&&c.transporte==="aereo").length===0&&(
-                        <div style={{textAlign:"center",padding:14,fontSize:12,color:"#94a3b8"}}>El cliente no tiene cotizaciones aéreas disponibles.</div>
-                      )}
-                    </div>
-                    <div style={{fontSize:11,color:"#64748b",marginTop:6}}>Seleccionadas: <strong>{opForm.cotizaciones.length}</strong> · Unidades totales: <strong>{fmtN(cotizaciones.filter(c=>opForm.cotizaciones.includes(c.id)).reduce((s,c)=>s+Number(c.unidades||0),0))}</strong></div>
+                {/* Selección de cotizaciones — MULTI-CLIENTE agrupadas por cliente */}
+                <div style={{marginBottom:14}}>
+                  <div style={{fontSize:11,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Cotizaciones aéreas — selecciona de uno o varios clientes</div>
+                  <div style={{background:"#f8fafc",borderRadius:8,padding:10,maxHeight:260,overflowY:"auto",border:"1px solid #e2e8f0"}}>
+                    {(()=>{
+                      const cotsDispo=cotizaciones.filter(c=>c.tipo!=="propia"&&c.transporte==="aereo"&&(!c.operacion_id||opForm.cotizaciones.includes(c.id)));
+                      const porCliente={};
+                      cotsDispo.forEach(c=>{const k=c.cliente||"Sin cliente";if(!porCliente[k])porCliente[k]=[];porCliente[k].push(c);});
+                      const clientes=Object.keys(porCliente).sort();
+                      if(clientes.length===0)return <div style={{textAlign:"center",padding:14,fontSize:12,color:"#94a3b8"}}>No hay cotizaciones aéreas disponibles.</div>;
+                      return clientes.map(cl=>(
+                        <div key={cl} style={{marginBottom:10}}>
+                          <div style={{fontSize:11,fontWeight:800,color:"#040c18",background:"#e2e8f0",padding:"4px 10px",borderRadius:6,marginBottom:4,display:"inline-block"}}>👤 {cl} ({porCliente[cl].length})</div>
+                          {porCliente[cl].map(c=>{
+                            const selected=opForm.cotizaciones.includes(c.id);
+                            return (
+                              <div key={c.id} onClick={()=>setOpForm(p=>({...p,cotizaciones:selected?p.cotizaciones.filter(x=>x!==c.id):[...p.cotizaciones,c.id]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",background:selected?"#eef6ff":"transparent",borderRadius:6,cursor:"pointer",marginBottom:3,border:`1px solid ${selected?"#3d7fc4":"transparent"}`}}>
+                                <div style={{width:16,height:16,borderRadius:4,background:selected?"#3d7fc4":"#fff",border:`2px solid ${selected?"#3d7fc4":"#cbd5e1"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:900}}>{selected?"✓":""}</div>
+                                <div style={{flex:1}}>
+                                  <span style={{fontSize:11,fontWeight:700,color:"#0f172a"}}>{c.nro}</span> · <span style={{fontSize:12,color:"#334155"}}>{c.producto}</span>
+                                  <span style={{fontSize:10,color:"#64748b",marginLeft:8}}>· {fmtN(c.unidades||0)} und</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ));
+                    })()}
                   </div>
-                )}
+                  {(()=>{
+                    const selCots=cotizaciones.filter(c=>opForm.cotizaciones.includes(c.id));
+                    const clientesSel=[...new Set(selCots.map(c=>c.cliente).filter(Boolean))];
+                    const totalU=selCots.reduce((s,c)=>s+Number(c.unidades||0),0);
+                    return (
+                      <div style={{fontSize:11,color:"#64748b",marginTop:6,display:"flex",gap:14,flexWrap:"wrap"}}>
+                        <span>Seleccionadas: <strong>{opForm.cotizaciones.length}</strong></span>
+                        <span>Clientes: <strong>{clientesSel.length>0?clientesSel.join(" + "):"—"}</strong></span>
+                        <span>Unidades totales: <strong>{fmtN(totalU)}</strong></span>
+                      </div>
+                    );
+                  })()}
+                </div>
 
                 {/* Costos consolidados */}
                 <div style={{borderTop:"1px solid #e2e8f0",paddingTop:14,marginBottom:14}}>
@@ -3643,15 +3662,20 @@ Número de seguimiento: ${c.nro}`;
                 <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
                   <button onClick={()=>{setOpForm(null);setOpEditId(null);}} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:7,padding:"9px 18px",fontSize:13,cursor:"pointer"}}>Cancelar</button>
                   <button onClick={async()=>{
-                    if(!opForm.cliente||opForm.cotizaciones.length===0){showToast("Selecciona cliente y al menos 1 cotización","err");return;}
+                    if(opForm.cotizaciones.length===0){showToast("Selecciona al menos 1 cotización","err");return;}
                     try{
+                      // Calcular clientes y cliente principal desde las cotizaciones seleccionadas
+                      const selCots=cotizaciones.filter(c=>opForm.cotizaciones.includes(c.id));
+                      const clientesArr=[...new Set(selCots.map(c=>c.cliente).filter(Boolean))];
+                      const clientePrincipal=clientesArr.length===1?clientesArr[0]:(clientesArr.length>1?clientesArr.join(" + "):"");
+                      const payload={...opForm,cliente:clientePrincipal,clientes:clientesArr};
                       if(opEditId){
-                        await supabase.from("operaciones").update({datos:opForm,updated_at:new Date().toISOString()}).eq("id",opEditId);
-                        setOperaciones(prev=>prev.map(o=>o.id===opEditId?{...opForm,id:opEditId}:o));
+                        await supabase.from("operaciones").update({datos:payload,updated_at:new Date().toISOString()}).eq("id",opEditId);
+                        setOperaciones(prev=>prev.map(o=>o.id===opEditId?{...payload,id:opEditId}:o));
                       } else {
-                        const {data,error}=await supabase.from("operaciones").insert({datos:opForm}).select("id").single();
+                        const {data,error}=await supabase.from("operaciones").insert({datos:payload}).select("id").single();
                         if(error)throw error;
-                        setOperaciones(prev=>[{...opForm,id:data.id},...prev]);
+                        setOperaciones(prev=>[{...payload,id:data.id},...prev]);
                         // Marcar cotizaciones con operacion_id
                         await Promise.all(opForm.cotizaciones.map(async cotId=>{
                           const cot=cotizaciones.find(c=>c.id===cotId);
@@ -3687,13 +3711,16 @@ Número de seguimiento: ${c.nro}`;
                 {operaciones.map(op=>{
                   const cots=cotizaciones.filter(c=>op.cotizaciones?.includes(c.id));
                   const totalUnd=cots.reduce((s,c)=>s+Number(c.unidades||0),0);
+                  const clientesOp=op.clientes&&op.clientes.length>0?op.clientes:[...new Set(cots.map(c=>c.cliente).filter(Boolean))];
                   return (
                     <div key={op.id} style={{background:"#fff",borderRadius:10,border:"1px solid #e2e8f0",padding:"14px 18px"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
                         <div>
-                          <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                             <span style={{fontSize:14,fontWeight:800,color:"#c9a055"}}>{op.nro}</span>
-                            <span style={{fontSize:14,fontWeight:700,color:"#040c18"}}>{op.cliente}</span>
+                            {clientesOp.map(cl=>(
+                              <span key={cl} style={{fontSize:12,fontWeight:700,color:"#040c18",background:"#eef6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"2px 9px"}}>👤 {cl}</span>
+                            ))}
                             <span style={{fontSize:10,fontWeight:700,background:"#f1f5f9",color:"#64748b",padding:"2px 8px",borderRadius:10,textTransform:"uppercase"}}>{op.estado}</span>
                           </div>
                           <div style={{fontSize:11,color:"#64748b",marginTop:4}}>{op.cotizaciones?.length||0} cotizaciones · {fmtN(totalUnd)} unidades · Margen {op.margen_objetivo}%</div>
