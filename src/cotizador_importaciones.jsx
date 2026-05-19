@@ -71,6 +71,8 @@ const makeDefaultForm = (usuario) => ({
   // Aéreo — costos aduaneros (editables, prefijados según agente)
   form_f_incluido:true, incluir_aforo:true,
   aer_honorarios:150000, aer_edi:15000, aer_despacho:50000, aer_aeropuerto:68000, aer_aforo:48000,
+  // Aéreo — modo de cobro Sunny (auto = max chargeable | peso = USD/kg | volumen = USD/CBM)
+  aer_modo_cobro_sunny:"auto", aer_tarifa_sunny_kg:9.55, aer_tarifa_sunny_cbm:"",
   nro_factura_cliente:"", link_factura_cliente:"",
   variantes:"", // colores, tallas, cantidades por variante
   fecha_llegada_real:"", sku_china:"",
@@ -1581,58 +1583,6 @@ Número de seguimiento: ${c.nro}`;
                     </div>
                   )}
 
-                  {/* ── BLOQUE CONFIGURACIÓN AÉREA — solo visible si transporte === "aereo" ── */}
-                  {form.tipo==="cliente"&&form.transporte==="aereo"&&(
-                    <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                        <div style={{fontSize:11,color:"#c47830",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>✈️ Configuración aérea</div>
-                        <div style={{fontSize:10,color:"#92400e",fontStyle:"italic"}}>Pago 100% · Sin comisión préstamo · Con factura</div>
-                      </div>
-                      {/* Form F toggle */}
-                      <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:10,padding:"7px 10px",background:form.form_f_incluido!==false?"#f0fdf4":"#fef2f2",borderRadius:7,border:"1px solid "+(form.form_f_incluido!==false?"#bbf7d0":"#fecaca")}}>
-                        <input type="checkbox" checked={form.form_f_incluido!==false} onChange={e=>setForm(p=>({...p,form_f_incluido:e.target.checked}))} style={{margin:0}}/>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:12,fontWeight:700,color:form.form_f_incluido!==false?"#15803d":"#dc2626"}}>Form F (TLC Chile-China) incluido</div>
-                          <div style={{fontSize:10,color:"#64748b"}}>{form.form_f_incluido!==false?"Arancel 0% sobre CIF ✅":"Arancel 6% sobre CIF — se traslada al cliente dentro de costos aduaneros"}</div>
-                        </div>
-                      </label>
-                      {/* Costos aduaneros editables */}
-                      <div style={{fontSize:10,color:"#92400e",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Costos aduaneros (editables)</div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                        {[
-                          ["aer_honorarios","Honorarios aduana"],
-                          ["aer_edi","Transmisión EDI"],
-                          ["aer_despacho","Gastos despacho"],
-                          ["aer_aeropuerto","Gastos aeropuerto"],
-                        ].map(([k,l])=>(
-                          <div key={k}>
-                            <label style={{display:"block",fontSize:9,color:"#92400e",marginBottom:3}}>{l}</label>
-                            <input type="number" value={form[k]??""} onChange={e=>setForm(p=>({...p,[k]:e.target.value===""?"":Number(e.target.value)}))} style={{width:"100%",background:"#ffffff",border:"1px solid #fed7aa",borderRadius:6,color:"#0f172a",padding:"6px 9px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
-                          </div>
-                        ))}
-                      </div>
-                      {/* Aforo con checkbox */}
-                      <div style={{display:"flex",gap:10,alignItems:"flex-end",marginBottom:8}}>
-                        <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",padding:"6px 10px",background:form.incluir_aforo!==false?"#fff7ed":"#f8fafc",borderRadius:6,border:"1px solid #fed7aa",flex:"0 0 auto"}}>
-                          <input type="checkbox" checked={form.incluir_aforo!==false} onChange={e=>setForm(p=>({...p,incluir_aforo:e.target.checked}))} style={{margin:0}}/>
-                          <span style={{fontSize:11,color:"#92400e",fontWeight:600}}>Incluir aforo</span>
-                        </label>
-                        <div style={{flex:1}}>
-                          <label style={{display:"block",fontSize:9,color:"#92400e",marginBottom:3}}>Aforo (condicional)</label>
-                          <input type="number" disabled={form.incluir_aforo===false} value={form.aer_aforo??""} onChange={e=>setForm(p=>({...p,aer_aforo:e.target.value===""?"":Number(e.target.value)}))} style={{width:"100%",background:form.incluir_aforo===false?"#f1f5f9":"#ffffff",border:"1px solid #fed7aa",borderRadius:6,color:"#0f172a",padding:"6px 9px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
-                        </div>
-                      </div>
-                      {/* Total prefijado */}
-                      <div style={{background:"#fff",borderRadius:7,padding:"8px 12px",border:"1px solid #fed7aa",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                        <span style={{fontSize:11,color:"#92400e",fontWeight:700}}>Subtotal aduana neto</span>
-                        <span style={{fontSize:14,fontWeight:800,color:"#c47830"}}>{fmt((Number(form.aer_honorarios)||0)+(Number(form.aer_edi)||0)+(Number(form.aer_despacho)||0)+(Number(form.aer_aeropuerto)||0)+(form.incluir_aforo!==false?(Number(form.aer_aforo)||0):0))}</span>
-                      </div>
-                      {/* Recordatorio dólar aduanero */}
-                      <div style={{marginTop:10,background:"#fef9c3",border:"1px solid #fde68a",borderRadius:7,padding:"8px 12px",fontSize:10,color:"#854d0e",lineHeight:1.5}}>
-                        💡 <strong>Dólar aduanero:</strong> el IVA aduana real puede variar según el dólar aduanero del mes (fijado por Aduana). Verificar con la agente antes del despacho. <a href="https://www.aduana.cl/indicadores-equivalencias/aduana/2025-12-30/115957.html" target="_blank" rel="noopener noreferrer" style={{color:"#854d0e",textDecoration:"underline",fontWeight:700}}>Ver dólar del mes →</a>
-                      </div>
-                    </div>
-                  )}
                   <div style={{marginBottom:12}}>
                     <label style={{display:"block",fontSize:10,color:"#777",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Producto</label>
                     <input value={form.producto||""} onChange={e=>setForm(p=>({...p,producto:e.target.value}))} placeholder="Nombre del producto" style={{width:"100%",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:8,color:"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
@@ -1698,8 +1648,8 @@ Número de seguimiento: ${c.nro}`;
                       <div style={{fontSize:11,color:"#666",background:"#f8fafc",borderRadius:7,padding:"6px 10px"}}>Tasa implícita: <span style={{color:"#334155"}}>{(Number(form.comision_real)/(Number(form.precio_china)*Number(form.unidades)*(1-Number(form.pct_deposito)/100))*100).toFixed(2)}%</span></div>
                     )}
 
-                    {/* ── DIMENSIONES (solo al editar) ── */}
-                    {editId&&(()=>{
+                    {/* ── DIMENSIONES + PESO (siempre visible — crítico en aéreo para validar m³ y peso cobrable) ── */}
+                    {(()=>{
                       const dimTipo=form.dim_tipo||"caja";
                       const esCaja=dimTipo==="caja";
                       const undCaja=Number(form.dim_und_caja)||0;
@@ -1777,6 +1727,13 @@ Número de seguimiento: ${c.nro}`;
                             </div>
                           )}
 
+                          {/* Alerta mínimo 1 m³ Sunny — solo aéreo */}
+                          {form.transporte==="aereo"&&Number(m3Total)>0&&Number(m3Total)<1&&(
+                            <div style={{marginTop:10,background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:7,padding:"8px 12px",fontSize:11,color:"#92400e",lineHeight:1.5}}>
+                              ⚠️ <strong>Carga inferior a 1 m³</strong> ({m3Total} m³). Sunny no acepta envíos individuales menores a 1 m³ — debe consolidarse con otra cotización (ver tab ✈️ Operaciones).
+                            </div>
+                          )}
+
                           {/* ── PESO (importante en aéreo) ── */}
                           {(()=>{
                             const pesoReal=Number(form.peso_kg)||0;
@@ -1825,6 +1782,79 @@ Número de seguimiento: ${c.nro}`;
                       );
                     })()}
                   </BLOCK>
+                )}
+
+                {/* ── BLOQUE CONFIGURACIÓN AÉREA — movido después de Cotización China para que producto/dimensiones/peso se llenen primero ── */}
+                {form.tipo==="cliente"&&form.transporte==="aereo"&&(
+                  <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                      <div style={{fontSize:11,color:"#c47830",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>✈️ Configuración aérea</div>
+                      <div style={{fontSize:10,color:"#92400e",fontStyle:"italic"}}>Pago 100% · Sin comisión préstamo · Con factura</div>
+                    </div>
+                    {/* Form F toggle */}
+                    <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:10,padding:"7px 10px",background:form.form_f_incluido!==false?"#f0fdf4":"#fef2f2",borderRadius:7,border:"1px solid "+(form.form_f_incluido!==false?"#bbf7d0":"#fecaca")}}>
+                      <input type="checkbox" checked={form.form_f_incluido!==false} onChange={e=>setForm(p=>({...p,form_f_incluido:e.target.checked}))} style={{margin:0}}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:12,fontWeight:700,color:form.form_f_incluido!==false?"#15803d":"#dc2626"}}>Form F (TLC Chile-China) incluido</div>
+                        <div style={{fontSize:10,color:"#64748b"}}>{form.form_f_incluido!==false?"Arancel 0% sobre CIF ✅":"Arancel 6% sobre CIF — se traslada al cliente dentro de costos aduaneros"}</div>
+                      </div>
+                    </label>
+                    {/* Costos aduaneros editables */}
+                    <div style={{fontSize:10,color:"#92400e",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Costos aduaneros (editables)</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                      {[
+                        ["aer_honorarios","Honorarios aduana"],
+                        ["aer_edi","Transmisión EDI"],
+                        ["aer_despacho","Gastos despacho"],
+                        ["aer_aeropuerto","Gastos aeropuerto"],
+                      ].map(([k,l])=>(
+                        <div key={k}>
+                          <label style={{display:"block",fontSize:9,color:"#92400e",marginBottom:3}}>{l}</label>
+                          <input type="number" value={form[k]??""} onChange={e=>setForm(p=>({...p,[k]:e.target.value===""?"":Number(e.target.value)}))} style={{width:"100%",background:"#ffffff",border:"1px solid #fed7aa",borderRadius:6,color:"#0f172a",padding:"6px 9px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Aforo con checkbox */}
+                    <div style={{display:"flex",gap:10,alignItems:"flex-end",marginBottom:8}}>
+                      <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",padding:"6px 10px",background:form.incluir_aforo!==false?"#fff7ed":"#f8fafc",borderRadius:6,border:"1px solid #fed7aa",flex:"0 0 auto"}}>
+                        <input type="checkbox" checked={form.incluir_aforo!==false} onChange={e=>setForm(p=>({...p,incluir_aforo:e.target.checked}))} style={{margin:0}}/>
+                        <span style={{fontSize:11,color:"#92400e",fontWeight:600}}>Incluir aforo</span>
+                      </label>
+                      <div style={{flex:1}}>
+                        <label style={{display:"block",fontSize:9,color:"#92400e",marginBottom:3}}>Aforo (condicional)</label>
+                        <input type="number" disabled={form.incluir_aforo===false} value={form.aer_aforo??""} onChange={e=>setForm(p=>({...p,aer_aforo:e.target.value===""?"":Number(e.target.value)}))} style={{width:"100%",background:form.incluir_aforo===false?"#f1f5f9":"#ffffff",border:"1px solid #fed7aa",borderRadius:6,color:"#0f172a",padding:"6px 9px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                      </div>
+                    </div>
+                    {/* Modo de cobro flete Sunny */}
+                    <div style={{fontSize:10,color:"#92400e",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1,marginTop:4}}>Modo de cobro flete Sunny</div>
+                    <div style={{display:"flex",gap:4,marginBottom:8}}>
+                      {[["auto","🔀 Auto (max)"],["peso","⚖️ Por peso (joyas/denso)"],["volumen","📦 Por volumen"]].map(([k,l])=>(
+                        <button key={k} onClick={()=>setForm(p=>({...p,aer_modo_cobro_sunny:k}))} style={{flex:1,background:(form.aer_modo_cobro_sunny||"auto")===k?"#fff7ed":"#ffffff",color:(form.aer_modo_cobro_sunny||"auto")===k?"#c47830":"#64748b",border:"1px solid "+((form.aer_modo_cobro_sunny||"auto")===k?"#c47830":"#fed7aa"),borderRadius:6,padding:"6px 4px",fontSize:10,cursor:"pointer",fontWeight:(form.aer_modo_cobro_sunny||"auto")===k?700:500}}>{l}</button>
+                      ))}
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                      <div>
+                        <label style={{display:"block",fontSize:9,color:"#92400e",marginBottom:3}}>Tarifa USD/kg (peso)</label>
+                        <input type="number" step="0.01" value={form.aer_tarifa_sunny_kg??""} onChange={e=>setForm(p=>({...p,aer_tarifa_sunny_kg:e.target.value===""?"":Number(e.target.value)}))} placeholder="9.55" style={{width:"100%",background:"#ffffff",border:"1px solid #fed7aa",borderRadius:6,color:"#0f172a",padding:"6px 9px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                      </div>
+                      <div>
+                        <label style={{display:"block",fontSize:9,color:"#92400e",marginBottom:3}}>Tarifa USD/CBM (volumen)</label>
+                        <input type="number" step="0.01" value={form.aer_tarifa_sunny_cbm??""} onChange={e=>setForm(p=>({...p,aer_tarifa_sunny_cbm:e.target.value===""?"":Number(e.target.value)}))} placeholder="—" style={{width:"100%",background:"#ffffff",border:"1px solid #fed7aa",borderRadius:6,color:"#0f172a",padding:"6px 9px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                      </div>
+                    </div>
+                    <div style={{fontSize:10,color:"#92400e",fontStyle:"italic",marginBottom:8,lineHeight:1.4}}>
+                      💡 Auto = se cobra el mayor entre peso y volumen (regla IATA). Por peso = joyas y productos densos. Por volumen = productos voluminosos. Pedir a Sunny tarifa USD/CBM cuando aplique.
+                    </div>
+                    {/* Total prefijado */}
+                    <div style={{background:"#fff",borderRadius:7,padding:"8px 12px",border:"1px solid #fed7aa",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:11,color:"#92400e",fontWeight:700}}>Subtotal aduana neto</span>
+                      <span style={{fontSize:14,fontWeight:800,color:"#c47830"}}>{fmt((Number(form.aer_honorarios)||0)+(Number(form.aer_edi)||0)+(Number(form.aer_despacho)||0)+(Number(form.aer_aeropuerto)||0)+(form.incluir_aforo!==false?(Number(form.aer_aforo)||0):0))}</span>
+                    </div>
+                    {/* Recordatorio dólar aduanero */}
+                    <div style={{marginTop:10,background:"#fef9c3",border:"1px solid #fde68a",borderRadius:7,padding:"8px 12px",fontSize:10,color:"#854d0e",lineHeight:1.5}}>
+                      💡 <strong>Dólar aduanero:</strong> el IVA aduana real puede variar según el dólar aduanero del mes (fijado por Aduana). Verificar con la agente antes del despacho. <a href="https://www.aduana.cl/indicadores-equivalencias/aduana/2025-12-30/115957.html" target="_blank" rel="noopener noreferrer" style={{color:"#854d0e",textDecoration:"underline",fontWeight:700}}>Ver dólar del mes →</a>
+                    </div>
+                  </div>
                 )}
 
                 {form.tipo==="cliente"&&!esPaso1&&(
