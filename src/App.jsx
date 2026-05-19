@@ -62,8 +62,14 @@ export default function App() {
     <ClientePortal supabase={supabase} perfil={perfil} onLogout={handleLogout} />
   )
 
-  // Agente China → Portal bilingüe de cotizaciones
+  // Agente China (Ling) → Portal bilingüe de cotizaciones marítimas
   if (perfil.rol === 'agente_china') return (
+    <PortalChina supabase={supabase} onLogout={handleLogout} />
+  )
+
+  // Agente Aéreo (Sunny) → temporalmente PortalChina (RLS filtra solo aéreas).
+  // PortalSunny.jsx con captura editable se construye según PORTAL_SUNNY_DESIGN.md
+  if (perfil.rol === 'agente_aereo') return (
     <PortalChina supabase={supabase} onLogout={handleLogout} />
   )
 
