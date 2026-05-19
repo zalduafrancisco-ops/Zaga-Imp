@@ -198,10 +198,15 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     // llamada anterior (race condition), la ignoramos y solo aplicamos la mas reciente.
     var miId = ++fetchIdRef.current
     try{
-      var result = await supabase.from('cotizaciones').select('datos').order('created_at',{ascending:false})
+      var result = await supabase.from('cotizaciones').select('id, datos').order('created_at',{ascending:false})
       if(miId !== fetchIdRef.current) return  // llego tarde, hay una carga mas reciente en curso
       if(result.data&&!result.error){
-        var lista = result.data.map(function(r){ return typeof r.datos==='string'?JSON.parse(r.datos):r.datos })
+        // FIX: usar el id REAL de la columna Supabase, no datos.id (que es null).
+        // Esto era el bug que impedía que el filtro de operaciones consolidadas matcheara.
+        var lista = result.data.map(function(r){
+          var d = typeof r.datos==='string'?JSON.parse(r.datos):r.datos
+          return Object.assign({}, d, { id: r.id })
+        })
         // Detectar cambios vs ultima visita
         var anteriores = leerEstadosGuardados()
         if(Object.keys(anteriores).length > 0){
