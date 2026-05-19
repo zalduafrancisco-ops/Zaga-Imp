@@ -244,19 +244,194 @@ export default function PortalSunny({ supabase, onLogout }) {
           <Empty zh="加载中" es="Cargando..." emoji="⏳" />
         ) : shown.length === 0 ? (
           <Empty zh={EMPTY_MSG[tab]?.zh} es={EMPTY_MSG[tab]?.es} emoji="📭" />
-        ) : tab === "pend_cot" ? (
-          shown.map(c => (
-            <CotEditable key={c._id} c={c} supabase={supabase} ops={ops} isExpanded={editingId === c._id}
+        ) : (()=>{
+          // Agrupar shown por operacion_id; las que no tienen op quedan sueltas
+          const grupos = new Map() // opId → array de cots
+          const sueltas = []
+          shown.forEach(c => {
+            if (c.operacion_id && ops.some(o => o._id === c.operacion_id)) {
+              if (!grupos.has(c.operacion_id)) grupos.set(c.operacion_id, [])
+              grupos.get(c.operacion_id).push(c)
+            } else {
+              sueltas.push(c)
+            }
+          })
+          const CardComp = tab === "pend_cot" ? CotEditable : CotReadOnly
+          const renderCard = (c) => (
+            <CardComp key={c._id} c={c} supabase={supabase} ops={ops} isExpanded={editingId === c._id}
               onExpand={() => setEditing(editingId === c._id ? null : c._id)} onSaved={loadData} />
-          ))
-        ) : (
-          shown.map(c => (
-            <CotReadOnly key={c._id} c={c} supabase={supabase} ops={ops}
-              isExpanded={editingId === c._id}
-              onExpand={() => setEditing(editingId === c._id ? null : c._id)}
-              onSaved={loadData} />
-          ))
-        )}
+          )
+          return (
+            <>
+              {Array.from(grupos.entries()).map(([opId, cotsDeOp]) => {
+                const op = ops.find(o => o._id === opId)
+                if (!op) return cotsDeOp.map(renderCard)
+                return (
+                  <OpGroupCard key={opId} op={op} cots={cotsDeOp} supabase={supabase} onSaved={loadData}>
+                    {cotsDeOp.map(renderCard)}
+                  </OpGroupCard>
+                )
+              })}
+              {sueltas.map(renderCard)}
+            </>
+          )
+        })()}
+      </div>
+    </div>
+  )
+}
+
+// ─── Card de grupo de operación consolidada (agrupa cots + chat de grupo) ─
+function OpGroupCard({ op, cots, supabase, onSaved, children }) {
+  const [expanded, setExpanded] = useState(false)
+  const [nuevoMsg, setNuevoMsg] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState(null)
+  const historial = Array.isArray(op.notas_grupo_historial) ? op.notas_grupo_historial : []
+  const totalUnd = cots.reduce((s, c) => s + (Number(c.unidades) || 0), 0)
+  const clientes = [...new Set(cots.map(c => c.cliente).filter(Boolean))]
+  const cbmTotal = Number(op.costos_china?.cbm) || 0
+  const pesoTotal = Number(op.costos_china?.peso_kg) || 0
+
+  async function enviarMensaje() {
+    const txt = nuevoMsg.trim()
+    if (!txt) return
+    setSaving(true); setMsg(null)
+    try {
+      const { data: fresca, error: errLoad } = await supabase
+        .from("operaciones").select("datos").eq("id", op._id).single()
+      if (errLoad || !fresca) throw new Error("No se pudo leer la operación")
+      const histPrev = Array.isArray(fresca.datos.notas_grupo_historial) ? [...fresca.datos.notas_grupo_historial] : []
+      const nuevaNota = {
+        id: Date.now().toString(),
+        fecha: new Date().toISOString(),
+        autor: "agente_aereo",
+        autorNombre: "Sunny",
+        texto: txt,
+      }
+      const datosMerged = {
+        ...fresca.datos,
+        notas_grupo_historial: [...histPrev, nuevaNota],
+        nota_grupo_nueva: true,
+      }
+      const { error: errSave } = await supabase
+        .from("operaciones").update({ datos: datosMerged, updated_at: new Date().toISOString() })
+        .eq("id", op._id).select("id")
+      if (errSave) throw errSave
+      setNuevoMsg("")
+      setMsg({ tipo: "ok", txt: "✅ 已发送给小组 / Enviado al grupo" })
+      onSaved && onSaved()
+      setTimeout(() => setMsg(null), 1500)
+    } catch(e) {
+      setMsg({ tipo: "err", txt: "⚠️ " + (e.message || "Error") })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{
+      background: "#fffbeb", borderRadius: 12, marginBottom: 14,
+      border: "2px solid #fde68a", overflow: "hidden",
+    }}>
+      <div onClick={()=>setExpanded(!expanded)} style={{
+        padding: "12px 16px", cursor: "pointer", background: "#fef3c7",
+        borderBottom: expanded ? "1px solid #fde68a" : "none",
+        display: "flex", alignItems: "center", gap: 12,
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+            <span style={{ background: "#040c18", color: "#c47830", borderRadius: 5, padding: "2px 9px", fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>
+              ✈️ {op.nro}
+            </span>
+            <span style={{ background: "#fff", color: "#854d0e", border: "1px solid #fde68a", borderRadius: 5, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>
+              {cots.length} 件 cotizaciones
+            </span>
+            <span style={{ background: "#fff", color: "#854d0e", border: "1px solid #fde68a", borderRadius: 5, padding: "2px 8px", fontSize: 10 }}>
+              {fmtN(totalUnd, 0)} und
+            </span>
+            {cbmTotal > 0 && (
+              <span style={{ background: "#fff", color: "#854d0e", border: "1px solid #fde68a", borderRadius: 5, padding: "2px 8px", fontSize: 10 }}>
+                📐 {fmtN(cbmTotal, 2)} m³
+              </span>
+            )}
+            {pesoTotal > 0 && (
+              <span style={{ background: "#fff", color: "#854d0e", border: "1px solid #fde68a", borderRadius: 5, padding: "2px 8px", fontSize: 10 }}>
+                ⚖️ {fmtN(pesoTotal, 0)} kg
+              </span>
+            )}
+            {historial.length > 0 && (
+              <span style={{ background: "#fff", color: "#2d78c8", border: "1px solid #bfdbfe", borderRadius: 5, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>
+                💬 {historial.length}
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: "#854d0e", fontWeight: 700 }}>
+            操作合并 / Operación consolidada · 👤 {clientes.join(" + ") || "—"}
+          </div>
+        </div>
+        <div style={{ fontSize: 22, color: "#854d0e" }}>{expanded ? "▾" : "▸"}</div>
+      </div>
+
+      {/* Chat del grupo (expandible al click del header) */}
+      {expanded && (
+        <div style={{ padding: "12px 16px", background: "#fff", borderBottom: "1px solid #fde68a" }}>
+          <div style={{ fontSize: 11, color: "#854d0e", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+            💬 小组消息 / Chat del grupo (visible para todas las cots)
+          </div>
+          {historial.length === 0 ? (
+            <div style={{ fontSize: 11, color: "#94a3b8", fontStyle: "italic", textAlign: "center", padding: "10px 0" }}>
+              还没有消息 / Aún sin mensajes
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 200, overflowY: "auto", marginBottom: 8 }}>
+              {historial.map((n, i) => {
+                const esSunny = n.autor === "agente_aereo"
+                return (
+                  <div key={n.id || i} style={{
+                    background: esSunny ? "#fff7ed" : "#eff6ff",
+                    border: "1px solid " + (esSunny ? "#fed7aa" : "#bfdbfe"),
+                    borderRadius: 8, padding: "7px 10px", fontSize: 12,
+                    alignSelf: esSunny ? "flex-end" : "flex-start", maxWidth: "85%",
+                  }}>
+                    <div style={{ fontSize: 9, color: esSunny ? "#c47830" : "#2d78c8", fontWeight: 700, marginBottom: 2 }}>
+                      {esSunny ? "Sunny" : (n.autorNombre || "Admin")} · {fmtDate(n.fecha)}
+                    </div>
+                    <div style={{ color: "#0f172a", whiteSpace: "pre-wrap", lineHeight: 1.4 }}>{n.texto}</div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          <textarea value={nuevoMsg} onChange={e=>setNuevoMsg(e.target.value)} rows={2}
+            placeholder="写消息小组... / Mensaje al grupo (afecta a todas las cotizaciones)..."
+            style={{ width: "100%", background: "#fff", border: "1px solid #fde68a", borderRadius: 7, padding: "7px 10px", fontSize: 12, outline: "none", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", marginBottom: 6 }}/>
+          {msg && (
+            <div style={{
+              marginBottom: 6, padding: "6px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
+              background: msg.tipo === "ok" ? "#f0fdf4" : "#fef2f2",
+              color: msg.tipo === "ok" ? "#15803d" : "#dc2626",
+              border: "1px solid " + (msg.tipo === "ok" ? "#bbf7d0" : "#fecaca"),
+            }}>{msg.txt}</div>
+          )}
+          <button onClick={enviarMensaje} disabled={saving || !nuevoMsg.trim()}
+            style={{
+              width: "100%", padding: "8px 14px", fontSize: 12, fontWeight: 700,
+              background: (saving || !nuevoMsg.trim()) ? "#cbd5e1" : "#c47830",
+              color: "#fff", border: "none", borderRadius: 7,
+              cursor: (saving || !nuevoMsg.trim()) ? "not-allowed" : "pointer", fontFamily: "inherit",
+            }}>
+            {saving ? "发送中..." : "📤 发送给小组 / Enviar al grupo"}
+          </button>
+        </div>
+      )}
+
+      {/* Cards de las cotizaciones del grupo */}
+      <div style={{ padding: "10px 12px 12px", background: "#fffbeb" }}>
+        <div style={{ fontSize: 10, color: "#854d0e", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+          📦 报价 / Cotizaciones del grupo ({cots.length})
+        </div>
+        {children}
       </div>
     </div>
   )
