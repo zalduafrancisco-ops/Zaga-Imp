@@ -2,29 +2,33 @@ import { useState, useEffect, useRef } from 'react'
 import LOGO_WHITE from "./logo-white.png"
 import LOGO_DARK from "./logo-dark.png"
 
-// Etiquetas y colores idénticos al Tracker (cotizador_importaciones.jsx)
+// Etiquetas y colores idénticos al Tracker — 7 estados simplificados
 const EST_LABEL = {
-  solicitud:"📥 Solicitud recibida", enviado_china:"📨 Enviado a China",
-  respuesta_china:"🇨🇳 Respuesta de China recibida",
-  enviada_cliente:"Enviada al cliente", re_testeando:"🔄 Re-testeando",
-  en_negociacion:"En negociación", aceptada:"Aceptada",
-  pagada_china:"Pagada / Importando", en_camino:"En camino",
-  en_bodega:"Disponible para retirar", completada:"Completada",
-  rechazada_cliente:"❌ Rechazada", no_procesada:"No procesada", anulada:"🚫 Anulada",
+  solicitud:   "📥 Solicitud recibida",
+  cotizada:    "💬 Cotizada",
+  pagada:      "💰 Pagada / Importando",
+  en_camino:   "✈️ En camino",
+  en_bodega:   "🇨🇱 Disponible para retirar",
+  completada:  "✓ Completada",
+  no_prospero: "❌ No prosperó",
 }
 const EST_COLOR = {
-  solicitud:"#6a9fd4", enviado_china:"#2a8aaa", respuesta_china:"#b8922e",
-  enviada_cliente:"#2d78c8", en_negociacion:"#c47830", re_testeando:"#6a9fd4",
-  rechazada_cliente:"#c0392b", anulada:"#8b1a2e", aceptada:"#1aa358",
-  no_procesada:"#c0392b", pagada_china:"#c47830", en_camino:"#a85590",
-  en_bodega:"#3d7fc4", completada:"#0d9870",
+  solicitud:   "#6a9fd4",
+  cotizada:    "#2d78c8",
+  pagada:      "#c47830",
+  en_camino:   "#a85590",
+  en_bodega:   "#3d7fc4",
+  completada:  "#0d9870",
+  no_prospero: "#c0392b",
 }
 const EST_BG = {
-  solicitud:"#eef4fb", enviado_china:"#e8f5f9", respuesta_china:"#fdf6e3",
-  enviada_cliente:"#eef4fb", en_negociacion:"#fdf0e3", re_testeando:"#eef4fb",
-  rechazada_cliente:"#fdf0f0", anulada:"#f5eaec", aceptada:"#eafaf1",
-  no_procesada:"#fdf0f0", pagada_china:"#fdf0e3", en_camino:"#f8f0fb",
-  en_bodega:"#eef4fb", completada:"#e8f9f4",
+  solicitud:   "#eef4fb",
+  cotizada:    "#eff6ff",
+  pagada:      "#fdf0e3",
+  en_camino:   "#f8f0fb",
+  en_bodega:   "#eef4fb",
+  completada:  "#e8f9f4",
+  no_prospero: "#fdf0f0",
 }
 const TIMELINE = [
   {key:"solicitud",label:"Enviado",icon:"📨"},
@@ -54,7 +58,7 @@ const CHECKLIST_FULL = [
   {key:"pago2_cliente",label:"2do pago recibido",icon:"💳"},
   {key:"retirado_bodega",label:"Importacion completada",icon:"🏁"},
 ]
-const RECHAZADAS_EST = ["no_prospero","no_prospero","no_prospero"]
+const RECHAZADAS_EST = ["no_prospero"]
 const PROCESADAS_EST = ["pagada","pagada","en_camino","en_bodega","completada"]
 const ESTADOS_ORDEN = ["solicitud","solicitud","cotizada","cotizada","solicitud","cotizada","pagada","pagada","en_camino","en_bodega","completada","no_prospero","no_prospero","no_prospero"]
 
@@ -382,7 +386,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     if(Number(c.precio_final_acordado_und)>0 && und>0) return s + Number(c.precio_final_acordado_und)*und
     return s+(c.con_iva?(c.calc.totClIva||c.calc.totCl||0):(c.calc.totCl||0))
   },0)
-  var pendientesConf = todas.filter(function(c){ return c.calc&&!(c.checklist&&c.checklist.pago1_cliente)&&!['solicitud','rechazada_cliente','anulada','no_procesada'].includes(c.estado) })
+  var pendientesConf = todas.filter(function(c){ return c.calc&&!(c.checklist&&c.checklist.pago1_cliente)&&!['solicitud','no_prospero','completada'].includes(c.estado) })
   var proxLlegada = activas.filter(function(c){ return c.fecha_llegada_est }).sort(function(a,b){ return new Date(a.fecha_llegada_est)-new Date(b.fecha_llegada_est) })[0]
 
   var abrirCot = function(id){
