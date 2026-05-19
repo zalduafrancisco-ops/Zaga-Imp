@@ -73,6 +73,8 @@ const makeDefaultForm = (usuario) => ({
   aer_honorarios:150000, aer_edi:15000, aer_despacho:50000, aer_aeropuerto:68000, aer_aforo:48000,
   // Aéreo — modo de cobro Sunny (auto = max chargeable | peso = USD/kg | volumen = USD/CBM)
   aer_modo_cobro_sunny:"auto", aer_tarifa_sunny_kg:9.55, aer_tarifa_sunny_cbm:"",
+  // Auto-margen — % margen bruto objetivo (sobre venta) usado por el botón "🎯 Calcular precio"
+  pct_margen_target_cliente:25,
   nro_factura_cliente:"", link_factura_cliente:"",
   variantes:"", // colores, tallas, cantidades por variante
   fecha_llegada_real:"", sku_china:"",
@@ -188,6 +190,25 @@ function calcCliente(d) {
   const roi = costoNetoReal>0 ? (ganImp/costoNetoReal)*100 : 0;
   const mult=cRUnd>0?pfUnd/cRUnd:0;
   return { tChNeto,ivaChina,tCh,dCh,prCh,comR:comREff,p1Ch,p2Ch,totCh,cRUnd,cRUndNeto,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,ivaCliente,ivaRecuperado,ivaNetoFavor,saldoF29,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult,aer,isAereo };
+}
+
+// Encuentra el margen/unidad (mar) tal que mgBrut sobre venta = targetMg (ej. 0.25 = 25%).
+// Bisección numérica: robusta ante IVA, aforo, arancel, servicio%, todos los términos dependientes.
+function findMarParaMargen(d, targetMg = 0.25) {
+  const u = Number(d.unidades) || 0;
+  const pCh = Number(d.precio_china) || 0;
+  if (u <= 0 || pCh <= 0) return 0;
+  let lo = 0;
+  let hi = pCh * 30; // tope: 30x precio China cubre cualquier escenario realista
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    const calc = calcCliente({ ...d, margen_und: mid });
+    const mg = (calc.mgBrut || 0) / 100;
+    if (mg < targetMg) lo = mid;
+    else hi = mid;
+    if (hi - lo < 0.5) break; // precisión: medio peso por unidad
+  }
+  return Math.round((lo + hi) / 2);
 }
 
 function calcPropia(d) {
@@ -1859,6 +1880,28 @@ Número de seguimiento: ${c.nro}`;
 
                 {form.tipo==="cliente"&&!esPaso1&&(
                   <BLOCK title="💰 Tu margen ZAGA" accent="#1aa358">
+                    {/* 🎯 Auto-margen objetivo (% sobre venta — gross margin) */}
+                    {Number(form.precio_china)>0&&Number(form.unidades)>0&&(
+                      <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:9,padding:"10px 14px",marginBottom:12}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                          <span style={{fontSize:12,color:"#92400e",fontWeight:700}}>🎯 Auto-precio para</span>
+                          <input type="number" min="1" max="80" step="1" value={form.pct_margen_target_cliente??25} onChange={e=>setForm(p=>({...p,pct_margen_target_cliente:e.target.value===""?"":Number(e.target.value)}))} style={{width:68,padding:"5px 8px",border:"1px solid #fbbf24",borderRadius:6,fontSize:14,fontWeight:800,color:"#92400e",textAlign:"center",outline:"none",background:"#ffffff"}}/>
+                          <span style={{fontSize:12,color:"#92400e",fontWeight:700}}>% margen sobre venta</span>
+                          <button onClick={()=>{
+                            const target=(Number(form.pct_margen_target_cliente)||25)/100;
+                            const mar=findMarParaMargen(form,target);
+                            const calc=calcCliente({...form,margen_und:mar});
+                            const precioRedondeado=Math.round((Number(form.precio_china)||0)+mar);
+                            setForm(p=>({...p,margen_und:mar,precio_venta_cliente:precioRedondeado}));
+                          }} style={{marginLeft:"auto",background:"#c47830",color:"#fff",border:"none",borderRadius:7,padding:"7px 16px",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 1px 3px rgba(196,120,48,0.3)"}}>
+                            Calcular precio →
+                          </button>
+                        </div>
+                        <div style={{fontSize:10,color:"#92400e",marginTop:6,fontStyle:"italic",lineHeight:1.4}}>
+                          Encuentra el precio venta/und que da exactamente el % de margen bruto sobre la venta total (gross margin = ganImp/totCl). Considera todos los costos: producto, aduana, servicio, comisión.
+                        </div>
+                      </div>
+                    )}
                     {/* Precio final → calcula margen automático */}
                     <div style={{background:"#f0fdf4",borderRadius:9,padding:"12px 14px",marginBottom:14,border:"1px solid #1aa35844"}}>
                       <div style={{fontSize:10,color:"#1aa358",fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>💵 Precio de venta al cliente</div>
