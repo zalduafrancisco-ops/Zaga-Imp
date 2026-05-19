@@ -393,10 +393,11 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   var pctConversion = todas.length>0?Math.round((procesadas.length/todas.length)*100):0
 
   var totalInvertido = todas.filter(function(c){ return c.checklist&&c.checklist.pago1_cliente }).reduce(function(s,c){
-    if(!c.calc) return s
-    // Prioriza precio_final_acordado_und × unidades (override admin), sino calc
+    // Prioriza precio_final_acordado_und × unidades (lo que el cliente efectivamente pagó)
     var und = Number(c.unidades)||0
     if(Number(c.precio_final_acordado_und)>0 && und>0) return s + Number(c.precio_final_acordado_und)*und
+    // Fallback al cálculo interno (solo si no hay precio acordado)
+    if(!c.calc) return s
     return s+(c.con_iva?(c.calc.totClIva||c.calc.totCl||0):(c.calc.totCl||0))
   },0)
   // "Pendientes de confirmación" = cliente recibió cotización pero aún no confirmó pago.
