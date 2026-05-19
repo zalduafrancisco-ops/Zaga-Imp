@@ -372,8 +372,9 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
 
   var totalInvertido = todas.filter(function(c){ return c.checklist&&c.checklist.pago1_cliente }).reduce(function(s,c){
     if(!c.calc) return s
-    // Prioriza precio_final_acordado (override admin), sino calc
-    if(Number(c.precio_final_acordado)>0) return s+Number(c.precio_final_acordado)
+    // Prioriza precio_final_acordado_und × unidades (override admin), sino calc
+    var und = Number(c.unidades)||0
+    if(Number(c.precio_final_acordado_und)>0 && und>0) return s + Number(c.precio_final_acordado_und)*und
     return s+(c.con_iva?(c.calc.totClIva||c.calc.totCl||0):(c.calc.totCl||0))
   },0)
   var pendientesConf = todas.filter(function(c){ return c.calc&&!(c.checklist&&c.checklist.pago1_cliente)&&!['solicitud','rechazada_cliente','anulada','no_procesada'].includes(c.estado) })
@@ -474,11 +475,11 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
       var ventaCIvaCot = ventaCIvaTotal * pct
       var und = Number(c.unidades)||0
       var precioCIvaUnit = und>0 ? ventaCIvaCot/und : 0
-      // Precio standalone c/IVA — prioriza precio_final_acordado (override del admin)
+      // Precio standalone c/IVA — prioriza precio_final_acordado_und × und (override del admin)
       var cl = c.calc
       var standaloneTotal = 0
-      if(Number(c.precio_final_acordado)>0){
-        standaloneTotal = Number(c.precio_final_acordado)
+      if(Number(c.precio_final_acordado_und)>0 && und>0){
+        standaloneTotal = Number(c.precio_final_acordado_und) * und
       } else if(cl){
         standaloneTotal = c.con_iva ? (cl.totClIva||cl.totCl||0) : (cl.totCl||0)
         if(!c.con_iva && standaloneTotal>0) standaloneTotal = standaloneTotal*1.19

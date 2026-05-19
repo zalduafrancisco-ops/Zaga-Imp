@@ -77,9 +77,9 @@ const makeDefaultForm = (usuario) => ({
   pct_margen_target_cliente:25,
   // Portal Sunny — campos que llena Sunny al cotizar (RMB nativo, días estimados producción)
   precio_china_rmb:"", dias_estimados_china:"",
-  // Ajuste manual final — precio realmente cobrado al cliente c/IVA (override del calculado)
-  // Si vacío: usa precio calculado. Si lleno: la diferencia (positiva o negativa) ajusta margen ZAGA.
-  precio_final_acordado:"",
+  // Ajuste manual final — precio POR UNIDAD c/IVA realmente acordado con el cliente
+  // Si vacío: usa precio calculado. Si lleno: total = precio_und × unidades, diff ajusta margen ZAGA.
+  precio_final_acordado_und:"",
   nro_factura_cliente:"", link_factura_cliente:"",
   variantes:"", // colores, tallas, cantidades por variante
   fecha_llegada_real:"", sku_china:"",
@@ -191,16 +191,17 @@ function calcCliente(d) {
 
   const gan1=pago100?ganImp:(dCl-tCh*pDep)+difCom, gan2=pago100?0:(prCl-tCh*(1-pDep))+serv;
 
-  // ── Ajuste manual: si hay precio_final_acordado, sobrescribe totClIva y ajusta margen ──
-  const precioFinalAcordado = Number(d.precio_final_acordado) || 0;
+  // ── Ajuste manual: si hay precio_final_acordado_und, sobrescribe totClIva y ajusta margen ──
+  const precioFinalAcordadoUnd = Number(d.precio_final_acordado_und) || 0;
+  const precioFinalAcordadoTotal = precioFinalAcordadoUnd > 0 && u > 0 ? precioFinalAcordadoUnd * u : 0;
   let totClIvaFinal = totClIva;
   let ajusteManual = 0;
   let ganImpAjustado = ganImp;
-  if (precioFinalAcordado > 0) {
-    totClIvaFinal = precioFinalAcordado;
+  if (precioFinalAcordadoTotal > 0) {
+    totClIvaFinal = precioFinalAcordadoTotal;
     // El ajuste va al margen: diff entre acordado y calculado (ambos c/IVA), pasado a neto
-    const totClFinalNeto = precioFinalAcordado / 1.19;
-    const totClCalculadoNeto = isAereo || conIva ? totCl : totCl; // ya en neto
+    const totClFinalNeto = precioFinalAcordadoTotal / 1.19;
+    const totClCalculadoNeto = totCl;
     ajusteManual = totClFinalNeto - totClCalculadoNeto; // CLP netos: positivo = cobré más, negativo = descuento
     ganImpAjustado = ganImp + ajusteManual;
   }
@@ -211,12 +212,12 @@ function calcCliente(d) {
   const cRUndNeto = u>0 ? costoNetoReal / u : 0;
   const markup=pCh>0?((pCUnd-pCh)/pCh)*100:0;
   // Margen bruto: si hay ajuste manual, usa el TOTAL FINAL (neto) y la ganancia ajustada
-  const totClParaMg = precioFinalAcordado > 0 ? precioFinalAcordado / 1.19 : totCl;
+  const totClParaMg = precioFinalAcordadoTotal > 0 ? precioFinalAcordadoTotal / 1.19 : totCl;
   const mgBrut = totClParaMg > 0 ? (ganImpAjustado / totClParaMg) * 100 : 0;
   // ROI sobre costo neto real (excluye IVAs recuperables) — métrica más honesta
   const roi = costoNetoReal>0 ? (ganImpAjustado/costoNetoReal)*100 : 0;
   const mult=cRUnd>0?pfUnd/cRUnd:0;
-  return { tChNeto,ivaChina,tCh,dCh,prCh,comR:comREff,p1Ch,p2Ch,totCh,cRUnd,cRUndNeto,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,totClIvaFinal,ajusteManual,ganImpAjustado,precioFinalAcordado,ivaCliente,ivaRecuperado,ivaNetoFavor,saldoF29,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult,aer,isAereo };
+  return { tChNeto,ivaChina,tCh,dCh,prCh,comR:comREff,p1Ch,p2Ch,totCh,cRUnd,cRUndNeto,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,totClIvaFinal,ajusteManual,ganImpAjustado,precioFinalAcordadoUnd,precioFinalAcordadoTotal,ivaCliente,ivaRecuperado,ivaNetoFavor,saldoF29,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult,aer,isAereo };
 }
 
 // ── Cálculo de consolidación aérea ──────────────────────────────────────────
@@ -2099,44 +2100,58 @@ Número de seguimiento: ${c.nro}`;
                       )}
                     </div>
 
-                    {/* 🎯 AJUSTE MANUAL — Precio final acordado con cliente (override del calculado) */}
+                    {/* 🎯 AJUSTE MANUAL — Precio final POR UNIDAD acordado con cliente (override del calculado) */}
                     {Number(form.unidades)>0&&Number(form.precio_china)>0&&(()=>{
+                      const u = Number(form.unidades) || 0;
                       const totClIvaCalc = calcActual.totClIva || 0;
-                      const acordado = Number(form.precio_final_acordado) || 0;
-                      const diff = acordado > 0 ? acordado - totClIvaCalc : 0;
+                      const pUndCalc = u > 0 ? totClIvaCalc / u : 0; // precio por unidad calculado c/IVA
+                      const acordadoUnd = Number(form.precio_final_acordado_und) || 0;
+                      const acordadoTotal = acordadoUnd > 0 ? acordadoUnd * u : 0;
+                      const diffTotal = acordadoTotal > 0 ? acordadoTotal - totClIvaCalc : 0;
+                      const diffUnd = acordadoUnd > 0 ? acordadoUnd - pUndCalc : 0;
                       return (
                         <div style={{background:"#fef3c7",border:"1px solid #fbbf24",borderRadius:9,padding:"12px 14px",marginBottom:14}}>
                           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,flexWrap:"wrap",gap:6}}>
-                            <span style={{fontSize:11,color:"#92400e",fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>🎯 Precio final acordado (ajuste manual)</span>
+                            <span style={{fontSize:11,color:"#92400e",fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>🎯 Precio final POR UNIDAD acordado (ajuste manual)</span>
                             <span style={{fontSize:10,color:"#94a3b8",fontStyle:"italic"}}>Override del calculado · diff va al margen ZAGA</span>
                           </div>
                           <div style={{display:"flex",gap:10,alignItems:"flex-end",flexWrap:"wrap"}}>
                             <div style={{flex:1,minWidth:160}}>
-                              <label style={{display:"block",fontSize:9,color:"#92400e",marginBottom:3,textTransform:"uppercase",letterSpacing:0.5,fontWeight:700}}>Precio FINAL c/IVA acordado</label>
-                              <input type="number" value={form.precio_final_acordado||""} placeholder={`Calc: ${fmt(totClIvaCalc)}`}
-                                onChange={e=>setForm(p=>({...p,precio_final_acordado:e.target.value}))}
+                              <label style={{display:"block",fontSize:9,color:"#92400e",marginBottom:3,textTransform:"uppercase",letterSpacing:0.5,fontWeight:700}}>Precio FINAL c/IVA por unidad</label>
+                              <input type="number" value={form.precio_final_acordado_und||""} placeholder={pUndCalc > 0 ? `Calc: ${fmt(pUndCalc)}` : "0"}
+                                onChange={e=>setForm(p=>({...p,precio_final_acordado_und:e.target.value}))}
                                 style={{width:"100%",background:"#fff",border:"1px solid #fbbf24",borderRadius:7,color:"#92400e",padding:"10px 12px",fontSize:15,fontWeight:800,outline:"none",boxSizing:"border-box"}}/>
+                              <div style={{fontSize:10,color:"#94a3b8",marginTop:3}}>× {fmtN(u)} unidades</div>
                             </div>
-                            {acordado > 0 && (
+                            {acordadoTotal > 0 && (
+                              <div style={{flex:1,minWidth:160,background:"#fff",border:"1px solid #fde68a",borderRadius:7,padding:"8px 12px"}}>
+                                <div style={{fontSize:9,color:"#92400e",fontWeight:700,marginBottom:2,textTransform:"uppercase"}}>Total acordado c/IVA</div>
+                                <div style={{fontSize:17,fontWeight:800,color:"#92400e"}}>{fmt(acordadoTotal)}</div>
+                                <div style={{fontSize:10,color:"#64748b",marginTop:2}}>
+                                  = {fmt(acordadoUnd)} × {fmtN(u)}
+                                </div>
+                              </div>
+                            )}
+                            {acordadoTotal > 0 && (
                               <div style={{flex:1,minWidth:160,background:"#fff",border:"1px solid #fde68a",borderRadius:7,padding:"8px 12px"}}>
                                 <div style={{fontSize:9,color:"#92400e",fontWeight:700,marginBottom:2,textTransform:"uppercase"}}>Diferencia vs calculado</div>
-                                <div style={{fontSize:15,fontWeight:800,color: diff >= 0 ? "#15803d" : "#dc2626"}}>
-                                  {diff >= 0 ? "+" : ""}{fmt(diff)}
+                                <div style={{fontSize:15,fontWeight:800,color: diffTotal >= 0 ? "#15803d" : "#dc2626"}}>
+                                  {diffTotal >= 0 ? "+" : ""}{fmt(diffTotal)}
                                 </div>
                                 <div style={{fontSize:10,color:"#64748b",marginTop:2}}>
-                                  {diff >= 0 ? "📈 Cobraste más → suma al margen" : "📉 Descuento dado → resta del margen"}
+                                  ({diffUnd >= 0 ? "+" : ""}{fmt(diffUnd)} /und) {diffTotal >= 0 ? "📈 +margen" : "📉 -margen"}
                                 </div>
                               </div>
                             )}
                           </div>
-                          {acordado > 0 && (
+                          {acordadoTotal > 0 && (
                             <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #fde68a",fontSize:11,color:"#92400e"}}>
-                              Calculado: <b>{fmt(totClIvaCalc)}</b> · Acordado: <b>{fmt(acordado)}</b> · Por unidad acordado: <b>{fmt(acordado / Number(form.unidades))}</b> c/IVA · Margen ajustado: <b style={{color:"#15803d"}}>{fmt(calcActual.ganImpAjustado)}</b> ({calcActual.mgBrut.toFixed(1)}%)
+                              Calculado/und: <b>{fmt(pUndCalc)}</b> · Acordado/und: <b>{fmt(acordadoUnd)}</b> · Total acordado: <b>{fmt(acordadoTotal)}</b> · Margen ajustado: <b style={{color:"#15803d"}}>{fmt(calcActual.ganImpAjustado)}</b> ({calcActual.mgBrut.toFixed(1)}%)
                             </div>
                           )}
-                          {!acordado && (
+                          {!acordadoTotal && (
                             <div style={{marginTop:6,fontSize:10,color:"#854d0e",fontStyle:"italic"}}>
-                              💡 Dejar vacío para usar el precio calculado. Llenar solo si negociaste un precio distinto con el cliente.
+                              💡 Dejar vacío para usar el precio calculado. Llenar el precio POR UNIDAD que efectivamente acordaste con el cliente.
                             </div>
                           )}
                         </div>
@@ -4024,8 +4039,10 @@ Número de seguimiento: ${c.nro}`;
                   const clienteUnico = clientesOp.length === 1;
                   const expanded = opOpenId === op.id;
                   // Calcular consolidado de cada cot solo si está expandido (perf)
+                  // Sin filtro de estado: se ve para todas las cots de la op, incluso pagada/en_camino/completada
+                  // (excluimos solo terminales negativas que no deberían estar en una op activa)
                   const consolidados = expanded ? cots
-                    .filter(c => c.estado === "enviada_cliente" || c.estado === "aceptada" || c.estado === "respuesta_china")
+                    .filter(c => !["rechazada_cliente","no_procesada","anulada"].includes(c.estado))
                     .map(c => ({ cot:c, calc: calcConsolidado(c, op, cots) }))
                     .filter(x => x.calc) : [];
                   const ahorroTotalOp = consolidados.reduce((s,x) => s + (x.calc?.ahorro?.totalCl||0), 0);
@@ -4079,7 +4096,7 @@ Número de seguimiento: ${c.nro}`;
                         <div style={{marginTop:14,padding:14,background:"#fafafa",borderRadius:9,border:"1px solid #e2e8f0"}}>
                           <div style={{fontSize:11,color:"#c9a055",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>💎 Comparativa standalone vs consolidado</div>
                           {consolidados.length===0?(
-                            <div style={{fontSize:12,color:"#94a3b8",fontStyle:"italic"}}>No hay cotizaciones en estado <b>enviada_cliente</b> o posteriores. La consolidación aplica solo desde ese estado.</div>
+                            <div style={{fontSize:12,color:"#94a3b8",fontStyle:"italic"}}>No hay cotizaciones activas en esta operación (todas están rechazadas/anuladas/no procesadas).</div>
                           ):(
                             <>
                               <div style={{overflowX:"auto"}}>
