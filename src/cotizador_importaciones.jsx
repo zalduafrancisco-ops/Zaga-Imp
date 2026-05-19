@@ -4188,13 +4188,24 @@ Número de seguimiento: ${c.nro}`;
                                       </tr>
                                       );
                                     })}
-                                    <tr style={{borderTop:"2px solid #c9a055",background:"#fef9c3"}}>
-                                      <td style={{padding:"8px",fontSize:11,fontWeight:800,color:"#854d0e"}}>Total ahorro op</td>
-                                      <td colSpan={2}></td>
-                                      <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#1aa358",fontSize:13}}>-{fmt(ahorroTotalOp)}</td>
-                                      <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#16a34a"}}>{fmt(consolidados.reduce((s,x)=>s+x.calc.ahorro.cliente,0))}</td>
-                                      <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#c9a055"}}>{fmt(consolidados.reduce((s,x)=>s+x.calc.ahorro.zaga,0))}</td>
-                                    </tr>
+                                    {(()=>{
+                                      const totalStandalone = consolidados.reduce((s,x)=>s+(x.calc.standalone.totClIva||0), 0);
+                                      const totalConsolidado = consolidados.reduce((s,x)=>s+(x.calc.consolidado.totClIva||0), 0);
+                                      const totalCliente = consolidados.reduce((s,x)=>s+x.calc.ahorro.cliente, 0);
+                                      const totalZaga = consolidados.reduce((s,x)=>s+x.calc.ahorro.zaga, 0);
+                                      return (
+                                        <tr style={{borderTop:"2px solid #c9a055",background:"#fef9c3"}}>
+                                          <td style={{padding:"8px",fontSize:11,fontWeight:800,color:"#854d0e"}}>TOTAL OPERACIÓN</td>
+                                          <td style={{padding:"8px",textAlign:"right",fontSize:13,fontWeight:800,color:"#854d0e"}}>{fmt(totalStandalone)}</td>
+                                          <td style={{padding:"8px",textAlign:"right",fontSize:13,fontWeight:800,color:"#0f172a"}}>{fmt(totalConsolidado)}</td>
+                                          <td style={{padding:"8px",textAlign:"right",fontWeight:800,color: ahorroTotalOp>=0 ? "#1aa358" : "#c0392b",fontSize:13}}>
+                                            {ahorroTotalOp>=0 ? "-" : "+"}{fmt(Math.abs(ahorroTotalOp))}
+                                          </td>
+                                          <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#16a34a"}}>{fmt(totalCliente)}</td>
+                                          <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#c9a055"}}>{fmt(totalZaga)}</td>
+                                        </tr>
+                                      );
+                                    })()}
                                   </tbody>
                                 </table>
                               </div>
@@ -4238,8 +4249,8 @@ Número de seguimiento: ${c.nro}`;
                                     setCotizaciones(prev=>prev.map(c=>cots.find(x=>x.id===c.id)?{...c,consolidado_aplicado_cliente:true}:c));
                                     showToast("✅ Consolidado aplicado a clientes");
                                   }catch(e){showToast("Error: "+e.message,"err");}
-                                }} disabled={!op.recotizacion_completada_sunny||op.consolidado_aplicado_cliente} style={{background:op.consolidado_aplicado_cliente?"#f0fdf4":(op.recotizacion_completada_sunny?"#1aa358":"#e2e8f0"),color:op.consolidado_aplicado_cliente?"#1aa358":(op.recotizacion_completada_sunny?"#fff":"#94a3b8"),border:`1px solid ${op.consolidado_aplicado_cliente?"#bbf7d0":(op.recotizacion_completada_sunny?"#1aa358":"#cbd5e1")}`,borderRadius:7,padding:"8px 14px",fontSize:12,cursor:op.recotizacion_completada_sunny&&!op.consolidado_aplicado_cliente?"pointer":"not-allowed",fontWeight:700}}>
-                                  ✅ {op.consolidado_aplicado_cliente?"Ya aplicado a clientes":"Aplicar consolidado al cliente"}
+                                }} disabled={op.consolidado_aplicado_cliente || (op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)} style={{background:op.consolidado_aplicado_cliente?"#f0fdf4":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#e2e8f0":"#1aa358"),color:op.consolidado_aplicado_cliente?"#1aa358":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#94a3b8":"#fff"),border:`1px solid ${op.consolidado_aplicado_cliente?"#bbf7d0":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#cbd5e1":"#1aa358")}`,borderRadius:7,padding:"8px 14px",fontSize:12,cursor:(!op.consolidado_aplicado_cliente && !(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny))?"pointer":"not-allowed",fontWeight:700}}>
+                                  ✅ {op.consolidado_aplicado_cliente?"Ya aplicado a clientes":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"Esperando respuesta Sunny...":"Aplicar consolidado al cliente")}
                                 </button>
                               </div>
                             </>
