@@ -295,9 +295,21 @@ function calcConsolidado(cot, op, cotsEnOp) {
   const clientesUnicos = [...new Set(cotsEnOp.map(c => c.cliente).filter(Boolean))];
   const clienteUnico = clientesUnicos.length === 1;
 
-  // Distribución del ahorro
-  const ahorroCliente = clienteUnico ? ahorroTotalCl : ahorroTotalCl / 2;
-  const ahorroZaga    = clienteUnico ? 0              : ahorroTotalCl / 2;
+  // Distribución del ahorro — modo manual del admin o auto por defecto
+  // op.distribucion_ahorro: "auto" (default) | "cliente_100" | "split_50_50"
+  const modoDistrib = op.distribucion_ahorro || "auto";
+  let ahorroCliente, ahorroZaga;
+  if (modoDistrib === "cliente_100") {
+    ahorroCliente = ahorroTotalCl;
+    ahorroZaga = 0;
+  } else if (modoDistrib === "split_50_50") {
+    ahorroCliente = ahorroTotalCl / 2;
+    ahorroZaga = ahorroTotalCl / 2;
+  } else {
+    // auto: 100% cliente único, 50/50 multi-cliente
+    ahorroCliente = clienteUnico ? ahorroTotalCl : ahorroTotalCl / 2;
+    ahorroZaga = clienteUnico ? 0 : ahorroTotalCl / 2;
+  }
 
   // Totales consolidados
   const totClConsolidado = Math.max(0, calcStand.totCl - ahorroCliente);
@@ -324,6 +336,7 @@ function calcConsolidado(cot, op, cotsEnOp) {
       ahorroCda: ahorroCdaCl,
       ahorroFlete: ahorroFleteCl,
       clienteUnico,
+      modoDistrib, // "auto" | "cliente_100" | "split_50_50"
       share,
       shareCbm,
       sharePeso,
@@ -3799,6 +3812,9 @@ Número de seguimiento: ${c.nro}`;
                   pago:{ tc_efectivo:980, comisiones_wu:65000, metodo_pago:"WU" },
                   distribucion:"cbm",
                   margen_objetivo:25,
+                  // Distribución del ahorro consolidado: "auto" | "cliente_100" | "split_50_50"
+                  // Auto: 100% cliente único, 50/50 multi-cliente. Manual override en cualquier caso.
+                  distribucion_ahorro:"auto",
                   notas:""
                 });
                 setOpEditId(null);
@@ -3833,6 +3849,14 @@ Número de seguimiento: ${c.nro}`;
                   <div>
                     <label style={{fontSize:10,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Margen objetivo %</label>
                     <input type="number" value={opForm.margen_objetivo} onChange={e=>setOpForm(p=>({...p,margen_objetivo:Number(e.target.value)||25}))} style={{width:"100%",padding:"8px 10px",fontSize:13,border:"1px solid #e2e8f0",borderRadius:7,marginTop:3,outline:"none"}}/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>💎 Distribución ahorro</label>
+                    <select value={opForm.distribucion_ahorro||"auto"} onChange={e=>setOpForm(p=>({...p,distribucion_ahorro:e.target.value}))} style={{width:"100%",padding:"8px 10px",fontSize:13,border:"1px solid #e2e8f0",borderRadius:7,marginTop:3,outline:"none",background:"#fff"}}>
+                      <option value="auto">🔀 Auto (100% si cliente único / 50-50 multi)</option>
+                      <option value="cliente_100">👤 100% al cliente (incluso si multi-cliente)</option>
+                      <option value="split_50_50">⚖️ 50/50 cliente / ZAGA</option>
+                    </select>
                   </div>
                 </div>
 
@@ -4136,7 +4160,7 @@ Número de seguimiento: ${c.nro}`;
                                 </table>
                               </div>
                               <div style={{fontSize:10,color:"#64748b",marginTop:8,fontStyle:"italic",lineHeight:1.5}}>
-                                Distribución de ahorro: <b>{clienteUnico?"100% al cliente":"50% cliente / 50% ZAGA (multi-cliente)"}</b> · Reparto de costos compartidos por <b>{clienteUnico?"modo Sunny auto":"modo Sunny auto"}</b> (mayor entre peso o volumen) · Aduana fija prorrateada + flete usando tarifa consolidada Sunny ({op.flete_usd_kg_consolidado?`USD/kg ${op.flete_usd_kg_consolidado}`:"aún no actualizada"})
+                                Distribución de ahorro: <b>{(()=>{ const m=op.distribucion_ahorro||"auto"; if(m==="cliente_100") return "100% al cliente (manual override)"; if(m==="split_50_50") return "50% cliente / 50% ZAGA (manual)"; return clienteUnico?"100% al cliente (auto: cliente único)":"50% cliente / 50% ZAGA (auto: multi-cliente)"; })()}</b> · Reparto de costos compartidos por <b>modo Sunny auto</b> (mayor entre peso o volumen) · Aduana fija prorrateada + flete usando tarifa consolidada Sunny ({op.flete_rmb_kg_consolidado?`RMB/kg ${op.flete_rmb_kg_consolidado}`:(op.flete_usd_kg_consolidado?`USD/kg ${op.flete_usd_kg_consolidado}`:"aún no actualizada")})
                               </div>
                               <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
                                 <button onClick={async()=>{

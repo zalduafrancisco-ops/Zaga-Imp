@@ -489,6 +489,15 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
       var standaloneUnit = und>0 ? standaloneTotal/und : 0
       var ahorroUnit = standaloneUnit>0 ? (standaloneUnit-precioCIvaUnit) : 0
       var ahorroTotal = ahorroUnit*und
+      // Aplicar modo distribución: si admin eligió 50/50, el cliente solo ve la mitad
+      // del ahorro (la otra mitad la queda ZAGA como margen extra)
+      var modoDistrib = op.distribucion_ahorro || "auto"
+      var clientesUnicos = [...new Set(misCots.map(function(c){ return c.cliente }).filter(Boolean))]
+      var clienteUnico = clientesUnicos.length === 1 && op.cotizaciones.length === misCots.length
+      if(modoDistrib === "split_50_50" || (modoDistrib === "auto" && !clienteUnico && totalCotsOp > misCots.length)){
+        ahorroUnit = ahorroUnit / 2
+        ahorroTotal = ahorroTotal / 2
+      }
       var ahorroPct = standaloneUnit>0 ? (ahorroUnit/standaloneUnit)*100 : 0
       return {
         cot: c, cbm: cbmDeCot(c), pct: pct,
