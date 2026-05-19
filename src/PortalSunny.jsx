@@ -579,17 +579,23 @@ function CotEditable({ c, supabase, isExpanded, onExpand, onSaved }) {
               style={{ ...btn, background:"#fff", color:"#64748b", border:"1px solid #cbd5e1", flex:1 }}>
               💾 {saving ? "..." : "保存草稿 / Guardar borrador"}
             </button>
-            <button onClick={()=>persistirRespuestaSunny(true)} disabled={saving || !form.precio_china_rmb}
+            <button onClick={()=>persistirRespuestaSunny(true)} disabled={saving}
               style={{
                 ...btn,
-                background: form.precio_china_rmb ? "#c47830" : "#cbd5e1",
+                background:"#c47830",
                 color:"#fff",
-                cursor: form.precio_china_rmb ? "pointer" : "not-allowed",
+                cursor: saving ? "wait" : "pointer",
                 flex:2,
+                opacity: saving ? 0.6 : 1,
               }}>
               ✅ {saving ? "发送中... / Enviando..." : "发送给管理员 / Enviar a admin"}
             </button>
           </div>
+          {!form.precio_china_rmb && !form.nota_nueva && (
+            <div style={{ marginTop:8, fontSize:11, color:"#94a3b8", fontStyle:"italic", textAlign:"center" }}>
+              💡 建议先填写 FOB 价格或备注 / Recomendado llenar precio FOB o agregar una nota antes de enviar
+            </div>
+          )}
         </div>
       )}
     </div>
