@@ -3083,8 +3083,10 @@ Número de seguimiento: ${c.nro}`;
                                   <button disabled={!(notaClienteInput[c.id]||"").trim()} onClick={async()=>{
                                     const txt=(notaClienteInput[c.id]||"").trim(); if(!txt) return;
                                     const nuevaNota={id:Date.now().toString(),autor:"admin",autorNombre:usuario?.nombre||"ZAGA",texto:txt,fecha:new Date().toISOString(),leida_por_admin:true};
-                                    const hist=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
-                                    await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_cliente_historial:[...hist,nuevaNota]}:x));
+                                    const histPrev=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
+                                    // Al responder, admin marca implícitamente como leídas todas las notas previas del cliente
+                                    const histLeida=histPrev.map(n=>n.autor==="cliente"?{...n,leida_por_admin:true}:n);
+                                    await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_cliente_historial:[...histLeida,nuevaNota]}:x));
                                     setNotaClienteInput(p=>({...p,[c.id]:""}));
                                     showToast("💬 Enviado al cliente");
                                   }} style={{background:(notaClienteInput[c.id]||"").trim()?"#2d78c8":"#e2e8f0",color:(notaClienteInput[c.id]||"").trim()?"#fff":"#94a3b8",border:"none",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:(notaClienteInput[c.id]||"").trim()?"pointer":"default",fontWeight:700,whiteSpace:"nowrap",fontFamily:"inherit"}}>
@@ -3627,8 +3629,10 @@ Número de seguimiento: ${c.nro}`;
                                         const txt=(notaClienteInput[c.id]||"").trim(); if(!txt) return;
                                         if(txt.length>2000){showToast("Máximo 2000 caracteres","err");return;}
                                         const nuevaNota={id:Date.now().toString(),autor:"admin",autorNombre:usuario?.nombre||"ZAGA",texto:txt,fecha:new Date().toISOString(),leida_por_admin:true};
-                                        const hist=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
-                                        await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_cliente_historial:[...hist,nuevaNota]}:x));
+                                        const histPrev=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
+                                        // Al responder, admin marca implícitamente como leídas todas las notas previas del cliente
+                                        const histLeida=histPrev.map(n=>n.autor==="cliente"?{...n,leida_por_admin:true}:n);
+                                        await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,notas_cliente_historial:[...histLeida,nuevaNota]}:x));
                                         setNotaClienteInput(p=>({...p,[c.id]:""}));
                                         showToast("💬 Mensaje enviado al cliente");
                                       }} style={{background:(notaClienteInput[c.id]||"").trim()?"#2d78c8":"#e2e8f0",color:(notaClienteInput[c.id]||"").trim()?"#fff":"#94a3b8",border:"none",borderRadius:6,padding:"7px 16px",fontSize:11,cursor:(notaClienteInput[c.id]||"").trim()?"pointer":"default",fontWeight:700,fontFamily:"inherit"}}>
