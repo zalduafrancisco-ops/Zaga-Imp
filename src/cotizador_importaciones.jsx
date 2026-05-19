@@ -720,7 +720,14 @@ export default function App({ supabase, usuario, onLogout }){
       if(c.id!==id) return c;
       let fll=c.fecha_llegada_est;
       if(estado==="pagada"&&!fll){ const d=new Date(); const diasLlegada=c.transporte==="aereo"?25:90; d.setDate(d.getDate()+diasLlegada); fll=d.toISOString().split("T")[0]; }
-      return {...c,estado,fecha_llegada_est:fll};
+      // Auto-marcar pago1_cliente cuando estado pasa a pagada (admin marcó como pagada → cliente pagó)
+      let chk=c.checklist||{};
+      let fechaP1=c.fecha_pago1_cliente;
+      if(estado==="pagada"&&!chk.pago1_cliente){
+        chk={...chk,pago1_cliente:true};
+        if(!fechaP1) fechaP1=new Date().toISOString().split("T")[0];
+      }
+      return {...c,estado,fecha_llegada_est:fll,checklist:chk,fecha_pago1_cliente:fechaP1};
     }));
   };
 
@@ -4148,14 +4155,24 @@ Número de seguimiento: ${c.nro}`;
                           if (cot.estado === nuevoEstadoCot) continue;
                           const {id, ...rest} = cot;
                           const newDatos = {...rest, estado: nuevoEstadoCot};
+                          // Auto-marcar pago1_cliente al pasar a pagada
+                          if (nuevoEstadoCot === "pagada" && !(rest.checklist||{}).pago1_cliente) {
+                            newDatos.checklist = {...(rest.checklist||{}), pago1_cliente:true};
+                            if (!rest.fecha_pago1_cliente) newDatos.fecha_pago1_cliente = new Date().toISOString().split("T")[0];
+                          }
                           await supabase.from("cotizaciones").update({datos: newDatos}).eq("id", id);
                           actualizadas++;
                         }
                         if (actualizadas > 0) {
-                          setCotizaciones(prev => prev.map(c =>
-                            opForm.cotizaciones.includes(c.id) && !COT_ESTADOS_TERMINALES.includes(c.estado)
-                              ? {...c, estado: nuevoEstadoCot} : c
-                          ));
+                          setCotizaciones(prev => prev.map(c => {
+                            if (!opForm.cotizaciones.includes(c.id) || COT_ESTADOS_TERMINALES.includes(c.estado)) return c;
+                            const upd = {...c, estado: nuevoEstadoCot};
+                            if (nuevoEstadoCot === "pagada" && !(c.checklist||{}).pago1_cliente) {
+                              upd.checklist = {...(c.checklist||{}), pago1_cliente:true};
+                              if (!c.fecha_pago1_cliente) upd.fecha_pago1_cliente = new Date().toISOString().split("T")[0];
+                            }
+                            return upd;
+                          }));
                           showToast(`✓ ${actualizadas} cotización(es) sincronizadas a "${nuevoEstadoCot}"`);
                         }
                       }
@@ -4220,9 +4237,22 @@ Número de seguimiento: ${c.nro}`;
                                 if (nuevoEstadoCot && cotsAfectables.length > 0) {
                                   for (const c of cotsAfectables) {
                                     const {id, ...rest} = c;
-                                    await supabase.from("cotizaciones").update({datos:{...rest, estado:nuevoEstadoCot}}).eq("id",id);
+                                    const newDatos = {...rest, estado:nuevoEstadoCot};
+                                    if (nuevoEstadoCot === "pagada" && !(rest.checklist||{}).pago1_cliente) {
+                                      newDatos.checklist = {...(rest.checklist||{}), pago1_cliente:true};
+                                      if (!rest.fecha_pago1_cliente) newDatos.fecha_pago1_cliente = new Date().toISOString().split("T")[0];
+                                    }
+                                    await supabase.from("cotizaciones").update({datos:newDatos}).eq("id",id);
                                   }
-                                  setCotizaciones(prev=>prev.map(c=>cotsAfectables.find(x=>x.id===c.id)?{...c,estado:nuevoEstadoCot}:c));
+                                  setCotizaciones(prev=>prev.map(c=>{
+                                    if(!cotsAfectables.find(x=>x.id===c.id)) return c;
+                                    const upd={...c,estado:nuevoEstadoCot};
+                                    if(nuevoEstadoCot==="pagada"&&!(c.checklist||{}).pago1_cliente){
+                                      upd.checklist={...(c.checklist||{}),pago1_cliente:true};
+                                      if(!c.fecha_pago1_cliente) upd.fecha_pago1_cliente=new Date().toISOString().split("T")[0];
+                                    }
+                                    return upd;
+                                  }));
                                 }
                                 setOperaciones(prev=>prev.map(o=>o.id===op.id?{...newOp,id:op.id}:o));
                                 showToast(`✓ OP ${op.nro} → "${nuevoEst}"` + (cotsAfectables.length>0?` (${cotsAfectables.length} cots sincronizadas)`:""));
@@ -4386,10 +4416,22 @@ Número de seguimiento: ${c.nro}`;
                                         for (const cot of cotsAfectables) {
                                           const {id, ...rest} = cot;
                                           const newDatos = {...rest, estado: nuevoEstadoCot};
+                                          if (nuevoEstadoCot === "pagada" && !(rest.checklist||{}).pago1_cliente) {
+                                            newDatos.checklist = {...(rest.checklist||{}), pago1_cliente:true};
+                                            if (!rest.fecha_pago1_cliente) newDatos.fecha_pago1_cliente = new Date().toISOString().split("T")[0];
+                                          }
                                           await supabase.from("cotizaciones").update({datos: newDatos}).eq("id", id);
                                           actualizadas++;
                                         }
-                                        setCotizaciones(prev=>prev.map(c=>cotsAfectables.find(x=>x.id===c.id)?{...c,estado:nuevoEstadoCot}:c));
+                                        setCotizaciones(prev=>prev.map(c=>{
+                                          if(!cotsAfectables.find(x=>x.id===c.id)) return c;
+                                          const upd={...c,estado:nuevoEstadoCot};
+                                          if(nuevoEstadoCot==="pagada"&&!(c.checklist||{}).pago1_cliente){
+                                            upd.checklist={...(c.checklist||{}),pago1_cliente:true};
+                                            if(!c.fecha_pago1_cliente) upd.fecha_pago1_cliente=new Date().toISOString().split("T")[0];
+                                          }
+                                          return upd;
+                                        }));
                                         showToast(`✓ ${actualizadas} cotización(es) sincronizadas a "${nuevoEstadoCot}"`);
                                       }catch(e){showToast("Error: "+e.message,"err");}
                                     }} disabled={!puedeSincronizar} style={{background:puedeSincronizar?"#eef6ff":"#f1f5f9",color:puedeSincronizar?"#2d78c8":"#94a3b8",border:`1px solid ${puedeSincronizar?"#bfdbfe":"#e2e8f0"}`,borderRadius:7,padding:"8px 14px",fontSize:12,cursor:puedeSincronizar?"pointer":"not-allowed",fontWeight:700}}>
