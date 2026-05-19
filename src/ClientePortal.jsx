@@ -969,9 +969,21 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                   var bg = EST_BG[c.estado]||"#eff6ff"
                   var label = EST_LABEL[c.estado]||c.estado
                   var cl = c.calc; var conIva = !!c.con_iva
-                  var p1 = cl?(conIva?(cl.p1ClIva||cl.p1Cl||0):(cl.p1Cl||0)):0
-                  var p2 = cl?(conIva?(cl.p2ClIva||cl.p2Cl||0):(cl.p2Cl||0)):0
-                  var tot = cl?(conIva?(cl.totClIva||cl.totCl||0):(cl.totCl||0)):0
+                  // Si admin fijó precio_final_acordado_und, usarlo como fuente de verdad para los montos.
+                  // (Override del calculado: prioriza lo que el cliente efectivamente pagó.)
+                  var und = Number(c.unidades)||0
+                  var totAcordado = (Number(c.precio_final_acordado_und)>0 && und>0) ? Number(c.precio_final_acordado_und)*und : null
+                  var pctDep = (Number(c.pct_deposito)||30)/100
+                  var p1, p2, tot
+                  if(totAcordado!==null){
+                    tot = totAcordado
+                    p1 = c.pago_100 ? totAcordado : totAcordado*pctDep
+                    p2 = c.pago_100 ? 0 : totAcordado*(1-pctDep)
+                  } else {
+                    p1 = cl?(conIva?(cl.p1ClIva||cl.p1Cl||0):(cl.p1Cl||0)):0
+                    p2 = cl?(conIva?(cl.p2ClIva||cl.p2Cl||0):(cl.p2Cl||0)):0
+                    tot = cl?(conIva?(cl.totClIva||cl.totCl||0):(cl.totCl||0)):0
+                  }
                   var pagado1 = c.checklist&&c.checklist.pago1_cliente
                   var pagado2 = c.checklist&&c.checklist.pago2_cliente
                   var done = CHECKLIST_FULL.filter(function(d){ return c.checklist&&c.checklist[d.key] }).length
