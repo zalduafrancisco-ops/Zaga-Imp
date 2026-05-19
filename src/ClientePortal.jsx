@@ -422,16 +422,33 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     var productosRMB = Number(cc.productos_rmb)||0
     var productosCLP = productosRMB * tcRmb
     var comisionCLP  = productosRMB * (Number(cc.comision_pct||0)/100) * tcRmb
-    // Usar tarifa consolidada de Sunny si existe (más barata por bulk); si no, usar la original.
-    var tarifaFleteKg = Number(op.flete_usd_kg_consolidado)||Number(cc.flete_usd_kg)||0
-    var fleteCLP     = tarifaFleteKg*(Number(cc.peso_kg)||0)*tc
-    var logisticaCLP = (Number(cc.logistica_rmb)||0)*tcRmb
-    var otrosCLP     = (Number(cc.otros_usd)||0)*tc
-    var formFCLP     = (Number(cc.form_f_usd_por_producto)||0)*totalCotsOp*tc
-    var seguroCLP    = productosRMB*(Number(cc.seguro_pct||0)/100)*tcRmb
+    // ── FLETE ── Priorizar tarifa consolidada Sunny (RMB > USD), sino tarifa op (RMB > USD legacy)
+    var TC_RMB_USD = 7.2
+    var fleteRmbKgConsolidado = Number(op.flete_rmb_kg_consolidado)||0
+    var fleteUsdKgConsolidadoLegacy = Number(op.flete_usd_kg_consolidado)||0
+    var fleteRmbKg = Number(cc.flete_rmb_kg)||0
+    var fleteUsdKgLegacy = Number(cc.flete_usd_kg)||0
+    var tarifaFleteKgUsd = fleteRmbKgConsolidado>0 ? fleteRmbKgConsolidado/TC_RMB_USD
+                         : (fleteUsdKgConsolidadoLegacy>0 ? fleteUsdKgConsolidadoLegacy
+                         : (fleteRmbKg>0 ? fleteRmbKg/TC_RMB_USD : fleteUsdKgLegacy))
+    var fleteCLP     = tarifaFleteKgUsd*(Number(cc.peso_kg)||0)*tc
+    // ── FIJOS CHINA en RMB nativo ── (logística + docs + despacho + compra docs)
+    var logisticaCLP    = (Number(cc.logistica_rmb)||0)*tcRmb
+    var docsOperacionCLP = (Number(cc.docs_operacion_rmb)||0)*tcRmb
+    var despachoExpCLP  = (Number(cc.despacho_exportacion_rmb)||0)*tcRmb
+    var compraDocsCLP   = (Number(cc.compra_docs_rmb)||0)*tcRmb
+    var otrosCLP        = (Number(cc.otros_usd)||0)*tc // legacy fallback si nuevos campos vacíos
+    // Si los campos granulares están todos vacíos, mantener compatibilidad con ops viejas usando otros_usd
+    var fijosChinaCLP   = docsOperacionCLP + despachoExpCLP + compraDocsCLP
+    if(fijosChinaCLP === 0) fijosChinaCLP = otrosCLP // fallback ops antiguas
+    // ── FORM F en RMB nativo ── fallback a USD legacy
+    var formFRmb = Number(cc.form_f_rmb_por_producto)||0
+    var formFUsdLegacy = Number(cc.form_f_usd_por_producto)||0
+    var formFCLP = formFRmb>0 ? formFRmb*totalCotsOp*tcRmb : formFUsdLegacy*totalCotsOp*tc
+    var seguroCLP = productosRMB*(Number(cc.seguro_pct||0)/100)*tcRmb
     var aduanaCLP    = (Number(ch.aduana_neta)||0)+(Number(ch.iva_agente)||0)
     var wuCLP        = Number(pg.comisiones_wu)||0
-    var costoTotal   = productosCLP+comisionCLP+fleteCLP+logisticaCLP+otrosCLP+formFCLP+seguroCLP+aduanaCLP+wuCLP
+    var costoTotal   = productosCLP+comisionCLP+fleteCLP+logisticaCLP+fijosChinaCLP+formFCLP+seguroCLP+aduanaCLP+wuCLP
 
     var margen = (Number(op.margen_objetivo)||25)/100
     var ventaNetaTotal = costoTotal/(1-margen)

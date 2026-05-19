@@ -115,7 +115,12 @@ function calcCliente(d) {
                     (aforoOn ? (Number(d.aer_aforo)||48000) : 0);
     const formF = d.form_f_incluido !== false;
     const arancelPct = formF ? 0 : 0.06;
-    const ivaAgente = aduFijo * 0.19;
+    // IVA agente Leslie aplica SOLO sobre servicios del agente: honorarios + EDI + despacho.
+    // Aeropuerto + aforo NO son del agente (son cargos fiscales del aeropuerto), no llevan IVA agente.
+    const baseIvaAgente = (Number(d.aer_honorarios)||150000) +
+                          (Number(d.aer_edi)||15000) +
+                          (Number(d.aer_despacho)||50000);
+    const ivaAgente = baseIvaAgente * 0.19;
 
     const cifReal = pCh * u;          // mi CIF real (lo que pago a China)
     const cifCl   = (pCh + mar) * u;  // CIF mostrado al cliente (precio venta)
@@ -207,7 +212,7 @@ function calcConsolidado(cot, op, cotsEnOp) {
   const cc = op.costos_china || {};
   const tc = Number(op?.pago?.tc_efectivo) || 950;
 
-  // Helpers — m³ y peso totales por cotización
+  // Helpers — m³ y peso COBRABLE (max entre real y volumétrico ÷6000) por cotización
   const getCbm = (c) => {
     const m3 = Number(c.dim_m3) || 0;
     const u = Number(c.unidades) || 0;
@@ -215,12 +220,17 @@ function calcConsolidado(cot, op, cotsEnOp) {
     const esCaja = c.dim_tipo === "caja";
     return esCaja && undCaja > 0 ? m3 * Math.ceil(u / undCaja) : m3 * u;
   };
+  // Peso cobrable = max(peso real total, peso volumétrico = CBM × 166,67)
+  // Esto evita subestimar el flete cuando la carga es voluminosa (densidad baja).
   const getPeso = (c) => {
     const p = Number(c.peso_kg) || 0;
     const u = Number(c.unidades) || 0;
     const undCaja = Number(c.dim_und_caja) || 0;
     const esCaja = c.dim_tipo === "caja";
-    return esCaja && undCaja > 0 ? p * Math.ceil(u / undCaja) : p * u;
+    const pesoReal = esCaja && undCaja > 0 ? p * Math.ceil(u / undCaja) : p * u;
+    const cbm = getCbm(c);
+    const pesoVol = cbm * 166.67; // 1 m³ ÷ 6000 cm³/kg = 166,67 kg
+    return Math.max(pesoReal, pesoVol);
   };
 
   const totalCbmOp = cotsEnOp.reduce((s, c) => s + getCbm(c), 0);
@@ -243,8 +253,16 @@ function calcConsolidado(cot, op, cotsEnOp) {
   const ahorroCdaCl = cdaStandaloneCl - cdaConsolidadoCl;
 
   // Ahorro 2 — Flete: tarifa standalone Sunny vs tarifa consolidada Sunny (si la dio)
-  const tarifaStandaloneKg = Number(cot.aer_tarifa_sunny_kg) || Number(cc.flete_usd_kg) || 0;
-  const tarifaConsolidadoKg = Number(op.flete_usd_kg_consolidado) || Number(cc.flete_usd_kg) || 0;
+  // Lógica RMB nativo con fallback USD legacy. RMB → USD via tc_rmb_usd = 7.2
+  const TC_RMB_USD = 7.2;
+  const fleteRmbKg = Number(cc.flete_rmb_kg) || 0;
+  const fleteUsdKgLegacy = Number(cc.flete_usd_kg) || 0;
+  const tarifaOpKg = fleteRmbKg > 0 ? fleteRmbKg / TC_RMB_USD : fleteUsdKgLegacy;
+  const fleteRmbKgConsolidado = Number(op.flete_rmb_kg_consolidado) || 0;
+  const fleteUsdKgConsolidadoLegacy = Number(op.flete_usd_kg_consolidado) || 0;
+  const tarifaConsolidadoKg = fleteRmbKgConsolidado > 0 ? fleteRmbKgConsolidado / TC_RMB_USD
+                            : (fleteUsdKgConsolidadoLegacy > 0 ? fleteUsdKgConsolidadoLegacy : tarifaOpKg);
+  const tarifaStandaloneKg = Number(cot.aer_tarifa_sunny_kg) || tarifaOpKg;
   const fleteStandaloneCl = pesoCot * tarifaStandaloneKg * tc;
   const fleteConsolidadoCl = pesoCot * tarifaConsolidadoKg * tc;
   const ahorroFleteCl = Math.max(0, fleteStandaloneCl - fleteConsolidadoCl);
@@ -1923,6 +1941,26 @@ Número de seguimiento: ${c.nro}`;
                     </label>
                     {/* Costos aduaneros editables */}
                     <div style={{fontSize:10,color:"#92400e",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Costos aduaneros (editables)</div>
+                    {/* Sugerencia automática honorarios Leslie: max(USD 150 × TC, CIF × 0,35%) */}
+                    {(()=>{
+                      const TC_ADUANERO = 896.03;
+                      const cifClp = (Number(form.precio_china)||0)*(Number(form.unidades)||0) + (Number(form.margen_und)||0)*(Number(form.unidades)||0);
+                      const minimo = 150 * TC_ADUANERO; // USD 150 × TC aduanero
+                      const porPct = cifClp * 0.0035;   // 0,35% sobre CIF
+                      const sugerido = Math.round(Math.max(minimo, porPct));
+                      const honorariosActual = Number(form.aer_honorarios) || 0;
+                      const diff = honorariosActual - sugerido;
+                      return (
+                        <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:6,padding:"7px 10px",marginBottom:6,fontSize:10,color:"#854d0e",lineHeight:1.5}}>
+                          💡 <b>Sugerencia honorarios Leslie:</b> {fmt(sugerido)} <span style={{color:"#94a3b8"}}>(max entre USD 150 × $896,03 = {fmt(minimo)} y CIF × 0,35% = {fmt(porPct)})</span>
+                          {cifClp > 0 && honorariosActual > 0 && Math.abs(diff) > 1000 && (
+                            <button onClick={()=>setForm(p=>({...p,aer_honorarios:sugerido}))} style={{marginLeft:8,background:"#fbbf24",color:"#040c18",border:"none",borderRadius:5,padding:"2px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>
+                              Aplicar →
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                       {[
                         ["aer_honorarios","Honorarios aduana"],
@@ -3663,7 +3701,20 @@ Número de seguimiento: ${c.nro}`;
                 const nuevoNro="OP-"+String(operaciones.length+1).padStart(3,"0");
                 setOpForm({
                   nro:nuevoNro, cliente:"", estado:"borrador", cotizaciones:[],
-                  costos_china:{ productos_rmb:0, comision_pct:5, flete_usd_kg:9.55, peso_kg:0, cbm:0, logistica_rmb:350, otros_usd:200, form_f_usd_por_producto:25, seguro_pct:0.2 },
+                  costos_china:{
+                    productos_rmb:0, comision_pct:5,
+                    // Modelo RMB nativo (Sunny piensa en RMB):
+                    flete_rmb_kg:65,                      // antes flete_usd_kg:9.55
+                    form_f_rmb_por_producto:150,          // antes form_f_usd_por_producto:25
+                    logistica_rmb:400,                    // Yiwu→Shanghai (era 350, actualizado por Sunny)
+                    docs_operacion_rmb:150,               // Documentación + operación (nuevo, antes en otros_usd)
+                    despacho_exportacion_rmb:200,         // Despacho aduanero exportación China (nuevo)
+                    compra_docs_rmb:350,                  // 买单 compra de documentos (nuevo)
+                    seguro_pct:0.2,
+                    peso_kg:0, cbm:0,
+                    // Legacy USD — mantener para retrocompatibilidad con ops existentes:
+                    flete_usd_kg:0, form_f_usd_por_producto:0, otros_usd:0,
+                  },
                   costos_chile:{ aduana_neta:331000, iva_agente:62890, aforo_incluido:true },
                   pago:{ tc_efectivo:980, comisiones_wu:65000, metodo_pago:"WU" },
                   distribucion:"cbm",
@@ -3748,20 +3799,39 @@ Número de seguimiento: ${c.nro}`;
                   })()}
                 </div>
 
-                {/* Costos consolidados */}
+                {/* Costos consolidados — todo en RMB nativo (Sunny piensa en RMB) */}
                 <div style={{borderTop:"1px solid #e2e8f0",paddingTop:14,marginBottom:14}}>
-                  <div style={{fontSize:12,fontWeight:700,color:"#2d78c8",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>🇨🇳 Costos China</div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#2d78c8",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>🇨🇳 Costos China (RMB nativo)</div>
+                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:10,fontStyle:"italic"}}>TC RMB↔USD = 7,2 · TC USD↔CLP = ver Pago abajo</div>
+                  <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Variables (escalan con tamaño)</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:10}}>
                     <div><label style={{fontSize:10,color:"#64748b"}}><b>Productos total RMB</b></label><input type="number" value={opForm.costos_china.productos_rmb||0} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,productos_rmb:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #2d78c8",borderRadius:6,marginTop:2,outline:"none",background:"#eff6ff"}}/></div>
                     <div><label style={{fontSize:10,color:"#64748b"}}>Comisión agente %</label><input type="number" step="0.1" value={opForm.costos_china.comision_pct} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,comision_pct:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
-                    <div><label style={{fontSize:10,color:"#64748b"}}>Flete USD/kg</label><input type="number" step="0.01" value={opForm.costos_china.flete_usd_kg} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,flete_usd_kg:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Flete RMB/kg (def 65)</label><input type="number" step="0.1" value={opForm.costos_china.flete_rmb_kg??65} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,flete_rmb_kg:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Form F RMB/producto (def 150)</label><input type="number" value={opForm.costos_china.form_f_rmb_por_producto??150} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,form_f_rmb_por_producto:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
                     <div><label style={{fontSize:10,color:"#64748b"}}>Peso total (kg)</label><input type="number" step="0.1" value={opForm.costos_china.peso_kg} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,peso_kg:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
                     <div><label style={{fontSize:10,color:"#64748b"}}>CBM total (m³)</label><input type="number" step="0.001" value={opForm.costos_china.cbm} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,cbm:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
-                    <div><label style={{fontSize:10,color:"#64748b"}}>Logística RMB</label><input type="number" value={opForm.costos_china.logistica_rmb} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,logistica_rmb:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
-                    <div><label style={{fontSize:10,color:"#64748b"}}>Otros gastos USD</label><input type="number" value={opForm.costos_china.otros_usd} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,otros_usd:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
-                    <div><label style={{fontSize:10,color:"#64748b"}}>Form F USD/producto</label><input type="number" value={opForm.costos_china.form_f_usd_por_producto} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,form_f_usd_por_producto:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
                     <div><label style={{fontSize:10,color:"#64748b"}}>Seguro %</label><input type="number" step="0.01" value={opForm.costos_china.seguro_pct} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,seguro_pct:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
                   </div>
+                  <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Fijos por embarque (1.100 RMB típico)</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10}}>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Logística Yiwu→Shanghai RMB (def 400)</label><input type="number" value={opForm.costos_china.logistica_rmb??400} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,logistica_rmb:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Docs + operación RMB (def 150)</label><input type="number" value={opForm.costos_china.docs_operacion_rmb??150} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,docs_operacion_rmb:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Despacho exportación RMB (def 200)</label><input type="number" value={opForm.costos_china.despacho_exportacion_rmb??200} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,despacho_exportacion_rmb:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                    <div><label style={{fontSize:10,color:"#64748b"}}>Compra docs (买单) RMB (def 350)</label><input type="number" value={opForm.costos_china.compra_docs_rmb??350} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,compra_docs_rmb:Number(e.target.value)||0}}))} style={{width:"100%",padding:"7px 9px",fontSize:12,border:"1px solid #e2e8f0",borderRadius:6,marginTop:2,outline:"none"}}/></div>
+                  </div>
+                  {/* Legacy USD — solo visible si tienen valor histórico */}
+                  {(Number(opForm.costos_china.flete_usd_kg)>0 || Number(opForm.costos_china.form_f_usd_por_producto)>0 || Number(opForm.costos_china.otros_usd)>0) && (
+                    <details style={{marginTop:10,fontSize:11}}>
+                      <summary style={{cursor:"pointer",color:"#94a3b8",fontStyle:"italic"}}>⚠️ Campos legacy USD (heredados de ops anteriores) — click para ver</summary>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:6}}>
+                        <div><label style={{fontSize:9,color:"#94a3b8"}}>Flete USD/kg (legacy)</label><input type="number" step="0.01" value={opForm.costos_china.flete_usd_kg||0} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,flete_usd_kg:Number(e.target.value)||0}}))} style={{width:"100%",padding:"5px 8px",fontSize:11,border:"1px solid #e2e8f0",borderRadius:5,outline:"none",background:"#f8fafc"}}/></div>
+                        <div><label style={{fontSize:9,color:"#94a3b8"}}>Form F USD (legacy)</label><input type="number" value={opForm.costos_china.form_f_usd_por_producto||0} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,form_f_usd_por_producto:Number(e.target.value)||0}}))} style={{width:"100%",padding:"5px 8px",fontSize:11,border:"1px solid #e2e8f0",borderRadius:5,outline:"none",background:"#f8fafc"}}/></div>
+                        <div><label style={{fontSize:9,color:"#94a3b8"}}>Otros USD (legacy)</label><input type="number" value={opForm.costos_china.otros_usd||0} onChange={e=>setOpForm(p=>({...p,costos_china:{...p.costos_china,otros_usd:Number(e.target.value)||0}}))} style={{width:"100%",padding:"5px 8px",fontSize:11,border:"1px solid #e2e8f0",borderRadius:5,outline:"none",background:"#f8fafc"}}/></div>
+                      </div>
+                      <div style={{fontSize:10,color:"#94a3b8",marginTop:5,fontStyle:"italic"}}>El sistema usa RMB nativo si está &gt;0; sino fallback a USD legacy × TC.</div>
+                    </details>
+                  )}
                 </div>
 
                 <div style={{borderTop:"1px solid #e2e8f0",paddingTop:14,marginBottom:14}}>
