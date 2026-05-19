@@ -562,7 +562,8 @@ export default function App({ supabase, usuario, onLogout }){
           .order("created_at",{ascending:false});
         if(error) throw error;
         if(data&&data.length>0){
-          const lista=data.map(r=>r.datos);
+          // FIX: garantizar id real de columna Supabase, no datos.id (puede ser null)
+          const lista=data.map(r=>Object.assign({},r.datos,{id:r.id}));
           cotizacionesRef.current=lista;
           setCotizaciones(lista);
         } else {
@@ -597,7 +598,8 @@ export default function App({ supabase, usuario, onLogout }){
       .on("postgres_changes",{event:"UPDATE",schema:"public",table:"cotizaciones"},async(payload)=>{
         const {data}=await supabase.from("cotizaciones").select("id,datos").eq("id",payload.new.id).single();
         if(data){
-          const nd=data.datos;
+          // FIX: garantizar id real de columna Supabase, no datos.id (puede ser null)
+          const nd=Object.assign({},data.datos,{id:data.id});
           const prevList=cotizacionesRef.current;
           const prev=prevList.find(x=>x.id===nd.id);
           // Alerta si llegó nota china nueva
