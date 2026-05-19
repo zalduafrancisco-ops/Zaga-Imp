@@ -60,7 +60,7 @@ const CHECKLIST_FULL = [
 ]
 const RECHAZADAS_EST = ["no_prospero"]
 const PROCESADAS_EST = ["pagada","pagada","en_camino","en_bodega","completada"]
-const ESTADOS_ORDEN = ["solicitud","solicitud","cotizada","cotizada","solicitud","cotizada","pagada","pagada","en_camino","en_bodega","completada","no_prospero","no_prospero","no_prospero"]
+const ESTADOS_ORDEN = ["solicitud","cotizada","pagada","en_camino","en_bodega","completada","no_prospero"]
 
 // ── Mapa: estado → índice máximo visible en el TIMELINE (red de seguridad) ──
 const TIMELINE_MAX_POR_ESTADO = {
