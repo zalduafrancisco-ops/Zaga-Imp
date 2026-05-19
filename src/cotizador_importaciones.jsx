@@ -194,6 +194,105 @@ function calcCliente(d) {
   return { tChNeto,ivaChina,tCh,dCh,prCh,comR:comREff,p1Ch,p2Ch,totCh,cRUnd,cRUndNeto,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,ivaCliente,ivaRecuperado,ivaNetoFavor,saldoF29,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult,aer,isAereo };
 }
 
+// ── Cálculo de consolidación aérea ──────────────────────────────────────────
+// Dada una cotización y la operación a la que pertenece (con todas sus cots),
+// devuelve standalone, consolidado y ahorro distribuido según regla:
+//   - 100% al cliente si todas las cots de la op son del MISMO cliente
+//   - 50/50 cliente / margen ZAGA si la op es multi-cliente
+// Distribución de costos compartidos = AUTO según modo cobro Sunny (peso/volumen).
+function calcConsolidado(cot, op, cotsEnOp) {
+  if (!op || !cotsEnOp || cotsEnOp.length === 0) return null;
+
+  const calcStand = calcCliente(cot);
+  const cc = op.costos_china || {};
+  const tc = Number(op?.pago?.tc_efectivo) || 950;
+
+  // Helpers — m³ y peso totales por cotización
+  const getCbm = (c) => {
+    const m3 = Number(c.dim_m3) || 0;
+    const u = Number(c.unidades) || 0;
+    const undCaja = Number(c.dim_und_caja) || 0;
+    const esCaja = c.dim_tipo === "caja";
+    return esCaja && undCaja > 0 ? m3 * Math.ceil(u / undCaja) : m3 * u;
+  };
+  const getPeso = (c) => {
+    const p = Number(c.peso_kg) || 0;
+    const u = Number(c.unidades) || 0;
+    const undCaja = Number(c.dim_und_caja) || 0;
+    const esCaja = c.dim_tipo === "caja";
+    return esCaja && undCaja > 0 ? p * Math.ceil(u / undCaja) : p * u;
+  };
+
+  const totalCbmOp = cotsEnOp.reduce((s, c) => s + getCbm(c), 0);
+  const totalPesoOp = cotsEnOp.reduce((s, c) => s + getPeso(c), 0);
+  const cbmCot = getCbm(cot);
+  const pesoCot = getPeso(cot);
+  const shareCbm = totalCbmOp > 0 ? cbmCot / totalCbmOp : 0;
+  const sharePeso = totalPesoOp > 0 ? pesoCot / totalPesoOp : 0;
+
+  // Modo AUTO: usa el mayor share (lo que más le toca pagar a esta cot)
+  const modo = cot.aer_modo_cobro_sunny || "auto";
+  const share = modo === "peso" ? sharePeso
+              : modo === "volumen" ? shareCbm
+              : Math.max(shareCbm, sharePeso);
+  const modoUsado = modo === "auto" ? (sharePeso >= shareCbm ? "peso" : "volumen") : modo;
+
+  // Ahorro 1 — Aduana fija prorrateada (standalone paga 100%, consolidado paga share)
+  const cdaStandaloneCl = calcStand.cdaCl;            // neto cliente (servicios aduana)
+  const cdaConsolidadoCl = cdaStandaloneCl * share;
+  const ahorroCdaCl = cdaStandaloneCl - cdaConsolidadoCl;
+
+  // Ahorro 2 — Flete: tarifa standalone Sunny vs tarifa consolidada Sunny (si la dio)
+  const tarifaStandaloneKg = Number(cot.aer_tarifa_sunny_kg) || Number(cc.flete_usd_kg) || 0;
+  const tarifaConsolidadoKg = Number(op.flete_usd_kg_consolidado) || Number(cc.flete_usd_kg) || 0;
+  const fleteStandaloneCl = pesoCot * tarifaStandaloneKg * tc;
+  const fleteConsolidadoCl = pesoCot * tarifaConsolidadoKg * tc;
+  const ahorroFleteCl = Math.max(0, fleteStandaloneCl - fleteConsolidadoCl);
+
+  // Ahorro total bruto (positivo = consolidado es más barato)
+  const ahorroTotalCl = Math.max(0, ahorroCdaCl + ahorroFleteCl);
+
+  // ¿Cliente único o multi-cliente?
+  const clientesUnicos = [...new Set(cotsEnOp.map(c => c.cliente).filter(Boolean))];
+  const clienteUnico = clientesUnicos.length === 1;
+
+  // Distribución del ahorro
+  const ahorroCliente = clienteUnico ? ahorroTotalCl : ahorroTotalCl / 2;
+  const ahorroZaga    = clienteUnico ? 0              : ahorroTotalCl / 2;
+
+  // Totales consolidados
+  const totClConsolidado = Math.max(0, calcStand.totCl - ahorroCliente);
+  const uCot = Number(cot.unidades) || 0;
+  const pCUndConsolidado = uCot > 0 ? totClConsolidado / uCot : 0;
+
+  return {
+    standalone: {
+      totCl: calcStand.totCl,
+      ganImp: calcStand.ganImp,
+      cdaCl: cdaStandaloneCl,
+      pCUnd: calcStand.pCUnd,
+    },
+    consolidado: {
+      totCl: totClConsolidado,
+      ganImp: calcStand.ganImp + ahorroZaga,
+      cdaCl: cdaConsolidadoCl,
+      pCUnd: pCUndConsolidado,
+    },
+    ahorro: {
+      totalCl: ahorroTotalCl,
+      cliente: ahorroCliente,
+      zaga: ahorroZaga,
+      ahorroCda: ahorroCdaCl,
+      ahorroFlete: ahorroFleteCl,
+      clienteUnico,
+      share,
+      shareCbm,
+      sharePeso,
+      modoUsado,
+    },
+  };
+}
+
 // Encuentra el margen/unidad (mar) tal que mgBrut sobre venta = targetMg (ej. 0.25 = 25%).
 // Bisección numérica: robusta ante IVA, aforo, arancel, servicio%, todos los términos dependientes.
 function findMarParaMargen(d, targetMg = 0.25) {
@@ -3787,26 +3886,45 @@ Número de seguimiento: ${c.nro}`;
                   const cots=cotizaciones.filter(c=>op.cotizaciones?.includes(c.id));
                   const totalUnd=cots.reduce((s,c)=>s+Number(c.unidades||0),0);
                   const clientesOp=op.clientes&&op.clientes.length>0?op.clientes:[...new Set(cots.map(c=>c.cliente).filter(Boolean))];
+                  const clienteUnico = clientesOp.length === 1;
+                  const expanded = opOpenId === op.id;
+                  // Calcular consolidado de cada cot solo si está expandido (perf)
+                  const consolidados = expanded ? cots
+                    .filter(c => c.estado === "enviada_cliente" || c.estado === "aceptada" || c.estado === "respuesta_china")
+                    .map(c => ({ cot:c, calc: calcConsolidado(c, op, cots) }))
+                    .filter(x => x.calc) : [];
+                  const ahorroTotalOp = consolidados.reduce((s,x) => s + (x.calc?.ahorro?.totalCl||0), 0);
                   return (
                     <div key={op.id} style={{background:"#fff",borderRadius:10,border:"1px solid #e2e8f0",padding:"14px 18px"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-                        <div>
+                        <div style={{flex:1,minWidth:0}}>
                           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                             <span style={{fontSize:14,fontWeight:800,color:"#c9a055"}}>{op.nro}</span>
                             {clientesOp.map(cl=>(
                               <span key={cl} style={{fontSize:12,fontWeight:700,color:"#040c18",background:"#eef6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"2px 9px"}}>👤 {cl}</span>
                             ))}
                             <span style={{fontSize:10,fontWeight:700,background:"#f1f5f9",color:"#64748b",padding:"2px 8px",borderRadius:10,textTransform:"uppercase"}}>{op.estado}</span>
+                            {op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny&&(
+                              <span style={{fontSize:10,fontWeight:700,background:"#fff7ed",color:"#c47830",border:"1px solid #fed7aa",padding:"2px 8px",borderRadius:10}}>📢 Esperando Sunny</span>
+                            )}
+                            {op.recotizacion_completada_sunny&&!op.consolidado_aplicado_cliente&&(
+                              <span style={{fontSize:10,fontWeight:700,background:"#eff6ff",color:"#2d78c8",border:"1px solid #bfdbfe",padding:"2px 8px",borderRadius:10}}>🔔 Sunny respondió — aplicar a clientes</span>
+                            )}
+                            {op.consolidado_aplicado_cliente&&(
+                              <span style={{fontSize:10,fontWeight:700,background:"#f0fdf4",color:"#1aa358",border:"1px solid #bbf7d0",padding:"2px 8px",borderRadius:10}}>✅ Consolidado activo</span>
+                            )}
                           </div>
-                          <div style={{fontSize:11,color:"#64748b",marginTop:4}}>{op.cotizaciones?.length||0} cotizaciones · {fmtN(totalUnd)} unidades · Margen {op.margen_objetivo}%</div>
+                          <div style={{fontSize:11,color:"#64748b",marginTop:4}}>
+                            {op.cotizaciones?.length||0} cotizaciones · {fmtN(totalUnd)} unidades · Margen {op.margen_objetivo}% · {clienteUnico?"Cliente único":"Multi-cliente"}
+                          </div>
                         </div>
-                        <div style={{display:"flex",gap:6}}>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                          <button onClick={()=>setOpOpenId(expanded?null:op.id)} style={{background:expanded?"#c9a05522":"#f8fafc",color:expanded?"#c9a055":"#64748b",border:`1px solid ${expanded?"#c9a05566":"#e2e8f0"}`,borderRadius:6,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>💎 {expanded?"Ocultar":"Ver"} consolidado</button>
                           <button onClick={()=>{setOpForm(op);setOpEditId(op.id);}} style={{background:"#eef6ff",color:"#2d78c8",border:"1px solid #bfdbfe",borderRadius:6,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>✏️ Editar</button>
                           <button onClick={async()=>{
                             if(!confirm(`¿Eliminar operación ${op.nro}?`))return;
                             try{
                               await supabase.from("operaciones").delete().eq("id",op.id);
-                              // Limpiar operacion_id de cotizaciones asociadas
                               await Promise.all((op.cotizaciones||[]).map(async cotId=>{
                                 const cot=cotizaciones.find(c=>c.id===cotId);
                                 if(cot){
@@ -3821,6 +3939,98 @@ Número de seguimiento: ${c.nro}`;
                           }} style={{background:"#fef2f2",color:"#c0392b",border:"1px solid #fecaca",borderRadius:6,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>🗑️ Eliminar</button>
                         </div>
                       </div>
+                      {/* Bloque consolidado expandible */}
+                      {expanded&&(
+                        <div style={{marginTop:14,padding:14,background:"#fafafa",borderRadius:9,border:"1px solid #e2e8f0"}}>
+                          <div style={{fontSize:11,color:"#c9a055",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>💎 Comparativa standalone vs consolidado</div>
+                          {consolidados.length===0?(
+                            <div style={{fontSize:12,color:"#94a3b8",fontStyle:"italic"}}>No hay cotizaciones en estado <b>enviada_cliente</b> o posteriores. La consolidación aplica solo desde ese estado.</div>
+                          ):(
+                            <>
+                              <div style={{overflowX:"auto"}}>
+                                <table style={{width:"100%",fontSize:12,borderCollapse:"collapse"}}>
+                                  <thead>
+                                    <tr style={{background:"#f1f5f9",color:"#64748b"}}>
+                                      <th style={{padding:"6px 8px",textAlign:"left",fontWeight:700}}>Cotización</th>
+                                      <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700}}>Standalone</th>
+                                      <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700}}>Consolidado</th>
+                                      <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700,color:"#1aa358"}}>Ahorro</th>
+                                      <th style={{padding:"6px 8px",textAlign:"center",fontWeight:700,fontSize:10}}>→ Cliente</th>
+                                      <th style={{padding:"6px 8px",textAlign:"center",fontWeight:700,fontSize:10}}>→ ZAGA</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {consolidados.map(({cot,calc})=>(
+                                      <tr key={cot.id} style={{borderTop:"1px solid #e2e8f0"}}>
+                                        <td style={{padding:"7px 8px"}}>
+                                          <div style={{fontSize:11,fontWeight:700,color:"#0f172a"}}>{cot.nro} · {cot.producto}</div>
+                                          <div style={{fontSize:10,color:"#64748b"}}>👤 {cot.cliente||"—"} · modo {calc.ahorro.modoUsado}</div>
+                                        </td>
+                                        <td style={{padding:"7px 8px",textAlign:"right"}}>{fmt(calc.standalone.totCl)}</td>
+                                        <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#0f172a"}}>{fmt(calc.consolidado.totCl)}</td>
+                                        <td style={{padding:"7px 8px",textAlign:"right",color:"#1aa358",fontWeight:700}}>-{fmt(calc.ahorro.totalCl)}</td>
+                                        <td style={{padding:"7px 8px",textAlign:"right",color:"#16a34a"}}>{fmt(calc.ahorro.cliente)}</td>
+                                        <td style={{padding:"7px 8px",textAlign:"right",color:"#c9a055"}}>{fmt(calc.ahorro.zaga)}</td>
+                                      </tr>
+                                    ))}
+                                    <tr style={{borderTop:"2px solid #c9a055",background:"#fef9c3"}}>
+                                      <td style={{padding:"8px",fontSize:11,fontWeight:800,color:"#854d0e"}}>Total ahorro op</td>
+                                      <td colSpan={2}></td>
+                                      <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#1aa358",fontSize:13}}>-{fmt(ahorroTotalOp)}</td>
+                                      <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#16a34a"}}>{fmt(consolidados.reduce((s,x)=>s+x.calc.ahorro.cliente,0))}</td>
+                                      <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#c9a055"}}>{fmt(consolidados.reduce((s,x)=>s+x.calc.ahorro.zaga,0))}</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                              <div style={{fontSize:10,color:"#64748b",marginTop:8,fontStyle:"italic",lineHeight:1.5}}>
+                                Distribución de ahorro: <b>{clienteUnico?"100% al cliente":"50% cliente / 50% ZAGA (multi-cliente)"}</b> · Reparto de costos compartidos por <b>{clienteUnico?"modo Sunny auto":"modo Sunny auto"}</b> (mayor entre peso o volumen) · Aduana fija prorrateada + flete usando tarifa consolidada Sunny ({op.flete_usd_kg_consolidado?`USD/kg ${op.flete_usd_kg_consolidado}`:"aún no actualizada"})
+                              </div>
+                              <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
+                                <button onClick={async()=>{
+                                  if(!confirm(`📢 Marcar OP ${op.nro} para que Sunny recotize?\n\nSunny verá la operación en su portal y deberá actualizar la tarifa de flete consolidada (USD/kg o USD/CBM según modo).`))return;
+                                  try{
+                                    const newOp = {...op, recotizacion_pendiente_sunny:true, recotizacion_completada_sunny:false, fecha_solicitud_recotizacion: new Date().toISOString()};
+                                    delete newOp.id;
+                                    await supabase.from("operaciones").update({datos:newOp,updated_at:new Date().toISOString()}).eq("id",op.id);
+                                    // Marcar cada cot también
+                                    await Promise.all(cots.map(async c=>{
+                                      const newCot={...c, recotizacion_pendiente_sunny:true};
+                                      delete newCot.id;
+                                      delete newCot._id;
+                                      delete newCot._updated;
+                                      await supabase.from("cotizaciones").update({datos:newCot}).eq("id",c.id);
+                                    }));
+                                    setOperaciones(prev=>prev.map(o=>o.id===op.id?{...newOp,id:op.id}:o));
+                                    setCotizaciones(prev=>prev.map(c=>cots.find(x=>x.id===c.id)?{...c,recotizacion_pendiente_sunny:true}:c));
+                                    showToast("📢 Sunny notificada");
+                                  }catch(e){showToast("Error: "+e.message,"err");}
+                                }} disabled={op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny} style={{background:op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny?"#fff7ed":"#c47830",color:op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny?"#c47830":"#fff",border:"1px solid #c47830",borderRadius:7,padding:"8px 14px",fontSize:12,cursor:op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny?"default":"pointer",fontWeight:700}}>
+                                  📢 {op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny?"Esperando Sunny...":"Notificar Sunny para recotizar"}
+                                </button>
+                                <button onClick={async()=>{
+                                  if(!confirm(`✅ Aplicar precios consolidados a los clientes de OP ${op.nro}?\n\nLos clientes verán en su portal el nuevo precio (más bajo) y el ahorro. Esto NO cambia el estado de las cotizaciones.`))return;
+                                  try{
+                                    const newOp = {...op, consolidado_aplicado_cliente:true, fecha_aplicacion_cliente: new Date().toISOString()};
+                                    delete newOp.id;
+                                    await supabase.from("operaciones").update({datos:newOp,updated_at:new Date().toISOString()}).eq("id",op.id);
+                                    await Promise.all(cots.map(async c=>{
+                                      const newCot={...c, consolidado_aplicado_cliente:true};
+                                      delete newCot.id; delete newCot._id; delete newCot._updated;
+                                      await supabase.from("cotizaciones").update({datos:newCot}).eq("id",c.id);
+                                    }));
+                                    setOperaciones(prev=>prev.map(o=>o.id===op.id?{...newOp,id:op.id}:o));
+                                    setCotizaciones(prev=>prev.map(c=>cots.find(x=>x.id===c.id)?{...c,consolidado_aplicado_cliente:true}:c));
+                                    showToast("✅ Consolidado aplicado a clientes");
+                                  }catch(e){showToast("Error: "+e.message,"err");}
+                                }} disabled={!op.recotizacion_completada_sunny||op.consolidado_aplicado_cliente} style={{background:op.consolidado_aplicado_cliente?"#f0fdf4":(op.recotizacion_completada_sunny?"#1aa358":"#e2e8f0"),color:op.consolidado_aplicado_cliente?"#1aa358":(op.recotizacion_completada_sunny?"#fff":"#94a3b8"),border:`1px solid ${op.consolidado_aplicado_cliente?"#bbf7d0":(op.recotizacion_completada_sunny?"#1aa358":"#cbd5e1")}`,borderRadius:7,padding:"8px 14px",fontSize:12,cursor:op.recotizacion_completada_sunny&&!op.consolidado_aplicado_cliente?"pointer":"not-allowed",fontWeight:700}}>
+                                  ✅ {op.consolidado_aplicado_cliente?"Ya aplicado a clientes":"Aplicar consolidado al cliente"}
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
