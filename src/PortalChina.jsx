@@ -6,9 +6,9 @@ import LOGO_WHITE from "./logo-white.png"
 // ACTUALIZACION: 5 tabs + dashboard + filtro premium
 
 // ─── Grupos de estados por tab ───────────────────────────────────────────────
-const ESTADOS_PEND_COT      = ["enviado_china", "re_testeando"]
-const ESTADOS_PEND_CLIENTE  = ["respuesta_china", "enviada_cliente", "en_negociacion"]
-const ESTADOS_CONFIRMADAS   = ["aceptada", "pagada_china"]
+const ESTADOS_PEND_COT      = ["solicitud"]
+const ESTADOS_PEND_CLIENTE  = ["cotizada"]
+const ESTADOS_CONFIRMADAS   = ["pagada"]
 const ESTADOS_CAMINO        = ["en_camino"]
 const ESTADOS_COMPLETADAS   = ["completada"]
 
@@ -17,50 +17,42 @@ const TODOS_ESTADOS = [
   ...ESTADOS_CONFIRMADAS, ...ESTADOS_CAMINO, ...ESTADOS_COMPLETADAS,
 ]
 
-// ─── Colores y etiquetas de estado ───────────────────────────────────────────
+// ─── Colores y etiquetas de estado (7 estados simplificados) ─────────────────
 const EST_COLOR = {
-  enviado_china:   "#2a8aaa",
-  re_testeando:    "#6a9fd4",
-  respuesta_china: "#b8922e",
-  enviada_cliente: "#2d78c8",
-  en_negociacion:  "#c47830",
-  aceptada:        "#1aa358",
-  pagada_china:    "#c47830",
-  en_camino:       "#a85590",
-  completada:      "#0d9870",
+  solicitud:   "#6a9fd4",
+  cotizada:    "#2d78c8",
+  pagada:      "#c47830",
+  en_camino:   "#a85590",
+  en_bodega:   "#3d7fc4",
+  completada:  "#0d9870",
+  no_prospero: "#c0392b",
 }
 const EST_BG = {
-  enviado_china:   "#e8f5f9",
-  re_testeando:    "#eef4fb",
-  respuesta_china: "#fdf6e3",
-  enviada_cliente: "#eff6ff",
-  en_negociacion:  "#fdf0e3",
-  aceptada:        "#eafaf1",
-  pagada_china:    "#fdf0e3",
-  en_camino:       "#f8f0fb",
-  completada:      "#f0fdf4",
+  solicitud:   "#e8f5f9",
+  cotizada:    "#eff6ff",
+  pagada:      "#fdf0e3",
+  en_camino:   "#f8f0fb",
+  en_bodega:   "#eef4fb",
+  completada:  "#f0fdf4",
+  no_prospero: "#fef2f2",
 }
 const EST_ES = {
-  enviado_china:   "Pendiente de cotizacion",
-  re_testeando:    "Re-testeando precio",
-  respuesta_china: "Cotizacion recibida",
-  enviada_cliente: "Enviada al cliente",
-  en_negociacion:  "En negociacion",
-  aceptada:        "Orden aceptada",
-  pagada_china:    "Pago realizado",
-  en_camino:       "En camino",
-  completada:      "Completada",
+  solicitud:   "Pendiente de cotizacion",
+  cotizada:    "Cotizada",
+  pagada:      "Pagada / Importando",
+  en_camino:   "En camino",
+  en_bodega:   "En bodega",
+  completada:  "Completada",
+  no_prospero: "No prospero",
 }
 const EST_ZH = {
-  enviado_china:   "等待报价",
-  re_testeando:    "重新议价中",
-  respuesta_china: "报价已收到",
-  enviada_cliente: "已发给客户",
-  en_negociacion:  "谈判中",
-  aceptada:        "订单已接受",
-  pagada_china:    "付款已完成",
-  en_camino:       "运输中",
-  completada:      "已完成",
+  solicitud:   "等待报价",
+  cotizada:    "已报价",
+  pagada:      "付款已完成",
+  en_camino:   "运输中",
+  en_bodega:   "已到仓库",
+  completada:  "已完成",
+  no_prospero: "未成交",
 }
 
 const TRANSP_ES = { maritimo:"Maritimo", aereo:"Aereo", ambos:"Maritimo + Aereo" }
@@ -556,10 +548,10 @@ function DashboardChina({ cots, pendCot, pendCliente, confirmadas, camino, compl
 
 // ─── Tarjeta de cotización ────────────────────────────────────────────────────
 function CotCard({ c, expanded, onToggle, supabase, recargar }) {
-  const est   = c.estado || "enviado_china"
+  const est   = c.estado || "solicitud"
   const color = EST_COLOR[est] || "#64748b"
   const bg    = EST_BG[est]   || "#f1f5f9"
-  const isUrg = est === "enviado_china" || est === "re_testeando"
+  const isUrg = est === "solicitud" || est === "solicitud"
   const nro   = c.nro_cotizacion || c.nro || String(c._id || "").slice(-6).toUpperCase() || "-"
 
   // ── Historial de notas China ──
@@ -864,7 +856,7 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
           )}
 
           {/* Notas de negociacion — solo visible en estado en_negociacion */}
-          {est === "en_negociacion" && Array.isArray(c.negociacion_rondas) && c.negociacion_rondas.filter(r => r.nota).length > 0 && (
+          {est === "cotizada" && Array.isArray(c.negociacion_rondas) && c.negociacion_rondas.filter(r => r.nota).length > 0 && (
             <div style={{
               background:"#fffbeb",
               border:"1px solid #f59e0b44",

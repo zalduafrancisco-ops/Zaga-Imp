@@ -5,14 +5,14 @@ import LOGO_DARK  from "./logo-dark.png";
 const PCT_COM_CLIENTE = 0.065;
 // Los clientes se obtienen dinámicamente desde las cotizaciones guardadas (clientesUnicos)
 const CHECKLIST_CLIENTE = [
-  { key:"enviado_china",     label:"Enviado a China",                group:"cotizacion" },
-  { key:"respuesta_china",   label:"Respuesta de China recibida",    group:"cotizacion" },
+  { key:"solicitud",     label:"Enviado a China",                group:"cotizacion" },
+  { key:"china_cotizo",      label:"China respondió cotización",     group:"cotizacion" },
   { key:"pago1_cliente",     label:"1er pago recibido del cliente",  group:"pagos" },
   { key:"factura1",          label:"Factura 1er pago emitida",       group:"pagos" },
   { key:"pago_china",        label:"Pago a China realizado",         group:"china" },
-  { key:"en_produccion",    label:"En proceso de producción",       group:"china" },
-  { key:"almacen_china",    label:"Ingreso en almacén de China",    group:"china" },
-  { key:"ctrl_calidad",     label:"Control de calidad en China OK", group:"china" },
+  { key:"en_produccion",     label:"En proceso de producción",       group:"china" },
+  { key:"almacen_china",     label:"Ingreso en almacén de China",    group:"china" },
+  { key:"ctrl_calidad",      label:"Control de calidad en China OK", group:"china" },
   { key:"llego_chile",       label:"Llegó a Chile",                  group:"logistica" },
   { key:"pago2_cliente",     label:"2do pago recibido del cliente",  group:"pagos" },
   { key:"factura2",          label:"Factura 2do pago emitida",       group:"pagos" },
@@ -20,12 +20,12 @@ const CHECKLIST_CLIENTE = [
 ];
 
 const CHECKLIST_PROPIA = [
-  { key:"enviado_china",     label:"Enviado a China",                group:"cotizacion" },
-  { key:"respuesta_china",   label:"Respuesta de China recibida",    group:"cotizacion" },
+  { key:"solicitud",     label:"Enviado a China",                group:"cotizacion" },
+  { key:"china_cotizo",      label:"China respondió cotización",     group:"cotizacion" },
   { key:"pago_china",        label:"Pago a China realizado",         group:"china" },
-  { key:"en_produccion",    label:"En proceso de producción",       group:"china" },
-  { key:"almacen_china",    label:"Ingreso en almacén de China",    group:"china" },
-  { key:"ctrl_calidad",     label:"Control de calidad en China OK", group:"china" },
+  { key:"en_produccion",     label:"En proceso de producción",       group:"china" },
+  { key:"almacen_china",     label:"Ingreso en almacén de China",    group:"china" },
+  { key:"ctrl_calidad",      label:"Control de calidad en China OK", group:"china" },
   { key:"llego_chile",       label:"Llegó a Chile",                  group:"logistica" },
   { key:"retirado_bodega",   label:"Retirado a mi bodega",           group:"logistica" },
   { key:"en_venta",          label:"Producto en venta / publicado",  group:"venta" },
@@ -39,41 +39,42 @@ const CANALES = [
   { key:"dropi",      label:"Dropi",          icon:"📦" },
 ];
 
+// ── Estados simplificados (migración 2026-05-19, de 14 → 7) ────────────────
+// Razón "no_prospero" detallada queda en datos.razon_no_prospero (rechazada_cliente/anulada/no_procesada)
 const EST_LABEL = {
-  solicitud:"📥 Solicitud recibida", enviado_china:"📨 Enviado a China",
-  respuesta_china:"🇨🇳 Respuesta de China recibida",
-  enviada_cliente:"Enviada al cliente", re_testeando:"🔄 Re-testeando",
-  en_negociacion:"En negociación", aceptada:"Aceptada",
-  pagada_china:"Pagada / Importando", en_camino:"En camino",
-  en_bodega:"Disponible para retirar", completada:"Completada",
-  rechazada_cliente:"❌ Rechazada", no_procesada:"No procesada",
-  anulada:"🚫 Anulada",
+  solicitud:   "📝 Solicitud",
+  cotizada:    "💬 Cotizada",
+  pagada:      "💰 Pagada",
+  en_camino:   "✈️ En camino",
+  en_bodega:   "🇨🇱 En bodega",
+  completada:  "✓ Completada",
+  no_prospero: "❌ No prosperó",
 };
 const EST_COLOR = {
-  solicitud:"#6a9fd4", enviado_china:"#2a8aaa",
-  respuesta_china:"#b8922e",
-  enviada_cliente:"#2d78c8", en_negociacion:"#c47830",
-  re_testeando:"#6a9fd4", rechazada_cliente:"#c0392b", anulada:"#8b1a2e",
-  aceptada:"#1aa358", no_procesada:"#c0392b",
-  pagada_china:"#c47830", en_camino:"#a85590", en_bodega:"#3d7fc4", completada:"#0d9870",
+  solicitud:   "#6a9fd4",
+  cotizada:    "#2d78c8",
+  pagada:      "#c47830",
+  en_camino:   "#a85590",
+  en_bodega:   "#3d7fc4",
+  completada:  "#0d9870",
+  no_prospero: "#c0392b",
 };
-const PROCESADAS = ["aceptada","pagada_china","en_camino","en_bodega","completada"];
+// Estados que indican que la cotización avanzó (cliente pagó o después)
+const PROCESADAS = ["pagada","en_camino","en_bodega","completada"];
 
 // ── Mapeo estado operación → estado cotización ─────────────────────────────
-// Cuando se cambia el estado de una operación, las cotizaciones vinculadas
-// pueden sincronizarse automáticamente con el estado equivalente.
+// Estados unificados: op y cot usan los mismos 7 nombres.
 const OP_COT_STATE_MAP = {
-  borrador:   null,                  // no propagar (op en armado)
-  cotizada:   "enviada_cliente",     // op cotizada → cot enviada al cliente
-  aceptada:   "aceptada",
-  pagada:     "pagada_china",        // op pagada por cliente → cot pagada a china
-  en_china:   "pagada_china",        // op en producción china
-  en_camino:  "en_camino",
-  en_chile:   "en_bodega",           // op llegó a chile → cot en bodega
-  completada: "completada",
+  borrador:    null,            // no propagar (op en armado)
+  cotizada:    "cotizada",
+  pagada:      "pagada",
+  en_camino:   "en_camino",
+  en_bodega:   "en_bodega",
+  completada:  "completada",
+  no_prospero: "no_prospero",
 };
 // Estados terminales de cotización que NO deben sobrescribirse al propagar
-const COT_ESTADOS_TERMINALES = ["rechazada_cliente","no_procesada","anulada"];
+const COT_ESTADOS_TERMINALES = ["no_prospero"];
 
 const makeDefaultForm = (usuario) => ({
   tipo:"cliente",
@@ -717,7 +718,7 @@ export default function App({ supabase, usuario, onLogout }){
     await persist(cotizaciones.map(c=>{
       if(c.id!==id) return c;
       let fll=c.fecha_llegada_est;
-      if(estado==="pagada_china"&&!fll){ const d=new Date(); d.setDate(d.getDate()+90); fll=d.toISOString().split("T")[0]; }
+      if(estado==="pagada"&&!fll){ const d=new Date(); d.setDate(d.getDate()+90); fll=d.toISOString().split("T")[0]; }
       return {...c,estado,fecha_llegada_est:fll};
     }));
   };
@@ -727,9 +728,9 @@ export default function App({ supabase, usuario, onLogout }){
       if(c.id!==id) return c;
       const chk={...c.checklist,[key]:val};
       let estado=c.estado;
-      if(key==="enviado_china"&&val) estado="enviado_china";
-      if(key==="respuesta_china"&&val) estado="respuesta_china";
-      if(key==="cliente_acepto"&&val) estado="aceptada";
+      if(key==="solicitud"&&val) estado="solicitud";
+      if(key==="cotizada"&&val) estado="cotizada";
+      if(key==="cliente_acepto"&&val) estado="pagada";
       if(key==="retirado_bodega"&&val) estado="completada";
       if(key==="pago2_cliente"&&val) estado="en_bodega";
       if(key==="vendido_100"&&val) estado="completada";
@@ -928,7 +929,7 @@ export default function App({ supabase, usuario, onLogout }){
     const p1=c.checklist?.pago1_cliente?0:(c.calc.p1Cl||0);
     const p2=c.checklist?.pago2_cliente?0:(c.calc.p2Cl||0);
     // Solo incluir pendiente si la cot está activa (no rechazada/anulada)
-    if(["rechazada_cliente","anulada","no_procesada"].includes(c.estado)) return 0;
+    if(["no_prospero","no_prospero","no_prospero"].includes(c.estado)) return 0;
     return p1+p2;
   };
   const totalCobradoCliente=dashData.reduce((s,c)=>s+calcCobradoCliente(c),0);
@@ -1018,8 +1019,8 @@ export default function App({ supabase, usuario, onLogout }){
           <div style={{display:"flex",alignItems:"center",gap:6}}>
             <div className="hide-mob" style={{display:"flex",gap:5,alignItems:"center",marginRight:6}}>
               {[
-                [cotizaciones.filter(c=>["solicitud","enviada_cliente"].includes(c.estado)).length,"Pendientes","#f59e0b"],
-                [cotizaciones.filter(c=>["pagada_china","en_camino"].includes(c.estado)).length,"En tránsito","#60a5fa"],
+                [cotizaciones.filter(c=>["solicitud","cotizada"].includes(c.estado)).length,"Pendientes","#f59e0b"],
+                [cotizaciones.filter(c=>["pagada","en_camino"].includes(c.estado)).length,"En tránsito","#60a5fa"],
                 [cotizaciones.filter(c=>c.estado==="completada").length,"Completadas","#34d399"],
               ].filter(([n])=>n>0).map(([n,lb,col])=>(
                 <div key={lb} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,padding:"3px 10px",color:"rgba(255,255,255,0.75)",fontSize:11,display:"flex",alignItems:"center",gap:5}}>
@@ -2615,7 +2616,7 @@ Número de seguimiento: ${c.nro}`;
               )}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:20}}>
-              {[["Total",cotizaciones.length,"#0f172a"],["Clientes",cotizaciones.filter(c=>c.tipo!=="propia").length,"#1aa358"],["Propias",cotizaciones.filter(c=>c.tipo==="propia").length,"#3d7fc4"],["En tránsito",cotizaciones.filter(c=>["pagada_china","en_camino"].includes(c.estado)).length,"#c47830"],["Completadas",cotizaciones.filter(c=>c.estado==="completada").length,"#0d9870"]].map(([l,v,col])=>(
+              {[["Total",cotizaciones.length,"#0f172a"],["Clientes",cotizaciones.filter(c=>c.tipo!=="propia").length,"#1aa358"],["Propias",cotizaciones.filter(c=>c.tipo==="propia").length,"#3d7fc4"],["En tránsito",cotizaciones.filter(c=>["pagada","en_camino"].includes(c.estado)).length,"#c47830"],["Completadas",cotizaciones.filter(c=>c.estado==="completada").length,"#0d9870"]].map(([l,v,col])=>(
                 <div key={l} style={{background:"#f1f5f9",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0",textAlign:"center"}}><div style={{fontSize:22,fontWeight:800,color:col}}>{v}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{l}</div></div>
               ))}
             </div>
@@ -2693,7 +2694,7 @@ Número de seguimiento: ${c.nro}`;
                 }
 
                 // 3. Cotización enviada al cliente sin respuesta > 7 días
-                if(c.estado==="enviada_cliente"&&c.fecha_solicitud){
+                if(c.estado==="cotizada"&&c.fecha_solicitud){
                   const diasEspera=Math.round((hoy-new Date(c.fecha_solicitud))/(1000*60*60*24));
                   if(diasEspera>7) alertas.push({nivel:"warning",ico:"👤",titulo:`${c.nro} — ${c.producto}`,msg:`Sin respuesta del cliente hace ${diasEspera} días (enviada ${c.fecha_solicitud})`,id:c.id,accion:"gestionar",alertKey:`${c.id}_sin_respuesta`});
                 }
@@ -2709,9 +2710,9 @@ Número de seguimiento: ${c.nro}`;
                 }
 
                 // 6. Negociación con propuestas pendientes > 5 días
-                const ESTADOS_TERMINALES=["completada","rechazada_cliente","anulada","no_procesada"];
+                const ESTADOS_TERMINALES=["completada","no_prospero","no_prospero","no_prospero"];
                 const pendientes=(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente");
-                if(pendientes.length>0&&c.estado==="en_negociacion"){
+                if(pendientes.length>0&&c.estado==="cotizada"){
                   const ultima=pendientes[pendientes.length-1];
                   const diasNeg=Math.round((hoy-new Date(ultima.fecha))/(1000*60*60*24));
                   if(diasNeg>5) alertas.push({nivel:"info",ico:"🤝",titulo:`${c.nro} — ${c.producto}`,msg:`Propuesta de negociación enviada hace ${diasNeg} días sin respuesta de China`,id:c.id,accion:"gestionar",alertKey:`${c.id}_negociacion`});
@@ -2721,7 +2722,7 @@ Número de seguimiento: ${c.nro}`;
                 const tienePrimerPago=c.checklist?.pago1_cliente||c.checklist?.pago_china;
                 const sinDimensiones=!c.dim_largo||!c.dim_ancho||!c.dim_alto;
                 const sinCajas=c.dim_tipo==="caja"&&!c.dim_und_caja;
-                const activa=!["completada","rechazada_cliente","anulada","no_procesada"].includes(c.estado);
+                const activa=!["completada","no_prospero","no_prospero","no_prospero"].includes(c.estado);
                 if(tienePrimerPago&&activa&&(sinDimensiones||sinCajas)){
                   const que=sinDimensiones?"dimensiones (L×A×H)":"unidades por caja";
                   alertas.push({nivel:"info",ico:"📐",titulo:`${c.nro} — ${c.cliente||c.producto}`,msg:`Pago recibido pero sin ${que} — proyección M³ incompleta`,id:c.id,accion:"dimensiones",alertKey:`${c.id}_dimensiones`});
@@ -2834,10 +2835,10 @@ Número de seguimiento: ${c.nro}`;
                 const sc=EST_COLOR[c.estado]||"#888", sl=EST_LABEL[c.estado]||c.estado;
                 const prog=checkProg(c), isOpen=openId===c.id, isPropia=c.tipo==="propia";
                 const notasCliNoLeidas=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial.filter(n=>n.autor==="cliente"&&!n.leida_por_admin).length:0;
-                const TL_CLIENTE=["solicitud","enviado_china","respuesta_china","enviada_cliente","en_negociacion","re_testeando","aceptada","pagada_china","en_camino","en_bodega","completada"];
-                const TL_PROPIA=["solicitud","enviado_china","respuesta_china","pagada_china","en_camino","en_bodega","completada"];
+                const TL_CLIENTE=["solicitud","cotizada","pagada","en_camino","en_bodega","completada"];
+                const TL_PROPIA=["solicitud","cotizada","pagada","en_camino","en_bodega","completada"];
                 const tlSteps=isPropia?TL_PROPIA:TL_CLIENTE;
-                const tlIdx=c.estado==="no_procesada"?0:Math.max(0,tlSteps.indexOf(c.estado));
+                const tlIdx=c.estado==="no_prospero"?0:Math.max(0,tlSteps.indexOf(c.estado));
                 const tlProg={done:tlIdx,total:tlSteps.length-1};
                 const diasLL=c.fecha_llegada_est?Math.round((new Date(c.fecha_llegada_est)-new Date())/(1000*60*60*24)):null;
                 let tiempoRealTransito=null;
@@ -2869,7 +2870,7 @@ Número de seguimiento: ${c.nro}`;
                             <span style={{background:sc+"22",color:sc,border:`1px solid ${sc}44`,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600}}>{sl}</span>
                             {diasLL!==null&&c.checklist?.pago_china&&!c.fecha_llegada_real&&<span style={{background:"#f9741618",color:"#c47830",border:"1px solid #f9741633",borderRadius:20,padding:"2px 10px",fontSize:11}}>{diasLL>0?`🚢 ${diasLL}d`:diasLL===0?"¡Llega hoy!":`⚠️ ${Math.abs(diasLL)}d tarde`}</span>}
                             {c.fulfillment_cliente&&<span style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:20,padding:"2px 10px",fontSize:11}}>🚚 Fulfillment{c.fulfillment_producto_creado?" ✓":""}</span>}
-                            {c.estado==="en_negociacion"&&(c.negociacion_rondas||[]).length>0&&<span style={{background:"#b8922e22",color:"#b8922e",border:"1px solid #f59e0b44",borderRadius:20,padding:"2px 10px",fontSize:11}}>🤝 {(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length} propuesta{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""} pendiente{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""}</span>}
+                            {c.estado==="cotizada"&&(c.negociacion_rondas||[]).length>0&&<span style={{background:"#b8922e22",color:"#b8922e",border:"1px solid #f59e0b44",borderRadius:20,padding:"2px 10px",fontSize:11}}>🤝 {(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length} propuesta{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""} pendiente{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""}</span>}
                             {c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&<span style={{background:"#0d987018",color:"#0d9870",border:"1px solid #1aa35844",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600}}>✅ {c.pago_100?"Pago único":"Pago 1"} · {fmtFechaCorta(c.fecha_pago1_cliente)}</span>}
                             {c.pago_100&&<span style={{background:"#c9a05522",color:"#c9a055",border:"1px solid #f5c84244",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>💰 PAGO 100%</span>}
                             {notasCliNoLeidas>0&&<span style={{background:"#c0392b22",color:"#c0392b",border:"1px solid #ef444444",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>💬 {notasCliNoLeidas}</span>}
@@ -2893,10 +2894,10 @@ Número de seguimiento: ${c.nro}`;
                           {c.fecha_llegada_real&&<div style={{fontSize:11,color:"#0d9870",marginTop:2}}>✅ Llegó a bodega: {c.fecha_llegada_real}{tiempoRealTransito!==null?` · ${tiempoRealTransito}d de tránsito`:""}</div>}
                           <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
                             <div style={{flex:1,height:4,background:"#f1f5f9",borderRadius:4,overflow:"hidden",position:"relative"}}>
-                              <div style={{height:"100%",background:`linear-gradient(to right,${EST_COLOR[tlSteps[0]]||"#6a9fd4"},${EST_COLOR[c.estado]||"#1aa358"})`,borderRadius:4,width:(c.estado==="no_procesada"||c.estado==="rechazada_cliente"||c.estado==="anulada")?"0%":`${(tlProg.done/tlProg.total)*100}%`,transition:"width .4s"}}/>
+                              <div style={{height:"100%",background:`linear-gradient(to right,${EST_COLOR[tlSteps[0]]||"#6a9fd4"},${EST_COLOR[c.estado]||"#1aa358"})`,borderRadius:4,width:(c.estado==="no_prospero"||c.estado==="no_prospero"||c.estado==="no_prospero")?"0%":`${(tlProg.done/tlProg.total)*100}%`,transition:"width .4s"}}/>
                             </div>
-                            <span style={{fontSize:11,color:(c.estado==="no_procesada"||c.estado==="rechazada_cliente"||c.estado==="anulada")?"#c0392b":EST_COLOR[c.estado]||"#555",fontWeight:600,whiteSpace:"nowrap"}}>
-                              {(c.estado==="no_procesada"||c.estado==="rechazada_cliente"||c.estado==="anulada")?"🚫":`${tlProg.done}/${tlProg.total}`}
+                            <span style={{fontSize:11,color:(c.estado==="no_prospero"||c.estado==="no_prospero"||c.estado==="no_prospero")?"#c0392b":EST_COLOR[c.estado]||"#555",fontWeight:600,whiteSpace:"nowrap"}}>
+                              {(c.estado==="no_prospero"||c.estado==="no_prospero"||c.estado==="no_prospero")?"🚫":`${tlProg.done}/${tlProg.total}`}
                             </span>
                             <span style={{fontSize:10,color:"#333",whiteSpace:"nowrap"}}>({prog.done}/{prog.total} ✓)</span>
                           </div>
@@ -3163,32 +3164,25 @@ Número de seguimiento: ${c.nro}`;
                     {isOpen&&<CardErrorBoundary>{(()=>{
                       const CHKL_LABELS={cot_enviada:"Cotización enviada al cliente",cliente_acepto:"Cliente aceptó",pago1_cliente:"1er pago recibido del cliente",factura1:"Factura 1er pago emitida",pago_china:"Pago a China realizado",en_produccion:"En proceso de producción",almacen_china:"Ingreso en almacén de China",ctrl_calidad:"Control de calidad en China OK",despachado:"Despachado desde China",llego_chile:"Llegó a Chile",retirado_bodega:"Retirado a mi bodega",pago2_cliente:"2do pago recibido del cliente",factura2:"Factura 2do pago emitida",en_venta:"Producto en venta / publicado",vendido_50:"50% vendido",vendido_100:"100% vendido"};
                       const CLIENTE_STEPS=[
-                        {estado:"solicitud",       icon:"📥",label:"Solicitud recibida",           color:"#334155",checks:[]},
-                        {estado:"enviado_china",   icon:"📨",label:"Enviado a China",               color:"#2a8aaa",checks:[]},
-                        {estado:"respuesta_china", icon:"🇨🇳",label:"Respuesta recibida de China",  color:"#b8922e",checks:[],special:"respuesta"},
-                        {estado:"enviada_cliente", icon:"📤",label:"Enviada al cliente",             color:"#2d78c8",checks:[],special:"decision"},
-                        {estado:"re_testeando",    icon:"🔄",label:"Re-testeando",                  color:"#334155",checks:[],special:"retesteando"},
-                        {estado:"en_negociacion",  icon:"🤝",label:"En negociación",                color:"#c47830",checks:[],special:"neg"},
-                        {estado:"rechazada_cliente",icon:"❌",label:"Rechazada por el cliente",     color:"#c0392b",checks:[],special:"rechazada"},
-                        {estado:"aceptada",        icon:"✅",label:"Aceptada",                      color:"#1aa358",checks:[]},
-                        {estado:"pagada_china",    icon:"💳",label:"Pagada / Importando",           color:"#c47830",checks:["pago1_cliente","factura1","pago_china","en_produccion","almacen_china","ctrl_calidad"]},
-                        {estado:"en_camino",       icon:"🚢",label:"En camino",                     color:"#a85590",checks:[]},
-                        {estado:"en_bodega",       icon:"📦",label:"Disponible para retirar",       color:"#3d7fc4",checks:["llego_chile","pago2_cliente","factura2"]},
-                        {estado:"completada",      icon:"🎉",label:"Completada",                    color:"#0d9870",checks:["retirado_bodega"]},
+                        {estado:"solicitud",  icon:"📝",label:"Solicitud / esperando China",  color:"#6a9fd4",checks:["enviado_china","china_cotizo"]},
+                        {estado:"cotizada",   icon:"💬",label:"Cotizada al cliente",          color:"#2d78c8",checks:[],special:"decision"},
+                        {estado:"pagada",     icon:"💰",label:"Pagada / Importando",          color:"#c47830",checks:["pago1_cliente","factura1","pago_china","en_produccion","almacen_china","ctrl_calidad"]},
+                        {estado:"en_camino",  icon:"✈️",label:"En camino",                    color:"#a85590",checks:[]},
+                        {estado:"en_bodega",  icon:"🇨🇱",label:"En bodega (disponible)",      color:"#3d7fc4",checks:["llego_chile","pago2_cliente","factura2"]},
+                        {estado:"completada", icon:"✓",label:"Completada",                    color:"#0d9870",checks:["retirado_bodega"]},
                       ];
                       const PROPIA_STEPS=[
-                        {estado:"solicitud",     icon:"📥",label:"Solicitud recibida",         color:"#334155",checks:[]},
-                        {estado:"enviado_china", icon:"📨",label:"Enviado a China",             color:"#2a8aaa",checks:[]},
-                        {estado:"respuesta_china",icon:"🇨🇳",label:"Respuesta recibida de China",color:"#b8922e",checks:[],special:"respuesta"},
-                        {estado:"pagada_china",  icon:"💳",label:"Pagada / Importando",         color:"#c47830",checks:["pago_china","en_produccion","almacen_china","ctrl_calidad"]},
-                        {estado:"en_camino",     icon:"🚢",label:"En camino",                   color:"#a85590",checks:["despachado"]},
-                        {estado:"en_bodega",     icon:"📦",label:"Disponible para retirar",                color:"#3d7fc4",checks:["llego_chile","retirado_bodega"]},
-                        {estado:"completada",    icon:"🎉",label:"Completada",                  color:"#0d9870",checks:["en_venta","vendido_50","vendido_100"]},
+                        {estado:"solicitud",  icon:"📝",label:"Solicitud / esperando China",  color:"#6a9fd4",checks:["enviado_china","china_cotizo"]},
+                        {estado:"cotizada",   icon:"💬",label:"Cotización revisada",          color:"#2d78c8",checks:[]},
+                        {estado:"pagada",     icon:"💰",label:"Pagada / Importando",          color:"#c47830",checks:["pago_china","en_produccion","almacen_china","ctrl_calidad"]},
+                        {estado:"en_camino",  icon:"✈️",label:"En camino",                    color:"#a85590",checks:["despachado"]},
+                        {estado:"en_bodega",  icon:"🇨🇱",label:"En bodega (disponible)",      color:"#3d7fc4",checks:["llego_chile","retirado_bodega"]},
+                        {estado:"completada", icon:"✓",label:"Completada",                    color:"#0d9870",checks:["en_venta","vendido_50","vendido_100"]},
                       ];
                       const steps=isPropia?PROPIA_STEPS:CLIENTE_STEPS;
                       const curIdx=steps.findIndex(s=>s.estado===c.estado);
-                      const isNoProcesada=c.estado==="no_procesada";
-                      const isTerminal=isNoProcesada||c.estado==="rechazada_cliente"||c.estado==="anulada";
+                      const isNoProcesada=c.estado==="no_prospero";
+                      const isTerminal=isNoProcesada||c.estado==="no_prospero"||c.estado==="no_prospero";
                       return (
                         <div style={{borderTop:"1px solid #e2e8f0",padding:"20px 24px"}}>
                           {/* Imágenes del producto — multi */}
@@ -3262,7 +3256,7 @@ Número de seguimiento: ${c.nro}`;
                               const dotColor=isCurrent?step.color:isDone?"#0d9870":"#1a2d45";
 
                               // Ocultar nodos alternativos que no aplican al estado actual
-                              const alternativeSteps=["re_testeando","en_negociacion","rechazada_cliente"];
+                              const alternativeSteps=["solicitud","cotizada","no_prospero"];
                               if(alternativeSteps.includes(step.estado)){
                                 // Solo mostrar si ES el estado actual, o si fue el estado anterior en el camino
                                 // (mostramos solo si está activo o fue el camino recorrido)
@@ -3306,7 +3300,7 @@ Número de seguimiento: ${c.nro}`;
                                     <div style={{marginTop:12,marginBottom:4,background:"#fffbeb",borderRadius:12,padding:16,border:"1px solid #fde68a"}}>
                                       <div style={{fontSize:11,color:"#92400e",fontWeight:700,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>🇨🇳 ¿Qué respondió China?</div>
                                       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                                        <button onClick={()=>handleEstado(c.id, isPropia?"pagada_china":"enviada_cliente")} style={{background:"#1aa35818",color:"#1aa358",border:"1px solid #1aa35844",borderRadius:9,padding:"12px 16px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
+                                        <button onClick={()=>handleEstado(c.id, isPropia?"pagada":"cotizada")} style={{background:"#1aa35818",color:"#1aa358",border:"1px solid #1aa35844",borderRadius:9,padding:"12px 16px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
                                           <span style={{fontSize:20}}>✅</span>
                                           <div><div>Todo OK — continuar</div><div style={{fontSize:10,color:"#1aa35888",fontWeight:400,marginTop:2}}>{isPropia?"Proceder con la importación propia":"El producto puede ingresar sin problema"}</div></div>
                                         </button>
@@ -3314,7 +3308,7 @@ Número de seguimiento: ${c.nro}`;
                                           <span style={{fontSize:20}}>📋</span>
                                           <div><div>Requiere CDA — editar cotización</div><div style={{fontSize:10,color:"#b8922e88",fontWeight:400,marginTop:2}}>Agregar costo del certificado y recalcular</div></div>
                                         </button>
-                                        <button onClick={()=>handleEstado(c.id,"anulada")} style={{background:"#8b1a2e18",color:"#c0392b",border:"1px solid #8b1a2e44",borderRadius:9,padding:"12px 16px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
+                                        <button onClick={()=>handleEstado(c.id,"no_prospero")} style={{background:"#8b1a2e18",color:"#c0392b",border:"1px solid #8b1a2e44",borderRadius:9,padding:"12px 16px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
                                           <span style={{fontSize:20}}>🚫</span>
                                           <div><div>No puede ingresar a Chile — Anular</div><div style={{fontSize:10,color:"#c0392b88",fontWeight:400,marginTop:2}}>El producto no puede ser importado</div></div>
                                         </button>
@@ -3327,22 +3321,22 @@ Número de seguimiento: ${c.nro}`;
                                     <div style={{marginTop:12,marginBottom:4,background:"#f0f9ff",borderRadius:12,padding:16,border:"1px solid #bae6fd"}}>
                                       <div style={{fontSize:11,color:"#0369a1",fontWeight:700,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>📬 ¿Cuál fue la respuesta del cliente?</div>
                                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                                        <button onClick={()=>handleEstado(c.id,"aceptada")} style={{background:"#1aa35818",color:"#1aa358",border:"1px solid #1aa35844",borderRadius:9,padding:"12px 10px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"center",lineHeight:1.4}}>
+                                        <button onClick={()=>handleEstado(c.id,"pagada")} style={{background:"#1aa35818",color:"#1aa358",border:"1px solid #1aa35844",borderRadius:9,padding:"12px 10px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"center",lineHeight:1.4}}>
                                           <div style={{fontSize:20,marginBottom:4}}>✅</div>
                                           <div>Aceptada</div>
                                           <div style={{fontSize:10,color:"#1aa35888",fontWeight:400,marginTop:2}}>Continúa el proceso</div>
                                         </button>
-                                        <button onClick={()=>handleEstado(c.id,"re_testeando")} style={{background:"#2d78c818",color:"#334155",border:"1px solid #2d78c844",borderRadius:9,padding:"12px 10px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"center",lineHeight:1.4}}>
+                                        <button onClick={()=>handleEstado(c.id,"solicitud")} style={{background:"#2d78c818",color:"#334155",border:"1px solid #2d78c844",borderRadius:9,padding:"12px 10px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"center",lineHeight:1.4}}>
                                           <div style={{fontSize:20,marginBottom:4}}>🔄</div>
                                           <div>Re-testeando</div>
                                           <div style={{fontSize:10,color:"#6a9fd488",fontWeight:400,marginTop:2}}>Cliente va a re-evaluar</div>
                                         </button>
-                                        <button onClick={()=>handleEstado(c.id,"en_negociacion")} style={{background:"#c4783018",color:"#c47830",border:"1px solid #c4783044",borderRadius:9,padding:"12px 10px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"center",lineHeight:1.4}}>
+                                        <button onClick={()=>handleEstado(c.id,"cotizada")} style={{background:"#c4783018",color:"#c47830",border:"1px solid #c4783044",borderRadius:9,padding:"12px 10px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"center",lineHeight:1.4}}>
                                           <div style={{fontSize:20,marginBottom:4}}>🤝</div>
                                           <div>Negociación</div>
                                           <div style={{fontSize:10,color:"#c4783088",fontWeight:400,marginTop:2}}>Mejora precio o cantidades</div>
                                         </button>
-                                        <button onClick={()=>handleEstado(c.id,"rechazada_cliente")} style={{background:"#c0392b18",color:"#c0392b",border:"1px solid #c0392b44",borderRadius:9,padding:"12px 10px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"center",lineHeight:1.4}}>
+                                        <button onClick={()=>handleEstado(c.id,"no_prospero")} style={{background:"#c0392b18",color:"#c0392b",border:"1px solid #c0392b44",borderRadius:9,padding:"12px 10px",fontSize:12,cursor:"pointer",fontWeight:700,textAlign:"center",lineHeight:1.4}}>
                                           <div style={{fontSize:20,marginBottom:4}}>❌</div>
                                           <div>Rechazada</div>
                                           <div style={{fontSize:10,color:"#c0392b88",fontWeight:400,marginTop:2}}>No quiere traer el producto</div>
@@ -3357,9 +3351,9 @@ Número de seguimiento: ${c.nro}`;
                                       <div style={{fontSize:11,color:"#334155",fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>🔄 Cliente re-evaluando</div>
                                       <div style={{fontSize:12,color:"#64748b",marginBottom:12}}>El cliente está analizando si le conviene traer el producto. Cuando tome una decisión, avanza al estado correspondiente.</div>
                                       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                                        <button onClick={()=>handleEstado(c.id,"aceptada")} style={{background:"#1aa35818",color:"#1aa358",border:"1px solid #1aa35844",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>✅ Decidió aceptar</button>
-                                        <button onClick={()=>handleEstado(c.id,"en_negociacion")} style={{background:"#c4783018",color:"#c47830",border:"1px solid #c4783044",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>🤝 Quiere negociar</button>
-                                        <button onClick={()=>handleEstado(c.id,"rechazada_cliente")} style={{background:"#c0392b15",color:"#c0392b",border:"1px solid #c0392b33",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>❌ Decidió no traer</button>
+                                        <button onClick={()=>handleEstado(c.id,"pagada")} style={{background:"#1aa35818",color:"#1aa358",border:"1px solid #1aa35844",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>✅ Decidió aceptar</button>
+                                        <button onClick={()=>handleEstado(c.id,"cotizada")} style={{background:"#c4783018",color:"#c47830",border:"1px solid #c4783044",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>🤝 Quiere negociar</button>
+                                        <button onClick={()=>handleEstado(c.id,"no_prospero")} style={{background:"#c0392b15",color:"#c0392b",border:"1px solid #c0392b33",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>❌ Decidió no traer</button>
                                       </div>
                                     </div>
                                   )}
@@ -3369,7 +3363,7 @@ Número de seguimiento: ${c.nro}`;
                                     <div style={{marginTop:10,marginBottom:4,background:"#fff1f2",borderRadius:10,padding:14,border:"1px solid #fecdd3"}}>
                                       <div style={{fontSize:11,color:"#c0392b",fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>❌ Cliente rechazó la cotización</div>
                                       <div style={{fontSize:12,color:"#64748b",marginBottom:10}}>El cliente decidió no traer el producto. La cotización queda cerrada.</div>
-                                      <button onClick={()=>handleEstado(c.id,"enviada_cliente")} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer"}}>↩ Reabrir cotización</button>
+                                      <button onClick={()=>handleEstado(c.id,"cotizada")} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer"}}>↩ Reabrir cotización</button>
                                     </div>
                                   )}
 
@@ -3421,8 +3415,8 @@ Número de seguimiento: ${c.nro}`;
 
                                       {/* Acciones finales */}
                                       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                                        <button onClick={()=>handleEstado(c.id,"aceptada")} style={{background:"#22c55e18",color:"#1aa358",border:"1px solid #bbf7d0",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>✅ Aceptada — continuar</button>
-                                        <button onClick={()=>handleEstado(c.id,"no_procesada")} style={{background:"#c0392b15",color:"#c0392b",border:"1px solid #ef444433",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>❌ Rechazada — cerrar cotización</button>
+                                        <button onClick={()=>handleEstado(c.id,"pagada")} style={{background:"#22c55e18",color:"#1aa358",border:"1px solid #bbf7d0",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>✅ Aceptada — continuar</button>
+                                        <button onClick={()=>handleEstado(c.id,"no_prospero")} style={{background:"#c0392b15",color:"#c0392b",border:"1px solid #ef444433",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>❌ Rechazada — cerrar cotización</button>
                                       </div>
                                     </div>
                                   )}
@@ -3445,7 +3439,7 @@ Número de seguimiento: ${c.nro}`;
                             )}
 
                             {/* estado anulada — terminal */}
-                            {c.estado==="anulada"&&(
+                            {c.estado==="no_prospero"&&(
                               <div style={{position:"relative",paddingTop:8}}>
                                 <div style={{position:"absolute",left:-44,top:8,width:32,height:32,borderRadius:"50%",background:"#8b1a2e18",border:"2px solid #8b1a2e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>🚫</div>
                                 <div style={{background:"#fff1f2",borderRadius:10,padding:"12px 16px",border:"1px solid #fecdd3",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
@@ -3453,11 +3447,11 @@ Número de seguimiento: ${c.nro}`;
                                     <div style={{fontSize:13,fontWeight:700,color:"#c0392b"}}>Anulada — No puede ingresar a Chile</div>
                                     <div style={{fontSize:11,color:"#64748b",marginTop:3}}>El producto fue bloqueado por restricciones de importación.</div>
                                   </div>
-                                  <button onClick={()=>handleEstado(c.id,"respuesta_china")} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>↩ Reabrir</button>
+                                  <button onClick={()=>handleEstado(c.id,"cotizada")} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>↩ Reabrir</button>
                                 </div>
                               </div>
                             )}
-                            {c.estado==="rechazada_cliente"&&(
+                            {c.estado==="no_prospero"&&(
                               <div style={{position:"relative",paddingTop:8}}>
                                 <div style={{position:"absolute",left:-44,top:8,width:32,height:32,borderRadius:"50%",background:"#c0392b15",border:"2px solid #c0392b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>❌</div>
                                 <div style={{background:"#fff1f2",borderRadius:10,padding:"12px 16px",border:"1px solid #fecdd3",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
@@ -3465,7 +3459,7 @@ Número de seguimiento: ${c.nro}`;
                                     <div style={{fontSize:13,fontWeight:700,color:"#c0392b"}}>Rechazada por el cliente</div>
                                     <div style={{fontSize:11,color:"#64748b",marginTop:3}}>El cliente decidió no traer el producto. Cotización cerrada.</div>
                                   </div>
-                                  <button onClick={()=>handleEstado(c.id,"enviada_cliente")} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>↩ Reabrir</button>
+                                  <button onClick={()=>handleEstado(c.id,"cotizada")} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:7,padding:"6px 14px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>↩ Reabrir</button>
                                 </div>
                               </div>
                             )}
@@ -3893,13 +3887,12 @@ Número de seguimiento: ${c.nro}`;
                     <label style={{fontSize:10,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Estado</label>
                     <select value={opForm.estado} onChange={e=>setOpForm(p=>({...p,estado:e.target.value}))} style={{width:"100%",padding:"8px 10px",fontSize:13,border:"1px solid #e2e8f0",borderRadius:7,marginTop:3,outline:"none"}}>
                       <option value="borrador">📝 Borrador</option>
-                      <option value="cotizada">💬 Cotizada al cliente</option>
-                      <option value="aceptada">✅ Aceptada</option>
-                      <option value="pagada">💰 Pagada por cliente</option>
-                      <option value="en_china">🇨🇳 En China</option>
-                      <option value="en_camino">✈️ En camino</option>
-                      <option value="en_chile">🇨🇱 En Chile</option>
-                      <option value="completada">✓ Completada</option>
+                      <option value="cotizada">💬 Cotizada</option>
+                      <option value="pagada">💰 Pagada</option>
+                      <option value="en_camino">✈️ En camino (enviado)</option>
+                      <option value="en_bodega">🇨🇱 En bodega</option>
+                      <option value="completada">✓ Completada (recibido)</option>
+                      <option value="no_prospero">❌ No prosperó</option>
                     </select>
                   </div>
                   <div>
@@ -3923,7 +3916,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{flex:1}}>
                       <div style={{fontSize:12,fontWeight:700,color:"#0f172a"}}>🔄 Sincronizar estado a cotizaciones al guardar</div>
                       <div style={{fontSize:10,color:"#64748b",marginTop:2}}>
-                        Estado <b>{opForm.estado}</b> propaga a cotizaciones como <b>{OP_COT_STATE_MAP[opForm.estado]||"— (sin mapeo)"}</b>. Las cots en estado terminal (rechazada/anulada/no procesada) NO se sobrescriben.
+                        Estado <b>{opForm.estado}</b> propaga a cotizaciones como <b>{OP_COT_STATE_MAP[opForm.estado]||"— (sin mapeo)"}</b>. Las cots en estado <b>no_prospero</b> NO se sobrescriben.
                       </div>
                     </div>
                   </label>
@@ -4156,7 +4149,7 @@ Número de seguimiento: ${c.nro}`;
                   // Sin filtro de estado: se ve para todas las cots de la op, incluso pagada/en_camino/completada
                   // (excluimos solo terminales negativas que no deberían estar en una op activa)
                   const consolidados = expanded ? cots
-                    .filter(c => !["rechazada_cliente","no_procesada","anulada"].includes(c.estado))
+                    .filter(c => !["no_prospero","no_prospero","no_prospero"].includes(c.estado))
                     .map(c => ({ cot:c, calc: calcConsolidado(c, op, cots) }))
                     .filter(x => x.calc) : [];
                   const ahorroTotalOp = consolidados.reduce((s,x) => s + ((x.calc?.standalone?.totClIva || 0) - (x.calc?.consolidado?.totClIva || 0)), 0);
@@ -4194,12 +4187,11 @@ Número de seguimiento: ${c.nro}`;
                             }} style={{fontSize:10,fontWeight:700,background:"#f1f5f9",color:"#64748b",padding:"3px 8px",borderRadius:10,textTransform:"uppercase",border:"1px solid #cbd5e1",cursor:"pointer",fontFamily:"inherit"}}>
                               <option value="borrador">📝 Borrador</option>
                               <option value="cotizada">💬 Cotizada</option>
-                              <option value="aceptada">✅ Aceptada</option>
                               <option value="pagada">💰 Pagada</option>
-                              <option value="en_china">🇨🇳 En China</option>
                               <option value="en_camino">✈️ En camino (enviado)</option>
-                              <option value="en_chile">🇨🇱 En Chile</option>
+                              <option value="en_bodega">🇨🇱 En bodega</option>
                               <option value="completada">✓ Completada (recibido)</option>
+                              <option value="no_prospero">❌ No prosperó</option>
                             </select>
                             {op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny&&(
                               <span style={{fontSize:10,fontWeight:700,background:"#fff7ed",color:"#c47830",border:"1px solid #fed7aa",padding:"2px 8px",borderRadius:10}}>📢 Esperando Sunny</span>
@@ -4452,7 +4444,7 @@ Número de seguimiento: ${c.nro}`;
               const enTransito=cotizaciones.filter(c=>
                 c.fecha_llegada_est&&
                 calcM3(c)>0&&
-                !["completada","rechazada_cliente","anulada","no_procesada"].includes(c.estado)&&
+                !["completada","no_prospero","no_prospero","no_prospero"].includes(c.estado)&&
                 !c.checklist?.retirado_bodega
               );
 
@@ -4530,7 +4522,7 @@ Número de seguimiento: ${c.nro}`;
 
               // Importaciones de Luisa con 1er pago recibido, agrupadas por mes
               const luisaCerradas=cotizaciones.filter(c=>
-                c.gestor==="luisa"&&c.tipo!=="propia"&&c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["rechazada_cliente","anulada","no_procesada"].includes(c.estado)
+                c.gestor==="luisa"&&c.tipo!=="propia"&&c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["no_prospero","no_prospero","no_prospero"].includes(c.estado)
               );
 
               // Agrupar por mes de fecha_pago1_cliente
@@ -4784,14 +4776,14 @@ Número de seguimiento: ${c.nro}`;
         {tab2==="clientes"&&(()=>{
           const clientes=[...new Set(cotizaciones.filter(c=>c.tipo!=="propia"&&c.cliente).map(c=>c.cliente))]
             .sort((a,b)=>{
-              const ganA=cotizaciones.filter(c=>c.cliente===a&&c.tipo!=="propia"&&!["rechazada_cliente","anulada","no_procesada"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
-              const ganB=cotizaciones.filter(c=>c.cliente===b&&c.tipo!=="propia"&&!["rechazada_cliente","anulada","no_procesada"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+              const ganA=cotizaciones.filter(c=>c.cliente===a&&c.tipo!=="propia"&&!["no_prospero","no_prospero","no_prospero"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+              const ganB=cotizaciones.filter(c=>c.cliente===b&&c.tipo!=="propia"&&!["no_prospero","no_prospero","no_prospero"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
               return ganB-ganA;
             });
           const todasCliente=clienteSeleccionado?cotizaciones.filter(c=>c.cliente===clienteSeleccionado&&c.tipo!=="propia"):[];
 
           // Estados agrupados para filtro
-          const RECHAZADAS=["rechazada_cliente","anulada","no_procesada"];
+          const RECHAZADAS=["no_prospero","no_prospero","no_prospero"];
           const impsCliente=todasCliente.filter(c=>{
             if(filtroCliente==="todas") return true;
             if(filtroCliente==="activas") return !RECHAZADAS.includes(c.estado)&&c.estado!=="completada";
@@ -4822,9 +4814,9 @@ Número de seguimiento: ${c.nro}`;
                     const imps=cotizaciones.filter(c=>c.cliente===cl&&c.tipo!=="propia");
                     const activas=imps.filter(c=>PROCESADAS.includes(c.estado)&&c.estado!=="completada").length;
                     const comp=imps.filter(c=>c.estado==="completada").length;
-                    const rech=imps.filter(c=>["rechazada_cliente","anulada","no_procesada"].includes(c.estado)).length;
+                    const rech=imps.filter(c=>["no_prospero","no_prospero","no_prospero"].includes(c.estado)).length;
                     const conv=imps.length>0?Math.round((imps.filter(c=>PROCESADAS.includes(c.estado)).length/imps.length)*100):0;
-                    const ganTotal=imps.filter(c=>!["rechazada_cliente","anulada","no_procesada"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+                    const ganTotal=imps.filter(c=>!["no_prospero","no_prospero","no_prospero"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
                     const sel=clienteSeleccionado===cl;
                     const tienePrimerPago=imps.some(c=>c.checklist?.pago1_cliente);
                     const tieneAcceso=imps.some(c=>c.app_email);
@@ -5167,8 +5159,8 @@ Número de seguimiento: ${c.nro}`;
           const mesAnt=`${mesAnterior.getFullYear()}-${String(mesAnterior.getMonth()+1).padStart(2,"0")}`;
 
           const todas=cotizaciones.filter(c=>c.gestor==="luisa"&&c.tipo!=="propia");
-          const enProceso=todas.filter(c=>["enviado_china","respuesta_china","enviada_cliente","en_negociacion","aceptada","pagada_china","en_camino"].includes(c.estado));
-          const cerradas=todas.filter(c=>c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["rechazada_cliente","anulada","no_procesada"].includes(c.estado));
+          const enProceso=todas.filter(c=>["solicitud","cotizada","cotizada","cotizada","pagada","pagada","en_camino"].includes(c.estado));
+          const cerradas=todas.filter(c=>c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["no_prospero","no_prospero","no_prospero"].includes(c.estado));
           const completadas=todas.filter(c=>c.estado==="completada");
 
           // Ganancias reales por mes (base para comisión)
@@ -5191,7 +5183,7 @@ Número de seguimiento: ${c.nro}`;
           const mesActualCalc=calcMes(mesActualList);
 
           // Proyección mes actual: + cotizaciones aceptadas sin pago aún
-          const proyPendientes=todas.filter(c=>["aceptada"].includes(c.estado)&&!c.checklist?.pago1_cliente);
+          const proyPendientes=todas.filter(c=>["pagada"].includes(c.estado)&&!c.checklist?.pago1_cliente);
           const proyBase=mesActualCalc.base+proyPendientes.reduce((s,c)=>s+(c.calc?.ganImp||0),0);
           const proyN=mesActualCalc.n+proyPendientes.length;
           const proyPct=proyN>=6?0.25:0.20;

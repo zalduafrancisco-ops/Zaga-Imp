@@ -9,9 +9,9 @@ import LOGO_WHITE from "./logo-white.png"
 const TC_RMB_USD = 7.2 // TC fijo (igual que PortalChina dashboard)
 
 // ─── Estados que ve Sunny por tab ───────────────────────────────────────────
-const ESTADOS_PEND_COT     = ["enviado_china", "re_testeando"]
-const ESTADOS_PEND_CLIENTE = ["respuesta_china", "enviada_cliente", "en_negociacion"]
-const ESTADOS_CONFIRMADAS  = ["aceptada", "pagada_china"]
+const ESTADOS_PEND_COT     = ["solicitud"]
+const ESTADOS_PEND_CLIENTE = ["cotizada"]
+const ESTADOS_CONFIRMADAS  = ["pagada"]
 const ESTADOS_CAMINO       = ["en_camino"]
 const ESTADOS_COMPLETADAS  = ["completada"]
 const TODOS_ESTADOS = [
@@ -21,37 +21,31 @@ const TODOS_ESTADOS = [
 
 // ─── Estilos chino/español ──────────────────────────────────────────────────
 const EST_ES = {
-  enviado_china:   "Pendiente de cotizar",
-  re_testeando:    "Re-testeando precio",
-  respuesta_china: "Cotización enviada",
-  enviada_cliente: "Enviada al cliente",
-  en_negociacion:  "En negociación",
-  aceptada:        "Orden aceptada",
-  pagada_china:    "Pago realizado",
-  en_camino:       "En camino",
-  completada:      "Completada",
+  solicitud:   "Pendiente de cotizar",
+  cotizada:    "Cotizada",
+  pagada:      "Pagada / Importando",
+  en_camino:   "En camino",
+  en_bodega:   "En bodega",
+  completada:  "Completada",
+  no_prospero: "No prosperó",
 }
 const EST_ZH = {
-  enviado_china:   "等待报价",
-  re_testeando:    "重新议价中",
-  respuesta_china: "报价已发送",
-  enviada_cliente: "已发给客户",
-  en_negociacion:  "谈判中",
-  aceptada:        "订单已接受",
-  pagada_china:    "付款已完成",
-  en_camino:       "运输中",
-  completada:      "已完成",
+  solicitud:   "等待报价",
+  cotizada:    "已报价",
+  pagada:      "付款已完成",
+  en_camino:   "运输中",
+  en_bodega:   "已到仓库",
+  completada:  "已完成",
+  no_prospero: "未成交",
 }
 const EST_COLOR = {
-  enviado_china:   "#c47830",
-  re_testeando:    "#6a9fd4",
-  respuesta_china: "#1aa358",
-  enviada_cliente: "#2d78c8",
-  en_negociacion:  "#c47830",
-  aceptada:        "#1aa358",
-  pagada_china:    "#c47830",
-  en_camino:       "#a85590",
-  completada:      "#0d9870",
+  solicitud:   "#c47830",
+  cotizada:    "#2d78c8",
+  pagada:      "#1aa358",
+  en_camino:   "#a85590",
+  en_bodega:   "#3d7fc4",
+  completada:  "#0d9870",
+  no_prospero: "#c0392b",
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -375,7 +369,7 @@ function CotEditable({ c, supabase, isExpanded, onExpand, onSaved }) {
       }
       // 5) Si se envía a admin, cambiar estado
       if (enviarAdmin) {
-        datosMerged.estado = "respuesta_china"
+        datosMerged.estado = "cotizada"
         datosMerged.fecha_respuesta_china = new Date().toISOString().split("T")[0]
       }
       // 6) UPDATE
@@ -687,7 +681,7 @@ function CotReadOnly({ c }) {
 function Dashboard({ cots, pendCot, confirmadas, camino, completadas }) {
   const totalCot = cots.length
   const respuestasMes = cots.filter(c => {
-    if (c.estado === "enviado_china") return false
+    if (c.estado === "solicitud") return false
     if (!c.fecha_respuesta_china) return false
     const d = new Date(c.fecha_respuesta_china)
     const ahora = new Date()

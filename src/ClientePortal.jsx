@@ -27,8 +27,8 @@ const EST_BG = {
   en_bodega:"#eef4fb", completada:"#e8f9f4",
 }
 const TIMELINE = [
-  {key:"enviado_china",label:"Enviado",icon:"📨"},
-  {key:"respuesta_china",label:"Cotizado",icon:"🇨🇳"},
+  {key:"solicitud",label:"Enviado",icon:"📨"},
+  {key:"cotizada",label:"Cotizado",icon:"🇨🇳"},
   {key:"cliente_acepto",label:"Aceptado",icon:"✅"},
   {key:"pago1_cliente",label:"1er pago",icon:"💳"},
   {key:"pago_china",label:"Pagado",icon:"🏦"},
@@ -40,8 +40,8 @@ const TIMELINE = [
   {key:"retirado_bodega",label:"Completado",icon:"🏁"},
 ]
 const CHECKLIST_FULL = [
-  {key:"enviado_china",label:"Solicitud enviada al proveedor",icon:"📨"},
-  {key:"respuesta_china",label:"Cotizacion del proveedor recibida",icon:"🇨🇳"},
+  {key:"solicitud",label:"Solicitud enviada al proveedor",icon:"📨"},
+  {key:"cotizada",label:"Cotizacion del proveedor recibida",icon:"🇨🇳"},
   {key:"cot_enviada",label:"Propuesta enviada al cliente",icon:"📋"},
   {key:"cliente_acepto",label:"Propuesta aceptada",icon:"✅"},
   {key:"pago1_cliente",label:"1er pago recibido",icon:"💳"},
@@ -54,9 +54,9 @@ const CHECKLIST_FULL = [
   {key:"pago2_cliente",label:"2do pago recibido",icon:"💳"},
   {key:"retirado_bodega",label:"Importacion completada",icon:"🏁"},
 ]
-const RECHAZADAS_EST = ["rechazada_cliente","no_procesada","anulada"]
-const PROCESADAS_EST = ["aceptada","pagada_china","en_camino","en_bodega","completada"]
-const ESTADOS_ORDEN = ["solicitud","enviado_china","respuesta_china","enviada_cliente","re_testeando","en_negociacion","aceptada","pagada_china","en_camino","en_bodega","completada","rechazada_cliente","no_procesada","anulada"]
+const RECHAZADAS_EST = ["no_prospero","no_prospero","no_prospero"]
+const PROCESADAS_EST = ["pagada","pagada","en_camino","en_bodega","completada"]
+const ESTADOS_ORDEN = ["solicitud","solicitud","cotizada","cotizada","solicitud","cotizada","pagada","pagada","en_camino","en_bodega","completada","no_prospero","no_prospero","no_prospero"]
 
 // ── Mapa: estado → índice máximo visible en el TIMELINE (red de seguridad) ──
 const TIMELINE_MAX_POR_ESTADO = {
@@ -752,7 +752,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
               ].map(function(s){
                 return (
                   <div key={s.label} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,padding:"13px 10px",position:"relative",overflow:"hidden",textAlign:"center",cursor:"pointer"}}
-                    onClick={function(){ setFiltro(s.label==="Cotizadas"?"todas":s.label==="En proceso"?"activas":s.label==="En camino"?"en_camino":s.label==="Completadas"?"completada":"no_procesada") }}>
+                    onClick={function(){ setFiltro(s.label==="Cotizadas"?"todas":s.label==="En proceso"?"activas":s.label==="En camino"?"en_camino":s.label==="Completadas"?"completada":"no_prospero") }}>
                     <div style={{position:"absolute",top:8,right:10,fontSize:18,opacity:.1}}>{s.icon}</div>
                     <div style={{fontSize:9,color:s.color,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:5}}>{s.label}</div>
                     <div style={{fontSize:24,fontWeight:800,color:"#0f172a",lineHeight:1}}>{s.value}</div>
@@ -954,7 +954,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                   var pasoActual = (function(){
                     // pagada_china: si 1er pago aún no recibido → mostrar step 3 (1er pago)
                     //               si 1er pago recibido → mostrar step 4 en adelante según checklist
-                    if(c.estado==="pagada_china"){
+                    if(c.estado==="pagada"){
                       if(!c.checklist||!c.checklist.pago1_cliente) return 3  // 1er pago pendiente
                       // avanzar hasta el primer sub-check no marcado (tope: step 6 ctrl_calidad)
                       var subKeys = ["pago_china","en_produccion","ctrl_calidad"]
