@@ -930,7 +930,7 @@ export default function App({ supabase, usuario, onLogout }){
     const p1=c.checklist?.pago1_cliente?0:(c.calc.p1Cl||0);
     const p2=c.checklist?.pago2_cliente?0:(c.calc.p2Cl||0);
     // Solo incluir pendiente si la cot está activa (no rechazada/anulada)
-    if(["no_prospero","no_prospero","no_prospero"].includes(c.estado)) return 0;
+    if(["no_prospero"].includes(c.estado)) return 0;
     return p1+p2;
   };
   const totalCobradoCliente=dashData.reduce((s,c)=>s+calcCobradoCliente(c),0);
@@ -2753,7 +2753,7 @@ Número de seguimiento: ${c.nro}`;
                 // 5. (removida) alerta "pendiente crear producto en sistema fulfillment" — no se usaba
 
                 // 6. Negociación con propuestas pendientes > 5 días
-                const ESTADOS_TERMINALES=["completada","no_prospero","no_prospero","no_prospero"];
+                const ESTADOS_TERMINALES=["completada","no_prospero"];
                 const pendientes=(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente");
                 if(pendientes.length>0&&c.estado==="cotizada"){
                   const ultima=pendientes[pendientes.length-1];
@@ -2765,7 +2765,7 @@ Número de seguimiento: ${c.nro}`;
                 const tienePrimerPago=c.checklist?.pago1_cliente||c.checklist?.pago_china;
                 const sinDimensiones=!c.dim_largo||!c.dim_ancho||!c.dim_alto;
                 const sinCajas=c.dim_tipo==="caja"&&!c.dim_und_caja;
-                const activa=!["completada","no_prospero","no_prospero","no_prospero"].includes(c.estado);
+                const activa=!["completada","no_prospero"].includes(c.estado);
                 if(tienePrimerPago&&activa&&(sinDimensiones||sinCajas)){
                   const que=sinDimensiones?"dimensiones (L×A×H)":"unidades por caja";
                   alertas.push({nivel:"info",ico:"📐",titulo:`${c.nro} — ${c.cliente||c.producto}`,msg:`Pago recibido pero sin ${que} — proyección M³ incompleta`,id:c.id,accion:"dimensiones",alertKey:`${c.id}_dimensiones`});
@@ -4192,7 +4192,7 @@ Número de seguimiento: ${c.nro}`;
                   // Sin filtro de estado: se ve para todas las cots de la op, incluso pagada/en_camino/completada
                   // (excluimos solo terminales negativas que no deberían estar en una op activa)
                   const consolidados = expanded ? cots
-                    .filter(c => !["no_prospero","no_prospero","no_prospero"].includes(c.estado))
+                    .filter(c => !["no_prospero"].includes(c.estado))
                     .map(c => ({ cot:c, calc: calcConsolidado(c, op, cots) }))
                     .filter(x => x.calc) : [];
                   const ahorroTotalOp = consolidados.reduce((s,x) => s + ((x.calc?.standalone?.totClIva || 0) - (x.calc?.consolidado?.totClIva || 0)), 0);
@@ -4487,7 +4487,7 @@ Número de seguimiento: ${c.nro}`;
               const enTransito=cotizaciones.filter(c=>
                 c.fecha_llegada_est&&
                 calcM3(c)>0&&
-                !["completada","no_prospero","no_prospero","no_prospero"].includes(c.estado)&&
+                !["completada","no_prospero"].includes(c.estado)&&
                 !c.checklist?.retirado_bodega
               );
 
@@ -4565,7 +4565,7 @@ Número de seguimiento: ${c.nro}`;
 
               // Importaciones de Luisa con 1er pago recibido, agrupadas por mes
               const luisaCerradas=cotizaciones.filter(c=>
-                c.gestor==="luisa"&&c.tipo!=="propia"&&c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["no_prospero","no_prospero","no_prospero"].includes(c.estado)
+                c.gestor==="luisa"&&c.tipo!=="propia"&&c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["no_prospero"].includes(c.estado)
               );
 
               // Agrupar por mes de fecha_pago1_cliente
@@ -4819,14 +4819,14 @@ Número de seguimiento: ${c.nro}`;
         {tab2==="clientes"&&(()=>{
           const clientes=[...new Set(cotizaciones.filter(c=>c.tipo!=="propia"&&c.cliente).map(c=>c.cliente))]
             .sort((a,b)=>{
-              const ganA=cotizaciones.filter(c=>c.cliente===a&&c.tipo!=="propia"&&!["no_prospero","no_prospero","no_prospero"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
-              const ganB=cotizaciones.filter(c=>c.cliente===b&&c.tipo!=="propia"&&!["no_prospero","no_prospero","no_prospero"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+              const ganA=cotizaciones.filter(c=>c.cliente===a&&c.tipo!=="propia"&&!["no_prospero"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+              const ganB=cotizaciones.filter(c=>c.cliente===b&&c.tipo!=="propia"&&!["no_prospero"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
               return ganB-ganA;
             });
           const todasCliente=clienteSeleccionado?cotizaciones.filter(c=>c.cliente===clienteSeleccionado&&c.tipo!=="propia"):[];
 
           // Estados agrupados para filtro
-          const RECHAZADAS=["no_prospero","no_prospero","no_prospero"];
+          const RECHAZADAS=["no_prospero"];
           const impsCliente=todasCliente.filter(c=>{
             if(filtroCliente==="todas") return true;
             if(filtroCliente==="activas") return !RECHAZADAS.includes(c.estado)&&c.estado!=="completada";
@@ -4857,9 +4857,9 @@ Número de seguimiento: ${c.nro}`;
                     const imps=cotizaciones.filter(c=>c.cliente===cl&&c.tipo!=="propia");
                     const activas=imps.filter(c=>PROCESADAS.includes(c.estado)&&c.estado!=="completada").length;
                     const comp=imps.filter(c=>c.estado==="completada").length;
-                    const rech=imps.filter(c=>["no_prospero","no_prospero","no_prospero"].includes(c.estado)).length;
+                    const rech=imps.filter(c=>["no_prospero"].includes(c.estado)).length;
                     const conv=imps.length>0?Math.round((imps.filter(c=>PROCESADAS.includes(c.estado)).length/imps.length)*100):0;
-                    const ganTotal=imps.filter(c=>!["no_prospero","no_prospero","no_prospero"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+                    const ganTotal=imps.filter(c=>!["no_prospero"].includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
                     const sel=clienteSeleccionado===cl;
                     const tienePrimerPago=imps.some(c=>c.checklist?.pago1_cliente);
                     const tieneAcceso=imps.some(c=>c.app_email);
@@ -5202,8 +5202,8 @@ Número de seguimiento: ${c.nro}`;
           const mesAnt=`${mesAnterior.getFullYear()}-${String(mesAnterior.getMonth()+1).padStart(2,"0")}`;
 
           const todas=cotizaciones.filter(c=>c.gestor==="luisa"&&c.tipo!=="propia");
-          const enProceso=todas.filter(c=>["solicitud","cotizada","cotizada","cotizada","pagada","pagada","en_camino"].includes(c.estado));
-          const cerradas=todas.filter(c=>c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["no_prospero","no_prospero","no_prospero"].includes(c.estado));
+          const enProceso=todas.filter(c=>["solicitud","cotizada","pagada","en_camino"].includes(c.estado));
+          const cerradas=todas.filter(c=>c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["no_prospero"].includes(c.estado));
           const completadas=todas.filter(c=>c.estado==="completada");
 
           // Ganancias reales por mes (base para comisión)

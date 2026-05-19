@@ -59,7 +59,7 @@ const CHECKLIST_FULL = [
   {key:"retirado_bodega",label:"Importacion completada",icon:"🏁"},
 ]
 const RECHAZADAS_EST = ["no_prospero"]
-const PROCESADAS_EST = ["pagada","pagada","en_camino","en_bodega","completada"]
+const PROCESADAS_EST = ["pagada","en_camino","en_bodega","completada"]
 const ESTADOS_ORDEN = ["solicitud","cotizada","pagada","en_camino","en_bodega","completada","no_prospero"]
 
 // ── Mapa: estado → índice máximo visible en el TIMELINE (red de seguridad) ──
