@@ -1493,7 +1493,7 @@ Número de seguimiento: ${c.nro}`;
                           {p.dim_tipo==="unidad"&&p.dim_m3&&p.unidades&&<span style={{marginLeft:8,color:"#1aa358",fontWeight:800}}>· Total: {(Number(p.dim_m3)*Number(p.unidades)).toFixed(2)} m³</span>}
                         </div>
                       )}
-                      {p.fulfillment_cliente&&<div style={{fontSize:12,color:"#2a8aaa",marginBottom:4}}>🚚 Fulfillment: <b>{p.fulfillment_producto_creado?"Producto creado ✓":"Pendiente crear producto"}</b></div>}
+                      {p.fulfillment_cliente&&<div style={{fontSize:12,color:"#2a8aaa",marginBottom:4}}>🚚 Cliente con fulfillment ZAGA</div>}
                       {p.fulfillment_costo_real&&<div style={{fontSize:12,color:"#0f172a",marginBottom:4}}>💵 Costo fulfillment: <b>{fmt(p.fulfillment_costo_real)}</b></div>}
                       {p.fulfillment_notas&&<div style={{fontSize:11,color:"#666",marginTop:6,fontStyle:"italic"}}>📝 {p.fulfillment_notas}</div>}
                     </div>
@@ -2704,10 +2704,7 @@ Número de seguimiento: ${c.nro}`;
                   alertas.push({nivel:"warning",ico:"💰",titulo:`${c.nro} — ${c.cliente||c.producto}`,msg:`Mercadería en bodega con 2do pago cliente pendiente de cobrar (${fmt(c.calc?.p2Cl)})`,id:c.id,accion:"gestionar",alertKey:`${c.id}_pago2`});
                 }
 
-                // 5. Fulfillment pendiente de crear producto
-                if(c.fulfillment_cliente!==false&&!c.fulfillment_producto_creado&&c.checklist?.retirado_bodega){
-                  alertas.push({nivel:"info",ico:"🚚",titulo:`${c.nro} — ${c.producto}`,msg:`Producto en bodega pero pendiente de crear en sistema de fulfillment`,id:c.id,accion:"gestionar",alertKey:`${c.id}_fulfillment`});
-                }
+                // 5. (removida) alerta "pendiente crear producto en sistema fulfillment" — no se usaba
 
                 // 6. Negociación con propuestas pendientes > 5 días
                 const ESTADOS_TERMINALES=["completada","no_prospero","no_prospero","no_prospero"];
@@ -2869,7 +2866,7 @@ Número de seguimiento: ${c.nro}`;
                             <span style={{fontSize:11,color:"#64748b"}}>{c.nro}</span>
                             <span style={{background:sc+"22",color:sc,border:`1px solid ${sc}44`,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600}}>{sl}</span>
                             {diasLL!==null&&c.checklist?.pago_china&&!c.fecha_llegada_real&&<span style={{background:"#f9741618",color:"#c47830",border:"1px solid #f9741633",borderRadius:20,padding:"2px 10px",fontSize:11}}>{diasLL>0?`🚢 ${diasLL}d`:diasLL===0?"¡Llega hoy!":`⚠️ ${Math.abs(diasLL)}d tarde`}</span>}
-                            {c.fulfillment_cliente&&<span style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:20,padding:"2px 10px",fontSize:11}}>🚚 Fulfillment{c.fulfillment_producto_creado?" ✓":""}</span>}
+                            {c.fulfillment_cliente&&<span style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:20,padding:"2px 10px",fontSize:11}}>🚚 Fulfillment</span>}
                             {c.estado==="cotizada"&&(c.negociacion_rondas||[]).length>0&&<span style={{background:"#b8922e22",color:"#b8922e",border:"1px solid #f59e0b44",borderRadius:20,padding:"2px 10px",fontSize:11}}>🤝 {(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length} propuesta{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""} pendiente{(c.negociacion_rondas||[]).filter(r=>r.estado==="pendiente").length!==1?"s":""}</span>}
                             {c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&<span style={{background:"#0d987018",color:"#0d9870",border:"1px solid #1aa35844",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600}}>✅ {c.pago_100?"Pago único":"Pago 1"} · {fmtFechaCorta(c.fecha_pago1_cliente)}</span>}
                             {c.pago_100&&<span style={{background:"#c9a05522",color:"#c9a055",border:"1px solid #f5c84244",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>💰 PAGO 100%</span>}
@@ -3801,10 +3798,6 @@ Número de seguimiento: ${c.nro}`;
                                   </label>
                                   {c.fulfillment_cliente!==false&&(
                                     <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                                      <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:12,color:c.fulfillment_producto_creado?"#1aa358":"#666"}}>
-                                        <input type="checkbox" checked={c.fulfillment_producto_creado||false} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,fulfillment_producto_creado:e.target.checked}:x));}} style={{cursor:"pointer",width:15,height:15}}/>
-                                        ✅ Producto creado en sistema
-                                      </label>
                                       <div>
                                         <div style={{fontSize:10,color:"#64748b",marginBottom:3}}>Costo real fulfillment $</div>
                                         <input type="number" value={c.fulfillment_costo_real||""} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,fulfillment_costo_real:e.target.value}:x));}} placeholder="0" style={{width:"100%",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:6,color:"#0f172a",padding:"6px 9px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
