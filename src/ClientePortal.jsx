@@ -757,7 +757,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
               return (
                 <div className="arrival-card" style={{background:"#040c18",borderRadius:14,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
                   <div style={{display:"flex",alignItems:"center",gap:14}}>
-                    <div style={{width:44,height:44,background:"rgba(201,160,85,0.15)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🚢</div>
+                    <div style={{width:44,height:44,background:"rgba(201,160,85,0.15)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{proxLlegada.transporte==="aereo"?"✈️":"🚢"}</div>
                     <div>
                       <div style={{fontSize:10,color:"#c9a055",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Proxima llegada estimada</div>
                       <div style={{fontSize:14,fontWeight:700,color:"#f8fafc"}}>{proxLlegada.producto}</div>
