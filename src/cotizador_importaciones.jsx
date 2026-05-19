@@ -75,6 +75,8 @@ const makeDefaultForm = (usuario) => ({
   aer_modo_cobro_sunny:"auto", aer_tarifa_sunny_kg:9.55, aer_tarifa_sunny_cbm:"",
   // Auto-margen — % margen bruto objetivo (sobre venta) usado por el botón "🎯 Calcular precio"
   pct_margen_target_cliente:25,
+  // Portal Sunny — campos que llena Sunny al cotizar (RMB nativo, días estimados producción)
+  precio_china_rmb:"", dias_estimados_china:"",
   nro_factura_cliente:"", link_factura_cliente:"",
   variantes:"", // colores, tallas, cantidades por variante
   fecha_llegada_real:"", sku_china:"",
