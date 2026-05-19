@@ -1880,8 +1880,8 @@ Número de seguimiento: ${c.nro}`;
 
                 {form.tipo==="cliente"&&!esPaso1&&(
                   <BLOCK title="💰 Tu margen ZAGA" accent="#1aa358">
-                    {/* 🎯 Auto-margen objetivo (% sobre venta — gross margin) */}
-                    {Number(form.precio_china)>0&&Number(form.unidades)>0&&(
+                    {/* 🎯 Auto-margen objetivo (% sobre venta — gross margin) — solo aéreo */}
+                    {form.transporte==="aereo"&&Number(form.precio_china)>0&&Number(form.unidades)>0&&(
                       <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:9,padding:"10px 14px",marginBottom:12}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                           <span style={{fontSize:12,color:"#92400e",fontWeight:700}}>🎯 Auto-precio para</span>
