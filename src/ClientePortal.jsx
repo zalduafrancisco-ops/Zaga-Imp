@@ -422,7 +422,9 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     var productosRMB = Number(cc.productos_rmb)||0
     var productosCLP = productosRMB * tcRmb
     var comisionCLP  = productosRMB * (Number(cc.comision_pct||0)/100) * tcRmb
-    var fleteCLP     = (Number(cc.flete_usd_kg)||0)*(Number(cc.peso_kg)||0)*tc
+    // Usar tarifa consolidada de Sunny si existe (más barata por bulk); si no, usar la original.
+    var tarifaFleteKg = Number(op.flete_usd_kg_consolidado)||Number(cc.flete_usd_kg)||0
+    var fleteCLP     = tarifaFleteKg*(Number(cc.peso_kg)||0)*tc
     var logisticaCLP = (Number(cc.logistica_rmb)||0)*tcRmb
     var otrosCLP     = (Number(cc.otros_usd)||0)*tc
     var formFCLP     = (Number(cc.form_f_usd_por_producto)||0)*totalCotsOp*tc
@@ -768,6 +770,9 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                   {operaciones.map(function(op){
                     var calc = calcOp(op)
                     if(!calc) return null
+                    // Solo mostrar la operación al cliente si admin presionó "Aplicar consolidado".
+                    // Antes de eso, el cliente solo ve sus cotizaciones standalone.
+                    if(!op.consolidado_aplicado_cliente) return null
                     var isOpenOp = opOpenId===op.id
                     var ahorroOpTotal = calc.porCot.reduce(function(s,x){ return s+(x.ahorroTotal>0?x.ahorroTotal:0) }, 0)
                     var undTotal = calc.cotsOp.reduce(function(s,c){ return s+(Number(c.unidades)||0) }, 0)
