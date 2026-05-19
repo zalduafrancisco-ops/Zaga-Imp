@@ -4169,7 +4169,38 @@ Número de seguimiento: ${c.nro}`;
                             {clientesOp.map(cl=>(
                               <span key={cl} style={{fontSize:12,fontWeight:700,color:"#040c18",background:"#eef6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"2px 9px"}}>👤 {cl}</span>
                             ))}
-                            <span style={{fontSize:10,fontWeight:700,background:"#f1f5f9",color:"#64748b",padding:"2px 8px",borderRadius:10,textTransform:"uppercase"}}>{op.estado}</span>
+                            {/* Dropdown de estado con cambio + propagación automática */}
+                            <select value={op.estado||"borrador"} onClick={e=>e.stopPropagation()} onChange={async(e)=>{
+                              const nuevoEst = e.target.value;
+                              if (nuevoEst === op.estado) return;
+                              const nuevoEstadoCot = OP_COT_STATE_MAP[nuevoEst];
+                              const cotsAfectables = cots.filter(c => !COT_ESTADOS_TERMINALES.includes(c.estado) && c.estado !== nuevoEstadoCot);
+                              const msg = `Cambiar OP ${op.nro} a estado "${nuevoEst}"?` + (nuevoEstadoCot && cotsAfectables.length>0 ? `\n\nEsto también sincronizará ${cotsAfectables.length} cotización(es) a "${nuevoEstadoCot}".` : "");
+                              if (!confirm(msg)) return;
+                              try {
+                                const newOp = {...op, estado: nuevoEst};
+                                delete newOp.id;
+                                await supabase.from("operaciones").update({datos:newOp,updated_at:new Date().toISOString()}).eq("id",op.id);
+                                if (nuevoEstadoCot && cotsAfectables.length > 0) {
+                                  for (const c of cotsAfectables) {
+                                    const {id, ...rest} = c;
+                                    await supabase.from("cotizaciones").update({datos:{...rest, estado:nuevoEstadoCot}}).eq("id",id);
+                                  }
+                                  setCotizaciones(prev=>prev.map(c=>cotsAfectables.find(x=>x.id===c.id)?{...c,estado:nuevoEstadoCot}:c));
+                                }
+                                setOperaciones(prev=>prev.map(o=>o.id===op.id?{...newOp,id:op.id}:o));
+                                showToast(`✓ OP ${op.nro} → "${nuevoEst}"` + (cotsAfectables.length>0?` (${cotsAfectables.length} cots sincronizadas)`:""));
+                              } catch(err) { showToast("Error: "+err.message,"err"); }
+                            }} style={{fontSize:10,fontWeight:700,background:"#f1f5f9",color:"#64748b",padding:"3px 8px",borderRadius:10,textTransform:"uppercase",border:"1px solid #cbd5e1",cursor:"pointer",fontFamily:"inherit"}}>
+                              <option value="borrador">📝 Borrador</option>
+                              <option value="cotizada">💬 Cotizada</option>
+                              <option value="aceptada">✅ Aceptada</option>
+                              <option value="pagada">💰 Pagada</option>
+                              <option value="en_china">🇨🇳 En China</option>
+                              <option value="en_camino">✈️ En camino (enviado)</option>
+                              <option value="en_chile">🇨🇱 En Chile</option>
+                              <option value="completada">✓ Completada (recibido)</option>
+                            </select>
                             {op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny&&(
                               <span style={{fontSize:10,fontWeight:700,background:"#fff7ed",color:"#c47830",border:"1px solid #fed7aa",padding:"2px 8px",borderRadius:10}}>📢 Esperando Sunny</span>
                             )}
