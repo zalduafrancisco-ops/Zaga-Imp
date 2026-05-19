@@ -59,6 +59,22 @@ const EST_COLOR = {
 };
 const PROCESADAS = ["aceptada","pagada_china","en_camino","en_bodega","completada"];
 
+// ── Mapeo estado operación → estado cotización ─────────────────────────────
+// Cuando se cambia el estado de una operación, las cotizaciones vinculadas
+// pueden sincronizarse automáticamente con el estado equivalente.
+const OP_COT_STATE_MAP = {
+  borrador:   null,                  // no propagar (op en armado)
+  cotizada:   "enviada_cliente",     // op cotizada → cot enviada al cliente
+  aceptada:   "aceptada",
+  pagada:     "pagada_china",        // op pagada por cliente → cot pagada a china
+  en_china:   "pagada_china",        // op en producción china
+  en_camino:  "en_camino",
+  en_chile:   "en_bodega",           // op llegó a chile → cot en bodega
+  completada: "completada",
+};
+// Estados terminales de cotización que NO deben sobrescribirse al propagar
+const COT_ESTADOS_TERMINALES = ["rechazada_cliente","no_procesada","anulada"];
+
 const makeDefaultForm = (usuario) => ({
   tipo:"cliente",
   gestor: usuario?.nombre?.toLowerCase()==="luisa" ? "luisa" : "francisco",
@@ -3853,6 +3869,8 @@ Número de seguimiento: ${c.nro}`;
                   // Distribución del ahorro consolidado: "auto" | "cliente_100" | "split_50_50"
                   // Auto: 100% cliente único, 50/50 multi-cliente. Manual override en cualquier caso.
                   distribucion_ahorro:"auto",
+                  // Propagar estado op → estado de todas las cotizaciones vinculadas al guardar
+                  propagar_estados:true,
                   notas:""
                 });
                 setOpEditId(null);
@@ -3896,6 +3914,19 @@ Número de seguimiento: ${c.nro}`;
                       <option value="split_50_50">⚖️ 50/50 cliente / ZAGA</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Toggle propagar estados */}
+                <div style={{marginBottom:14,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:7,padding:"10px 14px"}}>
+                  <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}>
+                    <input type="checkbox" checked={opForm.propagar_estados!==false} onChange={e=>setOpForm(p=>({...p,propagar_estados:e.target.checked}))} style={{margin:0}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#0f172a"}}>🔄 Sincronizar estado a cotizaciones al guardar</div>
+                      <div style={{fontSize:10,color:"#64748b",marginTop:2}}>
+                        Estado <b>{opForm.estado}</b> propaga a cotizaciones como <b>{OP_COT_STATE_MAP[opForm.estado]||"— (sin mapeo)"}</b>. Las cots en estado terminal (rechazada/anulada/no procesada) NO se sobrescriben.
+                      </div>
+                    </div>
+                  </label>
                 </div>
 
                 {/* Selección de cotizaciones — MULTI-CLIENTE agrupadas por cliente */}
@@ -4070,6 +4101,27 @@ Número de seguimiento: ${c.nro}`;
                           }
                         }));
                         setCotizaciones(prev=>prev.map(c=>opForm.cotizaciones.includes(c.id)?{...c,operacion_id:data.id}:c));
+                      }
+                      // ── PROPAGAR ESTADO OP → COTS (si propagar_estados !== false, default true) ──
+                      const nuevoEstadoCot = OP_COT_STATE_MAP[payload.estado];
+                      if (payload.propagar_estados !== false && nuevoEstadoCot) {
+                        const cotsAfectadas = cotizaciones.filter(c => opForm.cotizaciones.includes(c.id));
+                        let actualizadas = 0;
+                        for (const cot of cotsAfectadas) {
+                          if (COT_ESTADOS_TERMINALES.includes(cot.estado)) continue;
+                          if (cot.estado === nuevoEstadoCot) continue;
+                          const {id, ...rest} = cot;
+                          const newDatos = {...rest, estado: nuevoEstadoCot};
+                          await supabase.from("cotizaciones").update({datos: newDatos}).eq("id", id);
+                          actualizadas++;
+                        }
+                        if (actualizadas > 0) {
+                          setCotizaciones(prev => prev.map(c =>
+                            opForm.cotizaciones.includes(c.id) && !COT_ESTADOS_TERMINALES.includes(c.estado)
+                              ? {...c, estado: nuevoEstadoCot} : c
+                          ));
+                          showToast(`✓ ${actualizadas} cotización(es) sincronizadas a "${nuevoEstadoCot}"`);
+                        }
                       }
                       showToast(`✓ Operación ${opEditId?"actualizada":"creada"}`);
                       setOpForm(null);setOpEditId(null);
@@ -4254,6 +4306,31 @@ Número de seguimiento: ${c.nro}`;
                                 }} disabled={op.consolidado_aplicado_cliente || (op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)} style={{background:op.consolidado_aplicado_cliente?"#f0fdf4":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#e2e8f0":"#1aa358"),color:op.consolidado_aplicado_cliente?"#1aa358":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#94a3b8":"#fff"),border:`1px solid ${op.consolidado_aplicado_cliente?"#bbf7d0":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#cbd5e1":"#1aa358")}`,borderRadius:7,padding:"8px 14px",fontSize:12,cursor:(!op.consolidado_aplicado_cliente && !(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny))?"pointer":"not-allowed",fontWeight:700}}>
                                   ✅ {op.consolidado_aplicado_cliente?"Ya aplicado a clientes":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"Esperando respuesta Sunny...":"Aplicar consolidado al cliente")}
                                 </button>
+                                {/* Botón sincronizar estados */}
+                                {(()=>{
+                                  const nuevoEstadoCot = OP_COT_STATE_MAP[op.estado];
+                                  const cotsAfectables = cots.filter(c => !COT_ESTADOS_TERMINALES.includes(c.estado) && c.estado !== nuevoEstadoCot);
+                                  const puedeSincronizar = nuevoEstadoCot && cotsAfectables.length > 0;
+                                  if (!nuevoEstadoCot) return null;
+                                  return (
+                                    <button onClick={async()=>{
+                                      if(!confirm(`🔄 Sincronizar estado de ${cotsAfectables.length} cotización(es) a "${nuevoEstadoCot}"?\n\nOperación: ${op.nro} (${op.estado})\nLas cots en estados terminales (rechazada/anulada/no procesada) se omiten.`))return;
+                                      try{
+                                        let actualizadas = 0;
+                                        for (const cot of cotsAfectables) {
+                                          const {id, ...rest} = cot;
+                                          const newDatos = {...rest, estado: nuevoEstadoCot};
+                                          await supabase.from("cotizaciones").update({datos: newDatos}).eq("id", id);
+                                          actualizadas++;
+                                        }
+                                        setCotizaciones(prev=>prev.map(c=>cotsAfectables.find(x=>x.id===c.id)?{...c,estado:nuevoEstadoCot}:c));
+                                        showToast(`✓ ${actualizadas} cotización(es) sincronizadas a "${nuevoEstadoCot}"`);
+                                      }catch(e){showToast("Error: "+e.message,"err");}
+                                    }} disabled={!puedeSincronizar} style={{background:puedeSincronizar?"#eef6ff":"#f1f5f9",color:puedeSincronizar?"#2d78c8":"#94a3b8",border:`1px solid ${puedeSincronizar?"#bfdbfe":"#e2e8f0"}`,borderRadius:7,padding:"8px 14px",fontSize:12,cursor:puedeSincronizar?"pointer":"not-allowed",fontWeight:700}}>
+                                      🔄 {puedeSincronizar?`Sincronizar ${cotsAfectables.length} cots a "${nuevoEstadoCot}"`:"Estados ya sincronizados"}
+                                    </button>
+                                  );
+                                })()}
                               </div>
                             </>
                           )}
