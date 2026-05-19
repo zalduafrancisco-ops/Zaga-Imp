@@ -4,6 +4,7 @@ import Login from './Login'
 import Cotizador from './cotizador_importaciones'
 import ClientePortal from './ClientePortal'
 import PortalChina from './PortalChina'
+import PortalSunny from './PortalSunny'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -67,10 +68,9 @@ export default function App() {
     <PortalChina supabase={supabase} onLogout={handleLogout} />
   )
 
-  // Agente Aéreo (Sunny) → temporalmente PortalChina (RLS filtra solo aéreas).
-  // PortalSunny.jsx con captura editable se construye según PORTAL_SUNNY_DESIGN.md
+  // Agente Aéreo (Sunny) → PortalSunny con captura editable
   if (perfil.rol === 'agente_aereo') return (
-    <PortalChina supabase={supabase} onLogout={handleLogout} />
+    <PortalSunny supabase={supabase} onLogout={handleLogout} />
   )
 
   // Admin (Francisco o Luisa) → Cotizador completo

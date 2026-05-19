@@ -1,0 +1,702 @@
+import { useState, useEffect } from "react"
+import LOGO_WHITE from "./logo-white.png"
+
+// PortalSunny.jsx — Portal Agente Aéreo Sunny (空运货运)
+// Auth manejado por Supabase (rol agente_aereo). RLS filtra solo cotizaciones aéreas.
+// Captura editable en Tab 1: precio FOB, dimensiones, peso, modo cobro, Form F, días producción.
+// Diseño aprobado en PORTAL_SUNNY_DESIGN.md (commit e7eaeb2).
+
+const TC_RMB_USD = 7.2 // TC fijo (igual que PortalChina dashboard)
+
+// ─── Estados que ve Sunny por tab ───────────────────────────────────────────
+const ESTADOS_PEND_COT     = ["enviado_china", "re_testeando"]
+const ESTADOS_PEND_CLIENTE = ["respuesta_china", "enviada_cliente", "en_negociacion"]
+const ESTADOS_CONFIRMADAS  = ["aceptada", "pagada_china"]
+const ESTADOS_CAMINO       = ["en_camino"]
+const ESTADOS_COMPLETADAS  = ["completada"]
+const TODOS_ESTADOS = [
+  ...ESTADOS_PEND_COT, ...ESTADOS_PEND_CLIENTE,
+  ...ESTADOS_CONFIRMADAS, ...ESTADOS_CAMINO, ...ESTADOS_COMPLETADAS,
+]
+
+// ─── Estilos chino/español ──────────────────────────────────────────────────
+const EST_ES = {
+  enviado_china:   "Pendiente de cotizar",
+  re_testeando:    "Re-testeando precio",
+  respuesta_china: "Cotización enviada",
+  enviada_cliente: "Enviada al cliente",
+  en_negociacion:  "En negociación",
+  aceptada:        "Orden aceptada",
+  pagada_china:    "Pago realizado",
+  en_camino:       "En camino",
+  completada:      "Completada",
+}
+const EST_ZH = {
+  enviado_china:   "等待报价",
+  re_testeando:    "重新议价中",
+  respuesta_china: "报价已发送",
+  enviada_cliente: "已发给客户",
+  en_negociacion:  "谈判中",
+  aceptada:        "订单已接受",
+  pagada_china:    "付款已完成",
+  en_camino:       "运输中",
+  completada:      "已完成",
+}
+const EST_COLOR = {
+  enviado_china:   "#c47830",
+  re_testeando:    "#6a9fd4",
+  respuesta_china: "#1aa358",
+  enviada_cliente: "#2d78c8",
+  en_negociacion:  "#c47830",
+  aceptada:        "#1aa358",
+  pagada_china:    "#c47830",
+  en_camino:       "#a85590",
+  completada:      "#0d9870",
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function fmtDate(str) {
+  if (!str) return "—"
+  const d = new Date(str)
+  if (isNaN(d)) return str
+  return d.toLocaleDateString("es-CL", { day:"2-digit", month:"short", year:"numeric" })
+}
+function fmtUSD(n) {
+  if (!n || isNaN(n)) return "US$0"
+  return "US$" + Number(n).toLocaleString("en-US", { maximumFractionDigits:2 })
+}
+function fmtRMB(n) {
+  if (!n || isNaN(n)) return "¥0"
+  return "¥" + Number(n).toLocaleString("zh-CN", { maximumFractionDigits:2 })
+}
+function fmtN(n, d=2) {
+  if (!n || isNaN(n)) return "0"
+  return Number(n).toLocaleString("en-US", { maximumFractionDigits:d })
+}
+
+// ─── Componente principal ────────────────────────────────────────────────────
+export default function PortalSunny({ supabase, onLogout }) {
+  const [tab, setTab]           = useState("pend_cot")
+  const [cots, setCots]         = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [pulse, setPulse]       = useState(false)
+  const [editingId, setEditing] = useState(null)
+
+  useEffect(() => {
+    loadData()
+    const channel = supabase.channel("zaga-portal-sunny-v1")
+      .on("postgres_changes", { event:"*", schema:"public", table:"cotizaciones" }, () => {
+        loadData()
+        setPulse(true)
+        setTimeout(() => setPulse(false), 1800)
+      })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [])
+
+  async function loadData() {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from("cotizaciones")
+      .select("id,datos,created_at,updated_at")
+    if (!error && data) {
+      const relevantes = data
+        .map(r => ({ ...r.datos, _id: r.id, _updated: r.updated_at || r.created_at }))
+        .filter(c => TODOS_ESTADOS.includes(c.estado))
+        .filter(c => c.transporte === "aereo")
+        .sort((a, b) => new Date(b._updated) - new Date(a._updated))
+      setCots(relevantes)
+    }
+    setLoading(false)
+  }
+
+  // ─── Grupos por tab ───────────────────────────────────────────────────────
+  const pendCot     = cots.filter(c => ESTADOS_PEND_COT.includes(c.estado))
+  const pendCliente = cots.filter(c => ESTADOS_PEND_CLIENTE.includes(c.estado))
+  const confirmadas = cots.filter(c => ESTADOS_CONFIRMADAS.includes(c.estado))
+  const camino      = cots.filter(c => ESTADOS_CAMINO.includes(c.estado))
+  const completadas = cots.filter(c => ESTADOS_COMPLETADAS.includes(c.estado))
+
+  const tabMap = {
+    pend_cot:     pendCot,
+    pend_cliente: pendCliente,
+    confirmadas:  confirmadas,
+    camino:       camino,
+    completadas:  completadas,
+    dashboard:    [],
+  }
+  const shown = tabMap[tab] || []
+
+  const TABS = [
+    { id:"pend_cot",     label:"待报价 Pend. cotizar",  count: pendCot.length,     urgent: pendCot.length > 0 },
+    { id:"pend_cliente", label:"待客户 Pend. cliente",  count: pendCliente.length, urgent: false },
+    { id:"confirmadas",  label:"已确认 Confirmadas",    count: confirmadas.length, urgent: false },
+    { id:"camino",       label:"运输中 En camino",      count: camino.length,      urgent: false },
+    { id:"completadas",  label:"已完成 Completadas",    count: completadas.length, urgent: false },
+    { id:"dashboard",    label:"📊 数据",               count: null,               urgent: false },
+  ]
+
+  const EMPTY_MSG = {
+    pend_cot:     { zh:"暂无待报价请求",       es:"No hay solicitudes esperando cotización" },
+    pend_cliente: { zh:"暂无等待客户确认",     es:"No hay cotizaciones esperando al cliente" },
+    confirmadas:  { zh:"暂无确认订单",         es:"No hay órdenes confirmadas" },
+    camino:       { zh:"暂无运输中货物",        es:"No hay envíos en camino" },
+    completadas:  { zh:"暂无已完成记录",        es:"No hay completadas" },
+  }
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#f1f5f9", fontFamily:"'Inter','Segoe UI',sans-serif" }}>
+
+      {/* ── HEADER ──────────────────────────────────────────────────── */}
+      <div style={{
+        background:"#040c18", borderBottom:"2px solid #c4783040", padding:"0 24px",
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+        height:54, position:"sticky", top:0, zIndex:100, boxShadow:"0 2px 12px #00000040",
+      }}>
+        <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+          <img src={LOGO_WHITE} alt="ZAGA IMP" style={{ height:32, objectFit:"contain" }} />
+          <div style={{ fontSize:12, fontWeight:700, color:"#94a3b8", letterSpacing:2, textTransform:"uppercase" }}>
+            ✈️ 空运货运 — Cotizador Aéreo
+          </div>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          {pendCot.length > 0 && (
+            <div style={{
+              display:"flex", alignItems:"center", gap:6,
+              background:"#c4783025", border:"1px solid #c4783055",
+              borderRadius:20, padding:"4px 12px",
+            }}>
+              <div style={{
+                width:7, height:7, borderRadius:"50%",
+                background:"#c47830",
+                boxShadow: pulse ? "0 0 8px #c47830" : "none",
+                transition:"all 0.3s",
+              }}/>
+              <span style={{ fontSize:12, fontWeight:700, color:"#c47830" }}>
+                {pendCot.length} 待报价
+              </span>
+            </div>
+          )}
+          <button onClick={() => onLogout && onLogout()}
+            style={{ background:"transparent", border:"1px solid #ffffff20", color:"#94a3b8",
+              borderRadius:8, padding:"6px 16px", cursor:"pointer", fontSize:12, fontWeight:600, fontFamily:"inherit" }}>
+            退出 / Salir
+          </button>
+        </div>
+      </div>
+
+      {/* ── SUBHEADER ───────────────────────────────────────────────── */}
+      <div style={{ background:"#040c18", borderBottom:"1px solid #1e293b", padding:"8px 24px 12px" }}>
+        <div style={{ fontSize:13, color:"#c47830", fontWeight:700, letterSpacing:0.3 }}>
+          代理商门户 / Portal Sunny — Agente aéreo
+        </div>
+      </div>
+
+      {/* ── TABS ────────────────────────────────────────────────────── */}
+      <div style={{ background:"#fff", borderBottom:"1px solid #e2e8f0", padding:"0 24px", overflowX:"auto" }}>
+        <div style={{ display:"flex", gap:0, minWidth:"max-content" }}>
+          {TABS.map(t => {
+            const isActive = tab === t.id
+            return (
+              <button key={t.id} onClick={() => { setTab(t.id); setEditing(null); }}
+                style={{
+                  padding:"14px 18px", background:"transparent", border:"none",
+                  borderBottom: isActive ? "2px solid #c47830" : "2px solid transparent",
+                  color: isActive ? "#0f172a" : "#64748b",
+                  fontWeight: isActive ? 700 : 500, fontSize:13, cursor:"pointer",
+                  display:"flex", alignItems:"center", gap:7, fontFamily:"inherit",
+                  marginBottom:-1, whiteSpace:"nowrap",
+                }}>
+                {t.label}
+                {t.count !== null && t.count > 0 && (
+                  <span style={{
+                    background: isActive ? "#040c18" : (t.urgent ? "#c47830" : "#e2e8f0"),
+                    color: isActive ? "#c47830" : (t.urgent ? "#fff" : "#64748b"),
+                    borderRadius:20, padding:"1px 8px", fontSize:11, fontWeight:800,
+                  }}>{t.count}</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── CONTENIDO ───────────────────────────────────────────────── */}
+      <div style={{ maxWidth:920, margin:"0 auto", padding:"20px 16px 48px" }}>
+        {tab === "dashboard" ? (
+          <Dashboard cots={cots} pendCot={pendCot} confirmadas={confirmadas} camino={camino} completadas={completadas} />
+        ) : loading ? (
+          <Empty zh="加载中" es="Cargando..." emoji="⏳" />
+        ) : shown.length === 0 ? (
+          <Empty zh={EMPTY_MSG[tab]?.zh} es={EMPTY_MSG[tab]?.es} emoji="📭" />
+        ) : tab === "pend_cot" ? (
+          shown.map(c => (
+            <CotEditable key={c._id} c={c} supabase={supabase} isExpanded={editingId === c._id}
+              onExpand={() => setEditing(editingId === c._id ? null : c._id)} onSaved={loadData} />
+          ))
+        ) : (
+          shown.map(c => <CotReadOnly key={c._id} c={c} />)
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Componente vacío ────────────────────────────────────────────────────────
+function Empty({ zh, es, emoji }) {
+  return (
+    <div style={{ textAlign:"center", padding:64, color:"#94a3b8" }}>
+      <div style={{ fontSize:40, marginBottom:14 }}>{emoji}</div>
+      <div style={{ fontWeight:700, fontSize:15, marginBottom:4, color:"#475569" }}>{zh || ""}</div>
+      <div style={{ fontSize:13 }}>{es || ""}</div>
+    </div>
+  )
+}
+
+// ─── Card editable (Tab 1: Pend. cotizar) ────────────────────────────────────
+function CotEditable({ c, supabase, isExpanded, onExpand, onSaved }) {
+  const [form, setForm] = useState({
+    sku_china:             c.sku_china || "",
+    precio_china_rmb:      c.precio_china_rmb || "",
+    dim_largo:             c.dim_largo || "",
+    dim_ancho:             c.dim_ancho || "",
+    dim_alto:              c.dim_alto || "",
+    dim_und_caja:          c.dim_und_caja || "",
+    dim_tipo:              c.dim_tipo || "caja",
+    peso_kg:               c.peso_kg || "",
+    aer_modo_cobro_sunny:  c.aer_modo_cobro_sunny || "auto",
+    aer_tarifa_sunny_kg:   c.aer_tarifa_sunny_kg ?? 9.55,
+    aer_tarifa_sunny_cbm:  c.aer_tarifa_sunny_cbm ?? "",
+    form_f_incluido:       c.form_f_incluido !== false,
+    dias_estimados_china:  c.dias_estimados_china || "",
+    nota_nueva:            "",
+  })
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg]       = useState(null)
+
+  // ─── Cálculo en vivo ──────────────────────────────────────────────────────
+  const unidades = Number(c.unidades) || 0
+  const undCaja  = Number(form.dim_und_caja) || 0
+  const esCaja   = form.dim_tipo === "caja"
+  const nCajas   = esCaja && undCaja > 0 ? Math.ceil(unidades / undCaja) : 0
+  const m3Caja   = (Number(form.dim_largo)||0) * (Number(form.dim_ancho)||0) * (Number(form.dim_alto)||0) / 1000000
+  const m3Total  = esCaja ? m3Caja * nCajas : m3Caja * unidades
+  const pesoReal = Number(form.peso_kg) || 0
+  const pesoTotal = esCaja ? pesoReal * nCajas : pesoReal * unidades
+  const volCm3   = (Number(form.dim_largo)||0) * (Number(form.dim_ancho)||0) * (Number(form.dim_alto)||0) * (esCaja ? nCajas : unidades)
+  const pesoVol  = volCm3 / 6000
+  const pesoCobrable = Math.max(pesoTotal, pesoVol)
+  const precioUSD = Number(form.precio_china_rmb) > 0 ? Number(form.precio_china_rmb) / TC_RMB_USD : 0
+  const totalFOB  = precioUSD * unidades
+
+  // Flete según modo
+  const modo = form.aer_modo_cobro_sunny || "auto"
+  const tarifaKg  = Number(form.aer_tarifa_sunny_kg) || 0
+  const tarifaCbm = Number(form.aer_tarifa_sunny_cbm) || 0
+  let fleteEstimado = 0
+  let fleteBase = ""
+  if (modo === "peso" && tarifaKg > 0) {
+    fleteEstimado = pesoTotal * tarifaKg
+    fleteBase = `${fmtN(pesoTotal,1)} kg × ${fmtN(tarifaKg,2)} USD/kg`
+  } else if (modo === "volumen" && tarifaCbm > 0) {
+    fleteEstimado = m3Total * tarifaCbm
+    fleteBase = `${fmtN(m3Total,3)} m³ × ${fmtN(tarifaCbm,2)} USD/m³`
+  } else if (modo === "auto" && tarifaKg > 0) {
+    fleteEstimado = pesoCobrable * tarifaKg
+    fleteBase = `${fmtN(pesoCobrable,1)} kg cobrable × ${fmtN(tarifaKg,2)} USD/kg`
+  }
+
+  // ─── Calcular m³ cuando cambia L/A/H ─────────────────────────────────────
+  function onDim(field, v) {
+    setForm(p => ({ ...p, [field]: v }))
+  }
+
+  // ─── Guardar (borrador o envío final) ────────────────────────────────────
+  async function persistirRespuestaSunny(enviarAdmin) {
+    setSaving(true)
+    setMsg(null)
+    try {
+      // 1) Leer datos FRESCOS de Supabase (anti-race)
+      const { data: fresca, error: errLoad } = await supabase
+        .from("cotizaciones")
+        .select("datos")
+        .eq("id", c._id)
+        .single()
+      if (errLoad || !fresca) throw new Error("No se pudo leer la cotización")
+
+      // 2) Merge: solo campos de Sunny
+      const datosMerged = { ...fresca.datos }
+      const camposSunny = [
+        "sku_china", "precio_china_rmb",
+        "dim_largo", "dim_ancho", "dim_alto", "dim_und_caja", "dim_tipo",
+        "peso_kg",
+        "aer_modo_cobro_sunny", "aer_tarifa_sunny_kg", "aer_tarifa_sunny_cbm",
+        "form_f_incluido", "dias_estimados_china",
+      ]
+      for (const k of camposSunny) {
+        if (form[k] !== undefined && form[k] !== "") datosMerged[k] = form[k]
+      }
+      // 3) Calcular m³ por unidad o caja (cuadrado)
+      if (Number(form.dim_largo) && Number(form.dim_ancho) && Number(form.dim_alto)) {
+        datosMerged.dim_m3 = ((Number(form.dim_largo)*Number(form.dim_ancho)*Number(form.dim_alto))/1000000).toFixed(4)
+      }
+      // 4) Notas: agregar nueva si existe
+      if (form.nota_nueva && form.nota_nueva.trim()) {
+        const hist = Array.isArray(fresca.datos.notas_china_historial) ? [...fresca.datos.notas_china_historial] : []
+        hist.push({
+          fecha: new Date().toISOString(),
+          autor: "Sunny",
+          texto: form.nota_nueva.trim(),
+          oculta: false,
+        })
+        datosMerged.notas_china_historial = hist
+        datosMerged.nota_china_nueva = true
+      }
+      // 5) Si se envía a admin, cambiar estado
+      if (enviarAdmin) {
+        datosMerged.estado = "respuesta_china"
+        datosMerged.fecha_respuesta_china = new Date().toISOString().split("T")[0]
+      }
+      // 6) UPDATE
+      const { error: errSave } = await supabase
+        .from("cotizaciones")
+        .update({ datos: datosMerged, updated_at: new Date().toISOString() })
+        .eq("id", c._id)
+        .select("id")
+      if (errSave) throw errSave
+
+      setMsg({ tipo:"ok", txt: enviarAdmin ? "✅ 已发送 / Enviado a admin" : "✅ 已保存 / Guardado" })
+      setForm(p => ({ ...p, nota_nueva: "" }))
+      onSaved && onSaved()
+      if (enviarAdmin) setTimeout(() => onExpand && onExpand(), 1200)
+    } catch (e) {
+      console.error(e)
+      setMsg({ tipo:"err", txt:"⚠️ Error: " + (e.message || "no se pudo guardar") })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{
+      background:"#fff", borderRadius:12, marginBottom:14,
+      border: isExpanded ? "2px solid #c47830" : "1px solid #e2e8f0",
+      overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,0.04)",
+      transition:"all 0.2s",
+    }}>
+      {/* HEADER CARD ── compacto */}
+      <div onClick={onExpand} style={{
+        padding:"12px 16px", cursor:"pointer",
+        display:"flex", alignItems:"center", gap:12,
+        background: isExpanded ? "#fff7ed" : "#fff",
+        borderBottom: isExpanded ? "1px solid #fed7aa" : "none",
+      }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+            <span style={{
+              background:"#c4783020", color:"#c47830", border:"1px solid #c4783055",
+              borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:700,
+            }}>
+              {EST_ZH[c.estado]} / {EST_ES[c.estado]}
+            </span>
+            <span style={{ fontSize:10, color:"#94a3b8" }}>· {fmtDate(c._updated)}</span>
+          </div>
+          <div style={{ fontWeight:700, fontSize:14, color:"#0f172a", marginBottom:2 }}>
+            {c.producto || "Sin nombre"}
+          </div>
+          <div style={{ fontSize:12, color:"#64748b" }}>
+            📦 {Number(c.unidades || 0).toLocaleString("es-CL")} 件 unidades
+            {c.link_alibaba && <> · <a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{ color:"#2d78c8", textDecoration:"underline" }}>🔗 Link</a></>}
+          </div>
+        </div>
+        <div style={{ fontSize:22, color:"#94a3b8" }}>{isExpanded ? "▾" : "▸"}</div>
+      </div>
+
+      {/* FORM EDITABLE */}
+      {isExpanded && (
+        <div style={{ padding:"16px 20px", background:"#fafafa" }}>
+          {/* Info admin (read-only) */}
+          <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:9, padding:"10px 14px", marginBottom:14, fontSize:12 }}>
+            <div style={{ fontSize:10, fontWeight:700, color:"#94a3b8", marginBottom:6, textTransform:"uppercase", letterSpacing:1 }}>
+              📦 来自管理员 / Info del admin
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, color:"#475569" }}>
+              <div><b>产品 Producto:</b> {c.producto || "—"}</div>
+              <div><b>数量 Cantidad:</b> {Number(c.unidades||0).toLocaleString("es-CL")} und</div>
+              {c.variantes && <div style={{ gridColumn:"1 / -1" }}><b>规格 Variantes:</b> {c.variantes}</div>}
+              {c.notas && <div style={{ gridColumn:"1 / -1", color:"#92400e", background:"#fffbeb", borderRadius:6, padding:"5px 8px", marginTop:4 }}><b>📌 备注 Nota admin:</b> {c.notas}</div>}
+              {c.imagen_url && (() => {
+                const img = c.imagen_url.split("|||")[0]
+                return img ? <div style={{ gridColumn:"1 / -1", marginTop:4 }}><img src={img} alt="" style={{ maxWidth:140, borderRadius:6, border:"1px solid #e2e8f0" }} onError={e=>e.target.style.display="none"}/></div> : null
+              })()}
+            </div>
+          </div>
+
+          {/* SECCIÓN 1: SKU + Precio */}
+          <Section title="📋 请填写 / Por favor llenar">
+            <Field label="中国 SKU / SKU China">
+              <input value={form.sku_china} onChange={e=>setForm(p=>({...p, sku_china:e.target.value}))} placeholder="Ej: SK-EAR-2940-A" style={inp}/>
+            </Field>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+              <Field label="FOB 价格 / Precio FOB (RMB / und)">
+                <input type="number" step="0.01" value={form.precio_china_rmb} onChange={e=>setForm(p=>({...p, precio_china_rmb:e.target.value}))} placeholder="0.00" style={inp}/>
+              </Field>
+              <Field label="自动 / Calculado USD (TC 7.2)">
+                <div style={{ ...inp, background:"#f1f5f9", color:"#475569", fontWeight:700 }}>
+                  {precioUSD > 0 ? fmtUSD(precioUSD) : "—"}
+                </div>
+              </Field>
+            </div>
+            {totalFOB > 0 && (
+              <div style={{ fontSize:11, color:"#64748b", marginTop:-6, marginBottom:8 }}>
+                总 FOB / Total FOB: <b style={{ color:"#0f172a" }}>{fmtUSD(totalFOB)}</b> · ({fmtRMB(Number(form.precio_china_rmb)*unidades)})
+              </div>
+            )}
+          </Section>
+
+          {/* SECCIÓN 2: Dimensiones */}
+          <Section title="📐 箱尺寸 / Dimensiones de la caja">
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:6 }}>
+              <Field label="箱装 / Und por caja">
+                <input type="number" value={form.dim_und_caja} onChange={e=>onDim("dim_und_caja", e.target.value)} placeholder="Ej: 200" style={inp}/>
+              </Field>
+              <Field label="单箱重量 / Peso por caja (kg)">
+                <input type="number" step="0.01" value={form.peso_kg} onChange={e=>onDim("peso_kg", e.target.value)} placeholder="Ej: 8.5" style={inp}/>
+              </Field>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:8 }}>
+              <Field label="长 / Largo (cm)">
+                <input type="number" step="0.1" value={form.dim_largo} onChange={e=>onDim("dim_largo", e.target.value)} placeholder="0" style={inp}/>
+              </Field>
+              <Field label="宽 / Ancho (cm)">
+                <input type="number" step="0.1" value={form.dim_ancho} onChange={e=>onDim("dim_ancho", e.target.value)} placeholder="0" style={inp}/>
+              </Field>
+              <Field label="高 / Alto (cm)">
+                <input type="number" step="0.1" value={form.dim_alto} onChange={e=>onDim("dim_alto", e.target.value)} placeholder="0" style={inp}/>
+              </Field>
+            </div>
+
+            {/* CÁLCULO EN VIVO */}
+            {(m3Caja > 0 || pesoReal > 0) && (
+              <div style={{ background:"#f0fdf4", border:"1px solid #bbf7d0", borderRadius:8, padding:"10px 12px", fontSize:11, color:"#15803d", lineHeight:1.6 }}>
+                <div style={{ fontWeight:700, marginBottom:4 }}>💚 实时计算 / Cálculo en vivo:</div>
+                {m3Caja > 0 && <div>▸ 单箱体积 / m³ por caja: <b>{fmtN(m3Caja,4)} m³</b></div>}
+                {nCajas > 0 && <div>▸ 总箱数 / N° cajas: <b>{nCajas}</b> ({Number(c.unidades||0)} und ÷ {undCaja} por caja)</div>}
+                {m3Total > 0 && <div>▸ 总体积 / m³ total: <b style={{ color: m3Total < 1 ? "#dc2626" : "#15803d" }}>{fmtN(m3Total,3)} m³</b></div>}
+                {pesoReal > 0 && pesoTotal > 0 && <div>▸ 总重量 / Peso total: <b>{fmtN(pesoTotal,1)} kg</b></div>}
+                {pesoVol > 0 && <div>▸ 体积重量 / Peso volumétrico (÷6000): <b>{fmtN(pesoVol,1)} kg</b></div>}
+                {pesoCobrable > 0 && <div>▸ 计费重量 / Peso cobrable: <b>{fmtN(pesoCobrable,1)} kg</b> {pesoVol > pesoTotal ? "(volumétrico manda)" : "(real manda)"}</div>}
+              </div>
+            )}
+
+            {/* ALERTA <1 m³ */}
+            {m3Total > 0 && m3Total < 1 && (
+              <div style={{ marginTop:8, background:"#fef2f2", border:"1px solid #fecaca", borderRadius:8, padding:"8px 12px", fontSize:11, color:"#dc2626", lineHeight:1.5 }}>
+                ⚠️ <b>体积小于 1 m³ / Volumen menor a 1 m³</b> ({fmtN(m3Total,3)} m³). 需要与其他订单合并发货 / Hay que consolidar con otra cotización.
+              </div>
+            )}
+          </Section>
+
+          {/* SECCIÓN 3: Modo cobro flete + tarifas */}
+          <Section title="✈️ 计费方式 / Modo de cobro flete">
+            <div style={{ display:"flex", gap:6, marginBottom:10 }}>
+              {[
+                ["auto",    "🔀 自动 Auto"],
+                ["peso",    "⚖️ 重量 Peso"],
+                ["volumen", "📦 体积 Volumen"],
+              ].map(([k,l]) => (
+                <button key={k} onClick={()=>setForm(p=>({...p, aer_modo_cobro_sunny:k}))}
+                  style={{
+                    flex:1, padding:"7px 8px", fontSize:11, cursor:"pointer", fontWeight:600,
+                    background: modo===k ? "#c47830" : "#fff",
+                    color: modo===k ? "#fff" : "#64748b",
+                    border:"1px solid " + (modo===k ? "#c47830" : "#fed7aa"),
+                    borderRadius:7, fontFamily:"inherit",
+                  }}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+              <Field label="USD/kg (重量)">
+                <input type="number" step="0.01" value={form.aer_tarifa_sunny_kg} onChange={e=>setForm(p=>({...p, aer_tarifa_sunny_kg:e.target.value}))} placeholder="9.55" style={inp}/>
+              </Field>
+              <Field label="USD/m³ (体积)">
+                <input type="number" step="0.01" value={form.aer_tarifa_sunny_cbm} onChange={e=>setForm(p=>({...p, aer_tarifa_sunny_cbm:e.target.value}))} placeholder="—" style={inp}/>
+              </Field>
+            </div>
+            {fleteEstimado > 0 && (
+              <div style={{ marginTop:8, background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:7, padding:"7px 11px", fontSize:11, color:"#92400e" }}>
+                ▸ 估算运费 / Flete estimado: <b style={{ fontSize:13 }}>{fmtUSD(fleteEstimado)}</b> ({fleteBase})
+              </div>
+            )}
+          </Section>
+
+          {/* SECCIÓN 4: Form F + días producción */}
+          <Section title="📜 其他 / Otros datos">
+            <div style={{ marginBottom:10 }}>
+              <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", padding:"8px 12px",
+                background: form.form_f_incluido ? "#f0fdf4" : "#fef2f2",
+                border:"1px solid " + (form.form_f_incluido ? "#bbf7d0" : "#fecaca"),
+                borderRadius:7,
+              }}>
+                <input type="checkbox" checked={form.form_f_incluido} onChange={e=>setForm(p=>({...p, form_f_incluido:e.target.checked}))}/>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color: form.form_f_incluido ? "#15803d" : "#dc2626" }}>
+                    Form F (中智自贸协定 / TLC Chile-China) {form.form_f_incluido ? "包含 incluido ✅" : "不包含 NO incluido ❌"}
+                  </div>
+                  <div style={{ fontSize:10, color:"#64748b", marginTop:2 }}>
+                    {form.form_f_incluido ? "智利关税 0% / Arancel 0% en Chile" : "智利关税 6% / Arancel 6% — encarece para el cliente"}
+                  </div>
+                </div>
+              </label>
+            </div>
+            <Field label="预计生产时间 / Días estimados producción">
+              <input type="number" value={form.dias_estimados_china} onChange={e=>setForm(p=>({...p, dias_estimados_china:e.target.value}))} placeholder="Ej: 15" style={inp}/>
+            </Field>
+          </Section>
+
+          {/* SECCIÓN 5: Nota */}
+          <Section title="✉️ 备注 / Nota para admin">
+            <textarea value={form.nota_nueva} onChange={e=>setForm(p=>({...p, nota_nueva:e.target.value}))} rows={3}
+              placeholder="可选 / Opcional. Ej: stock disponible, restricción de color, lead time variable..."
+              style={{ ...inp, resize:"vertical", minHeight:60, fontFamily:"inherit" }}/>
+          </Section>
+
+          {/* MENSAJE */}
+          {msg && (
+            <div style={{
+              marginBottom:10, padding:"8px 12px", borderRadius:7, fontSize:12, fontWeight:600,
+              background: msg.tipo==="ok" ? "#f0fdf4" : "#fef2f2",
+              border:"1px solid " + (msg.tipo==="ok" ? "#bbf7d0" : "#fecaca"),
+              color: msg.tipo==="ok" ? "#15803d" : "#dc2626",
+            }}>{msg.txt}</div>
+          )}
+
+          {/* BOTONES */}
+          <div style={{ display:"flex", gap:8, marginTop:14 }}>
+            <button onClick={()=>persistirRespuestaSunny(false)} disabled={saving}
+              style={{ ...btn, background:"#fff", color:"#64748b", border:"1px solid #cbd5e1", flex:1 }}>
+              💾 {saving ? "..." : "保存草稿 / Guardar borrador"}
+            </button>
+            <button onClick={()=>persistirRespuestaSunny(true)} disabled={saving || !form.precio_china_rmb}
+              style={{
+                ...btn,
+                background: form.precio_china_rmb ? "#c47830" : "#cbd5e1",
+                color:"#fff",
+                cursor: form.precio_china_rmb ? "pointer" : "not-allowed",
+                flex:2,
+              }}>
+              ✅ {saving ? "发送中... / Enviando..." : "发送给管理员 / Enviar a admin"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Card read-only (tabs 2-5) ───────────────────────────────────────────────
+function CotReadOnly({ c }) {
+  return (
+    <div style={{
+      background:"#fff", borderRadius:10, marginBottom:10, padding:"12px 16px",
+      border:"1px solid #e2e8f0", display:"flex", alignItems:"center", gap:12,
+    }}>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+          <span style={{
+            background: (EST_COLOR[c.estado]||"#94a3b8") + "20",
+            color: EST_COLOR[c.estado]||"#475569",
+            border:"1px solid " + (EST_COLOR[c.estado]||"#cbd5e1") + "55",
+            borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:700,
+          }}>
+            {EST_ZH[c.estado]} / {EST_ES[c.estado]}
+          </span>
+          <span style={{ fontSize:10, color:"#94a3b8" }}>· {fmtDate(c._updated)}</span>
+        </div>
+        <div style={{ fontWeight:700, fontSize:14, color:"#0f172a", marginBottom:2 }}>
+          {c.producto || "—"}
+        </div>
+        <div style={{ fontSize:11, color:"#64748b" }}>
+          📦 {Number(c.unidades || 0).toLocaleString("es-CL")} 件 unidades
+          {c.sku_china && <> · 🏷 {c.sku_china}</>}
+          {Number(c.dim_m3) > 0 && <> · 📐 {fmtN(Number(c.dim_m3)*Number(c.unidades||0),3)} m³ total</>}
+          {Number(c.peso_kg) > 0 && <> · ⚖️ {c.peso_kg} kg</>}
+          {c.fecha_llegada_estimada && <> · ✈️ {fmtDate(c.fecha_llegada_estimada)}</>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Dashboard (tab 6) ───────────────────────────────────────────────────────
+function Dashboard({ cots, pendCot, confirmadas, camino, completadas }) {
+  const totalCot = cots.length
+  const respuestasMes = cots.filter(c => {
+    if (c.estado === "enviado_china") return false
+    if (!c.fecha_respuesta_china) return false
+    const d = new Date(c.fecha_respuesta_china)
+    const ahora = new Date()
+    return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear()
+  }).length
+  const enTransito = camino.length
+  const cerradasMes = completadas.filter(c => {
+    if (!c.fecha_llegada_real) return false
+    const d = new Date(c.fecha_llegada_real)
+    const ahora = new Date()
+    return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear()
+  }).length
+
+  const Kpi = ({ label, value, hint, color }) => (
+    <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:12, padding:18, flex:1, minWidth:180 }}>
+      <div style={{ fontSize:11, color:"#94a3b8", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>{label}</div>
+      <div style={{ fontSize:32, fontWeight:800, color: color || "#0f172a", lineHeight:1 }}>{value}</div>
+      {hint && <div style={{ fontSize:11, color:"#64748b", marginTop:6 }}>{hint}</div>}
+    </div>
+  )
+
+  return (
+    <div>
+      <div style={{ fontSize:18, fontWeight:800, color:"#0f172a", marginBottom:14 }}>
+        📊 仪表板 / Dashboard
+      </div>
+      <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:18 }}>
+        <Kpi label="待报价 Pend. cotizar" value={pendCot.length} hint={pendCot.length > 0 ? "Hay solicitudes esperando" : "Todo al día"} color="#c47830"/>
+        <Kpi label="本月已报价 Cotizadas mes" value={respuestasMes} hint="Respuestas enviadas este mes" color="#1aa358"/>
+        <Kpi label="运输中 En tránsito" value={enTransito} hint="Envíos en camino" color="#a85590"/>
+        <Kpi label="本月完成 Cerradas mes" value={cerradasMes} hint="Llegaron en este mes" color="#0d9870"/>
+      </div>
+      <Kpi label="总活跃 Total activas" value={totalCot} hint="Todas las cotizaciones aéreas que ves"/>
+    </div>
+  )
+}
+
+// ─── Mini componentes UI ─────────────────────────────────────────────────────
+function Section({ title, children }) {
+  return (
+    <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
+      <div style={{ fontSize:11, color:"#c47830", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:10 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+}
+function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom:8 }}>
+      <label style={{ display:"block", fontSize:10, color:"#64748b", fontWeight:600, marginBottom:4, textTransform:"uppercase", letterSpacing:0.5 }}>{label}</label>
+      {children}
+    </div>
+  )
+}
+const inp = {
+  width:"100%", background:"#fff", border:"1px solid #e2e8f0", borderRadius:7,
+  padding:"8px 11px", fontSize:13, outline:"none", boxSizing:"border-box",
+  color:"#0f172a", fontFamily:"inherit",
+}
+const btn = {
+  padding:"10px 18px", fontSize:13, fontWeight:700, cursor:"pointer",
+  borderRadius:8, fontFamily:"inherit", transition:"all 0.15s",
+}
