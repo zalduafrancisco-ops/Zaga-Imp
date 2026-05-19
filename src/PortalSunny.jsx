@@ -107,11 +107,11 @@ export default function PortalSunny({ supabase, onLogout }) {
       setCots(relevantes)
     }
     if (!opsRes.error && opsRes.data) {
-      const opsRecotizar = opsRes.data
+      // Guardar TODAS las ops (para badge en cards + dropdown de "ya consolidadas")
+      const todasOps = opsRes.data
         .map(r => ({ ...r.datos, _id: r.id, _updated: r.updated_at || r.created_at }))
-        .filter(o => o.recotizacion_pendiente_sunny === true)
         .sort((a, b) => new Date(b._updated) - new Date(a._updated))
-      setOps(opsRecotizar)
+      setOps(todasOps)
     }
     setLoading(false)
   }
@@ -133,7 +133,7 @@ export default function PortalSunny({ supabase, onLogout }) {
   }
   const shown = tabMap[tab] || []
 
-  const opsPendientes = ops.filter(o => !o.recotizacion_completada_sunny)
+  const opsPendientes = ops.filter(o => o.recotizacion_pendiente_sunny === true && !o.recotizacion_completada_sunny)
 
   const TABS = [
     { id:"pend_cot",     label:"待报价 Pend. cotizar",  count: pendCot.length,     urgent: pendCot.length > 0 },
@@ -246,11 +246,16 @@ export default function PortalSunny({ supabase, onLogout }) {
           <Empty zh={EMPTY_MSG[tab]?.zh} es={EMPTY_MSG[tab]?.es} emoji="📭" />
         ) : tab === "pend_cot" ? (
           shown.map(c => (
-            <CotEditable key={c._id} c={c} supabase={supabase} isExpanded={editingId === c._id}
+            <CotEditable key={c._id} c={c} supabase={supabase} ops={ops} isExpanded={editingId === c._id}
               onExpand={() => setEditing(editingId === c._id ? null : c._id)} onSaved={loadData} />
           ))
         ) : (
-          shown.map(c => <CotReadOnly key={c._id} c={c} />)
+          shown.map(c => (
+            <CotReadOnly key={c._id} c={c} supabase={supabase} ops={ops}
+              isExpanded={editingId === c._id}
+              onExpand={() => setEditing(editingId === c._id ? null : c._id)}
+              onSaved={loadData} />
+          ))
         )}
       </div>
     </div>
@@ -269,7 +274,8 @@ function Empty({ zh, es, emoji }) {
 }
 
 // ─── Card editable (Tab 1: Pend. cotizar) ────────────────────────────────────
-function CotEditable({ c, supabase, isExpanded, onExpand, onSaved }) {
+function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
+  const opVinculada = c.operacion_id && Array.isArray(ops) ? ops.find(o => o._id === c.operacion_id) : null
   const [form, setForm] = useState({
     sku_china:             c.sku_china || "",
     precio_china_rmb:      c.precio_china_rmb || "",
@@ -422,6 +428,11 @@ function CotEditable({ c, supabase, isExpanded, onExpand, onSaved }) {
             }}>
               {EST_ZH[c.estado]} / {EST_ES[c.estado]}
             </span>
+            {opVinculada && (
+              <span style={{ background:"#fef9c3", color:"#854d0e", border:"1px solid #fde68a", borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:800 }}>
+                ✈️ 在 {opVinculada.nro} / En {opVinculada.nro}
+              </span>
+            )}
             <span style={{ fontSize:10, color:"#94a3b8" }}>· {fmtDate(c._updated)}</span>
           </div>
           <div style={{ fontWeight:700, fontSize:14, color:"#0f172a", marginBottom:2 }}>
@@ -630,49 +641,163 @@ function CotEditable({ c, supabase, isExpanded, onExpand, onSaved }) {
   )
 }
 
-// ─── Card read-only (tabs 2-5) ───────────────────────────────────────────────
-function CotReadOnly({ c }) {
+// ─── Card read-only (tabs 2-5) — con badge OP + chat expandible ───────────
+function CotReadOnly({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
+  const opVinculada = c.operacion_id && Array.isArray(ops) ? ops.find(o => o._id === c.operacion_id) : null
+  const [nuevoMsg, setNuevoMsg] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState(null)
+  const historial = Array.isArray(c.notas_china_historial) ? c.notas_china_historial : []
+
+  async function enviarMensaje() {
+    const txt = nuevoMsg.trim()
+    if (!txt) return
+    setSaving(true); setMsg(null)
+    try {
+      const { data: fresca, error: errLoad } = await supabase
+        .from("cotizaciones").select("datos").eq("id", c._id).single()
+      if (errLoad || !fresca) throw new Error("No se pudo leer la cotización")
+      const histPrev = Array.isArray(fresca.datos.notas_china_historial) ? [...fresca.datos.notas_china_historial] : []
+      const nuevaNota = {
+        id: Date.now().toString(),
+        fecha: new Date().toISOString(),
+        autor: "agente_aereo",
+        autorNombre: "Sunny",
+        texto: txt,
+        oculta: false,
+      }
+      const datosMerged = {
+        ...fresca.datos,
+        notas_china_historial: [...histPrev, nuevaNota],
+        nota_china_nueva: true,
+      }
+      const { error: errSave } = await supabase
+        .from("cotizaciones").update({ datos: datosMerged, updated_at: new Date().toISOString() })
+        .eq("id", c._id).select("id")
+      if (errSave) throw errSave
+      setNuevoMsg("")
+      setMsg({ tipo:"ok", txt:"✅ 已发送 / Enviado" })
+      onSaved && onSaved()
+      setTimeout(() => setMsg(null), 1500)
+    } catch(e) {
+      setMsg({ tipo:"err", txt:"⚠️ " + (e.message || "Error al enviar") })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div style={{
-      background:"#fff", borderRadius:10, marginBottom:10, padding:"12px 16px",
-      border:"1px solid #e2e8f0", display:"flex", alignItems:"center", gap:12,
+      background:"#fff", borderRadius:10, marginBottom:10,
+      border: isExpanded ? "2px solid #c47830" : "1px solid #e2e8f0",
+      overflow:"hidden", transition:"all 0.2s",
     }}>
-      <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, flexWrap:"wrap" }}>
-          {c.nro && (
+      <div onClick={onExpand} style={{ padding:"12px 16px", cursor:"pointer", display:"flex", alignItems:"center", gap:12 }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, flexWrap:"wrap" }}>
+            {c.nro && (
+              <span style={{ background:"#040c18", color:"#c47830", borderRadius:5, padding:"2px 8px", fontSize:10, fontWeight:800, letterSpacing:0.5 }}>
+                {c.nro}
+              </span>
+            )}
             <span style={{
-              background:"#040c18", color:"#c47830", borderRadius:5,
-              padding:"2px 8px", fontSize:10, fontWeight:800, letterSpacing:0.5,
+              background: (EST_COLOR[c.estado]||"#94a3b8") + "20",
+              color: EST_COLOR[c.estado]||"#475569",
+              border:"1px solid " + (EST_COLOR[c.estado]||"#cbd5e1") + "55",
+              borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:700,
             }}>
-              {c.nro}
+              {EST_ZH[c.estado]} / {EST_ES[c.estado]}
             </span>
-          )}
-          <span style={{
-            background: (EST_COLOR[c.estado]||"#94a3b8") + "20",
-            color: EST_COLOR[c.estado]||"#475569",
-            border:"1px solid " + (EST_COLOR[c.estado]||"#cbd5e1") + "55",
-            borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:700,
-          }}>
-            {EST_ZH[c.estado]} / {EST_ES[c.estado]}
-          </span>
-          <span style={{ fontSize:10, color:"#94a3b8" }}>· {fmtDate(c._updated)}</span>
-        </div>
-        <div style={{ fontWeight:700, fontSize:14, color:"#0f172a", marginBottom:2 }}>
-          {c.producto || "—"}
-        </div>
-        {c.cliente && (
-          <div style={{ fontSize:11, color:"#64748b", marginBottom:2 }}>
-            👤 客户 / Cliente: <b style={{ color:"#475569" }}>{c.cliente}</b>
+            {opVinculada && (
+              <span style={{ background:"#fef9c3", color:"#854d0e", border:"1px solid #fde68a", borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:800 }}>
+                ✈️ 在 {opVinculada.nro} / En {opVinculada.nro}
+              </span>
+            )}
+            <span style={{ fontSize:10, color:"#94a3b8" }}>· {fmtDate(c._updated)}</span>
           </div>
-        )}
-        <div style={{ fontSize:11, color:"#64748b" }}>
-          📦 {Number(c.unidades || 0).toLocaleString("es-CL")} 件 unidades
-          {c.sku_china && <> · 🏷 {c.sku_china}</>}
-          {Number(c.dim_m3) > 0 && <> · 📐 {fmtN(Number(c.dim_m3)*Number(c.unidades||0),3)} m³ total</>}
-          {Number(c.peso_kg) > 0 && <> · ⚖️ {c.peso_kg} kg</>}
-          {c.fecha_llegada_estimada && <> · ✈️ {fmtDate(c.fecha_llegada_estimada)}</>}
+          <div style={{ fontWeight:700, fontSize:14, color:"#0f172a", marginBottom:2 }}>
+            {c.producto || "—"}
+          </div>
+          {c.cliente && (
+            <div style={{ fontSize:11, color:"#64748b", marginBottom:2 }}>
+              👤 客户 / Cliente: <b style={{ color:"#475569" }}>{c.cliente}</b>
+            </div>
+          )}
+          <div style={{ fontSize:11, color:"#64748b" }}>
+            📦 {Number(c.unidades || 0).toLocaleString("es-CL")} 件 unidades
+            {c.sku_china && <> · 🏷 {c.sku_china}</>}
+            {Number(c.dim_m3) > 0 && <> · 📐 {fmtN(Number(c.dim_m3)*Number(c.unidades||0),3)} m³ total</>}
+            {Number(c.peso_kg) > 0 && <> · ⚖️ {c.peso_kg} kg</>}
+            {historial.length > 0 && <> · 💬 {historial.length} {historial.length===1?"mensaje":"mensajes"}</>}
+          </div>
         </div>
+        <div style={{ fontSize:22, color:"#94a3b8" }}>{isExpanded ? "▾" : "▸"}</div>
       </div>
+
+      {isExpanded && (
+        <div style={{ padding:"12px 16px 16px", borderTop:"1px solid #f1f5f9", background:"#fafafa" }}>
+          {/* Info producto */}
+          <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:8, padding:"10px 12px", marginBottom:10, fontSize:11, color:"#475569" }}>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+              {c.sku_china && <div><b>SKU:</b> {c.sku_china}</div>}
+              {c.precio_china_rmb && <div><b>FOB:</b> ¥{c.precio_china_rmb}/und</div>}
+              {Number(c.dim_largo) > 0 && <div><b>Caja:</b> {c.dim_largo}×{c.dim_ancho}×{c.dim_alto} cm</div>}
+              {Number(c.peso_kg) > 0 && <div><b>Peso/caja:</b> {c.peso_kg} kg</div>}
+              {c.dim_und_caja && <div><b>Und/caja:</b> {c.dim_und_caja}</div>}
+              {c.form_f_incluido !== undefined && <div><b>Form F:</b> {c.form_f_incluido ? "✓ Sí" : "✗ No"}</div>}
+            </div>
+            {c.link_alibaba && <div style={{ marginTop:6 }}><a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" style={{ color:"#2d78c8" }}>🔗 Link producto</a></div>}
+          </div>
+
+          {/* Chat */}
+          <Section title="💬 消息 / Mensajes">
+            {historial.length === 0 ? (
+              <div style={{ fontSize:11, color:"#94a3b8", fontStyle:"italic", textAlign:"center", padding:"10px 0" }}>
+                还没有消息 / Aún sin mensajes
+              </div>
+            ) : (
+              <div style={{ display:"flex", flexDirection:"column", gap:6, maxHeight:240, overflowY:"auto", marginBottom:8 }}>
+                {historial.filter(n=>!n.oculta).map((n, i) => {
+                  const esSunny = n.autor === "agente_aereo" || n.autor === "agente_china"
+                  return (
+                    <div key={n.id || i} style={{
+                      background: esSunny ? "#fff7ed" : "#eff6ff",
+                      border: "1px solid " + (esSunny ? "#fed7aa" : "#bfdbfe"),
+                      borderRadius: 8, padding:"7px 10px", fontSize:12,
+                      alignSelf: esSunny ? "flex-end" : "flex-start", maxWidth:"85%",
+                    }}>
+                      <div style={{ fontSize:9, color: esSunny ? "#c47830" : "#2d78c8", fontWeight:700, marginBottom:2 }}>
+                        {esSunny ? "Sunny" : (n.autorNombre || "Admin")} · {fmtDate(n.fecha)}
+                      </div>
+                      <div style={{ color:"#0f172a", whiteSpace:"pre-wrap", lineHeight:1.4 }}>{n.texto}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <textarea value={nuevoMsg} onChange={e=>setNuevoMsg(e.target.value)} rows={2}
+              placeholder="写消息... / Escribir mensaje..."
+              style={{ width:"100%", background:"#fff", border:"1px solid #e2e8f0", borderRadius:7, padding:"7px 10px", fontSize:12, outline:"none", resize:"vertical", boxSizing:"border-box", fontFamily:"inherit", marginBottom:6 }}/>
+            {msg && (
+              <div style={{
+                marginBottom:6, padding:"6px 10px", borderRadius:6, fontSize:11, fontWeight:600,
+                background: msg.tipo==="ok" ? "#f0fdf4" : "#fef2f2",
+                color: msg.tipo==="ok" ? "#15803d" : "#dc2626",
+                border:"1px solid " + (msg.tipo==="ok" ? "#bbf7d0" : "#fecaca"),
+              }}>{msg.txt}</div>
+            )}
+            <button onClick={enviarMensaje} disabled={saving || !nuevoMsg.trim()}
+              style={{
+                width:"100%", padding:"8px 14px", fontSize:12, fontWeight:700,
+                background: (saving || !nuevoMsg.trim()) ? "#cbd5e1" : "#c47830",
+                color:"#fff", border:"none", borderRadius:7,
+                cursor: (saving || !nuevoMsg.trim()) ? "not-allowed" : "pointer", fontFamily:"inherit",
+              }}>
+              {saving ? "发送中... / Enviando..." : "📤 发送 / Enviar"}
+            </button>
+          </Section>
+        </div>
+      )}
     </div>
   )
 }
