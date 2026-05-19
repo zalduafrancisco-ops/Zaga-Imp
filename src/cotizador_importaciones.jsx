@@ -311,23 +311,59 @@ function calcConsolidado(cot, op, cotsEnOp) {
     ahorroZaga = clienteUnico ? 0 : ahorroTotalCl / 2;
   }
 
-  // Totales consolidados
-  const totClConsolidado = Math.max(0, calcStand.totCl - ahorroCliente);
+  // ── Override con precio acordado manual ────────────────────────────────────
+  // Si la cot tiene precio_final_acordado_und, ese es el precio que se cobró al cliente.
+  // En ese caso recalculamos: consolidado = precio acordado × und (c/IVA),
+  // y el "ahorro vs standalone" se vuelve informativo (puede ser positivo o negativo).
   const uCot = Number(cot.unidades) || 0;
-  const pCUndConsolidado = uCot > 0 ? totClConsolidado / uCot : 0;
+  const precioAcordadoUnd = Number(cot.precio_final_acordado_und) || 0;
+  const tieneAcordado = precioAcordadoUnd > 0 && uCot > 0;
+
+  let totClConsolidado;     // neto
+  let totClIvaConsolidado;  // c/IVA
+  let pCUndConsolidado;     // /und neto
+
+  if (tieneAcordado) {
+    // Usar precio acordado real (viene c/IVA)
+    totClIvaConsolidado = precioAcordadoUnd * uCot;
+    totClConsolidado = totClIvaConsolidado / 1.19;
+    pCUndConsolidado = totClConsolidado / uCot;
+    // Recalcular ahorro real: standalone (c/IVA) vs acordado (c/IVA)
+    const standaloneCIva = calcStand.totClIva || (calcStand.totCl * 1.19);
+    const diffCIva = standaloneCIva - totClIvaConsolidado;
+    // En modo cliente_100: ahorro cliente = diff, ZAGA = 0
+    // En modo split_50_50: ahorro cliente = diff/2, ZAGA = diff/2
+    // En modo auto + cliente_unico: ahorro cliente = diff, ZAGA = 0
+    // En modo auto + multi-cliente: ahorro cliente = diff/2, ZAGA = diff/2
+    // (recalculamos según modoDistrib)
+    if (modoDistrib === "cliente_100" || (modoDistrib === "auto" && clienteUnico)) {
+      ahorroCliente = diffCIva;
+      ahorroZaga = 0;
+    } else {
+      ahorroCliente = diffCIva / 2;
+      ahorroZaga = diffCIva / 2;
+    }
+  } else {
+    totClConsolidado = Math.max(0, calcStand.totCl - ahorroCliente);
+    totClIvaConsolidado = totClConsolidado * 1.19;
+    pCUndConsolidado = uCot > 0 ? totClConsolidado / uCot : 0;
+  }
 
   return {
     standalone: {
       totCl: calcStand.totCl,
+      totClIva: calcStand.totClIva || calcStand.totCl * 1.19,
       ganImp: calcStand.ganImp,
       cdaCl: cdaStandaloneCl,
       pCUnd: calcStand.pCUnd,
     },
     consolidado: {
       totCl: totClConsolidado,
+      totClIva: totClIvaConsolidado,
       ganImp: calcStand.ganImp + ahorroZaga,
       cdaCl: cdaConsolidadoCl,
       pCUnd: pCUndConsolidado,
+      esPrecioAcordado: tieneAcordado,
     },
     ahorro: {
       totalCl: ahorroTotalCl,
@@ -4069,7 +4105,7 @@ Número de seguimiento: ${c.nro}`;
                     .filter(c => !["rechazada_cliente","no_procesada","anulada"].includes(c.estado))
                     .map(c => ({ cot:c, calc: calcConsolidado(c, op, cots) }))
                     .filter(x => x.calc) : [];
-                  const ahorroTotalOp = consolidados.reduce((s,x) => s + (x.calc?.ahorro?.totalCl||0), 0);
+                  const ahorroTotalOp = consolidados.reduce((s,x) => s + ((x.calc?.standalone?.totClIva || 0) - (x.calc?.consolidado?.totClIva || 0)), 0);
                   return (
                     <div key={op.id} style={{background:"#fff",borderRadius:10,border:"1px solid #e2e8f0",padding:"14px 18px"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
@@ -4136,19 +4172,22 @@ Número de seguimiento: ${c.nro}`;
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {consolidados.map(({cot,calc})=>(
+                                    {consolidados.map(({cot,calc})=>{
+                                      const diffCIva = calc.standalone.totClIva - calc.consolidado.totClIva;
+                                      return (
                                       <tr key={cot.id} style={{borderTop:"1px solid #e2e8f0"}}>
                                         <td style={{padding:"7px 8px"}}>
                                           <div style={{fontSize:11,fontWeight:700,color:"#0f172a"}}>{cot.nro} · {cot.producto}</div>
-                                          <div style={{fontSize:10,color:"#64748b"}}>👤 {cot.cliente||"—"} · modo {calc.ahorro.modoUsado}</div>
+                                          <div style={{fontSize:10,color:"#64748b"}}>👤 {cot.cliente||"—"} · modo {calc.ahorro.modoUsado}{calc.consolidado.esPrecioAcordado?" · 🎯 acordado":""}</div>
                                         </td>
-                                        <td style={{padding:"7px 8px",textAlign:"right"}}>{fmt(calc.standalone.totCl)}</td>
-                                        <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#0f172a"}}>{fmt(calc.consolidado.totCl)}</td>
-                                        <td style={{padding:"7px 8px",textAlign:"right",color:"#1aa358",fontWeight:700}}>-{fmt(calc.ahorro.totalCl)}</td>
+                                        <td style={{padding:"7px 8px",textAlign:"right"}}>{fmt(calc.standalone.totClIva)}</td>
+                                        <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#0f172a"}}>{fmt(calc.consolidado.totClIva)}</td>
+                                        <td style={{padding:"7px 8px",textAlign:"right",color: diffCIva >= 0 ? "#1aa358" : "#c0392b",fontWeight:700}}>{diffCIva >= 0 ? "-" : "+"}{fmt(Math.abs(diffCIva))}</td>
                                         <td style={{padding:"7px 8px",textAlign:"right",color:"#16a34a"}}>{fmt(calc.ahorro.cliente)}</td>
                                         <td style={{padding:"7px 8px",textAlign:"right",color:"#c9a055"}}>{fmt(calc.ahorro.zaga)}</td>
                                       </tr>
-                                    ))}
+                                      );
+                                    })}
                                     <tr style={{borderTop:"2px solid #c9a055",background:"#fef9c3"}}>
                                       <td style={{padding:"8px",fontSize:11,fontWeight:800,color:"#854d0e"}}>Total ahorro op</td>
                                       <td colSpan={2}></td>
