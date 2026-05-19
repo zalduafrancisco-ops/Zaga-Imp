@@ -78,6 +78,7 @@ function fmtN(n, d=2) {
 export default function PortalSunny({ supabase, onLogout }) {
   const [tab, setTab]           = useState("pend_cot")
   const [cots, setCots]         = useState([])
+  const [ops, setOps]           = useState([])
   const [loading, setLoading]   = useState(true)
   const [pulse, setPulse]       = useState(false)
   const [editingId, setEditing] = useState(null)
@@ -90,22 +91,33 @@ export default function PortalSunny({ supabase, onLogout }) {
         setPulse(true)
         setTimeout(() => setPulse(false), 1800)
       })
+      .on("postgres_changes", { event:"*", schema:"public", table:"operaciones" }, () => {
+        loadData()
+      })
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [])
 
   async function loadData() {
     setLoading(true)
-    const { data, error } = await supabase
-      .from("cotizaciones")
-      .select("id,datos,created_at,updated_at")
-    if (!error && data) {
-      const relevantes = data
+    const [cotsRes, opsRes] = await Promise.all([
+      supabase.from("cotizaciones").select("id,datos,created_at,updated_at"),
+      supabase.from("operaciones").select("id,datos,created_at,updated_at"),
+    ])
+    if (!cotsRes.error && cotsRes.data) {
+      const relevantes = cotsRes.data
         .map(r => ({ ...r.datos, _id: r.id, _updated: r.updated_at || r.created_at }))
         .filter(c => TODOS_ESTADOS.includes(c.estado))
         .filter(c => c.transporte === "aereo")
         .sort((a, b) => new Date(b._updated) - new Date(a._updated))
       setCots(relevantes)
+    }
+    if (!opsRes.error && opsRes.data) {
+      const opsRecotizar = opsRes.data
+        .map(r => ({ ...r.datos, _id: r.id, _updated: r.updated_at || r.created_at }))
+        .filter(o => o.recotizacion_pendiente_sunny === true)
+        .sort((a, b) => new Date(b._updated) - new Date(a._updated))
+      setOps(opsRecotizar)
     }
     setLoading(false)
   }
@@ -127,8 +139,11 @@ export default function PortalSunny({ supabase, onLogout }) {
   }
   const shown = tabMap[tab] || []
 
+  const opsPendientes = ops.filter(o => !o.recotizacion_completada_sunny)
+
   const TABS = [
     { id:"pend_cot",     label:"待报价 Pend. cotizar",  count: pendCot.length,     urgent: pendCot.length > 0 },
+    { id:"recotizar",    label:"🔄 待重新报价 Recotizar consolidado", count: opsPendientes.length, urgent: opsPendientes.length > 0 },
     { id:"pend_cliente", label:"待客户 Pend. cliente",  count: pendCliente.length, urgent: false },
     { id:"confirmadas",  label:"已确认 Confirmadas",    count: confirmadas.length, urgent: false },
     { id:"camino",       label:"运输中 En camino",      count: camino.length,      urgent: false },
@@ -225,6 +240,12 @@ export default function PortalSunny({ supabase, onLogout }) {
       <div style={{ maxWidth:920, margin:"0 auto", padding:"20px 16px 48px" }}>
         {tab === "dashboard" ? (
           <Dashboard cots={cots} pendCot={pendCot} confirmadas={confirmadas} camino={camino} completadas={completadas} />
+        ) : tab === "recotizar" ? (
+          loading ? <Empty zh="加载中" es="Cargando..." emoji="⏳" /> :
+          opsPendientes.length === 0 ? <Empty zh="暂无重新报价请求" es="No hay operaciones esperando recotización" emoji="🔄" /> :
+          opsPendientes.map(op => (
+            <OpRecotizarCard key={op._id} op={op} cots={cots} supabase={supabase} onSaved={loadData} />
+          ))
         ) : loading ? (
           <Empty zh="加载中" es="Cargando..." emoji="⏳" />
         ) : shown.length === 0 ? (
@@ -700,6 +721,151 @@ function Dashboard({ cots, pendCot, confirmadas, camino, completadas }) {
         <Kpi label="本月完成 Cerradas mes" value={cerradasMes} hint="Llegaron en este mes" color="#0d9870"/>
       </div>
       <Kpi label="总活跃 Total activas" value={totalCot} hint="Todas las cotizaciones aéreas que ves"/>
+    </div>
+  )
+}
+
+// ─── Card de operación a recotizar (tab nuevo) ──────────────────────────────
+function OpRecotizarCard({ op, cots, supabase, onSaved }) {
+  const cotsEnOp = cots.filter(c => (op.cotizaciones || []).includes(c._id))
+  const [tarifaKg, setTarifaKg] = useState(op.flete_usd_kg_consolidado ?? op.costos_china?.flete_usd_kg ?? "")
+  const [tarifaCbm, setTarifaCbm] = useState(op.flete_usd_cbm_consolidado ?? "")
+  const [nota, setNota] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState(null)
+
+  // Totales de la operación
+  const totalCbm = cotsEnOp.reduce((s, c) => {
+    const m3 = Number(c.dim_m3) || 0
+    const u = Number(c.unidades) || 0
+    const undCaja = Number(c.dim_und_caja) || 0
+    const esCaja = c.dim_tipo === "caja"
+    return s + (esCaja && undCaja > 0 ? m3 * Math.ceil(u/undCaja) : m3 * u)
+  }, 0)
+  const totalPeso = cotsEnOp.reduce((s, c) => {
+    const p = Number(c.peso_kg) || 0
+    const u = Number(c.unidades) || 0
+    const undCaja = Number(c.dim_und_caja) || 0
+    const esCaja = c.dim_tipo === "caja"
+    return s + (esCaja && undCaja > 0 ? p * Math.ceil(u/undCaja) : p * u)
+  }, 0)
+  const totalUnd = cotsEnOp.reduce((s, c) => s + (Number(c.unidades) || 0), 0)
+  const tarifaActualKg = Number(op.costos_china?.flete_usd_kg) || 0
+  const fleteOriginal = totalPeso * tarifaActualKg
+  const fleteConsolidado = totalPeso * (Number(tarifaKg) || 0)
+  const ahorroFlete = Math.max(0, fleteOriginal - fleteConsolidado)
+
+  async function confirmar() {
+    setSaving(true)
+    setMsg(null)
+    try {
+      // Lee fresco
+      const { data: fresca, error: errLoad } = await supabase
+        .from("operaciones").select("datos").eq("id", op._id).single()
+      if (errLoad || !fresca) throw new Error("No se pudo leer operación")
+      const datosMerged = { ...fresca.datos }
+      if (tarifaKg !== "") datosMerged.flete_usd_kg_consolidado = Number(tarifaKg)
+      if (tarifaCbm !== "") datosMerged.flete_usd_cbm_consolidado = Number(tarifaCbm)
+      datosMerged.recotizacion_completada_sunny = true
+      datosMerged.recotizacion_pendiente_sunny = false
+      datosMerged.fecha_respuesta_sunny = new Date().toISOString()
+      if (nota.trim()) {
+        const hist = Array.isArray(fresca.datos.notas_sunny) ? [...fresca.datos.notas_sunny] : []
+        hist.push({ fecha: new Date().toISOString(), autor: "Sunny", texto: nota.trim() })
+        datosMerged.notas_sunny = hist
+      }
+      const { error: errSave } = await supabase
+        .from("operaciones").update({ datos: datosMerged, updated_at: new Date().toISOString() })
+        .eq("id", op._id).select("id")
+      if (errSave) throw errSave
+      setMsg({ tipo:"ok", txt:"✅ 已发送 / Tarifa enviada al admin" })
+      setTimeout(() => onSaved && onSaved(), 1200)
+    } catch (e) {
+      console.error(e)
+      setMsg({ tipo:"err", txt:"⚠️ Error: " + (e.message || "no se pudo guardar") })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{ background:"#fff", borderRadius:12, marginBottom:14, border:"2px solid #c47830", overflow:"hidden" }}>
+      <div style={{ padding:"12px 16px", background:"#fff7ed", borderBottom:"1px solid #fed7aa" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, flexWrap:"wrap" }}>
+          <span style={{ background:"#040c18", color:"#c47830", borderRadius:5, padding:"2px 8px", fontSize:11, fontWeight:800 }}>
+            🔄 {op.nro}
+          </span>
+          <span style={{ fontSize:10, fontWeight:700, color:"#92400e", background:"#fff", border:"1px solid #fed7aa", borderRadius:5, padding:"2px 8px" }}>
+            管理员请求重新报价 / Admin pidió recotización
+          </span>
+        </div>
+        <div style={{ fontWeight:700, fontSize:14, color:"#0f172a" }}>
+          📦 {cotsEnOp.length} 件 cotizaciones · {fmtN(totalUnd,0)} und · {fmtN(totalCbm,3)} m³ · {fmtN(totalPeso,1)} kg
+        </div>
+      </div>
+
+      <div style={{ padding:"16px 20px" }}>
+        {/* Lista de cots */}
+        <Section title="📋 操作中的报价 / Cotizaciones en la operación">
+          {cotsEnOp.map(c => (
+            <div key={c._id} style={{ display:"flex", justifyContent:"space-between", padding:"7px 0", borderBottom:"1px solid #f1f5f9", fontSize:12 }}>
+              <div>
+                <b style={{ color:"#0f172a" }}>{c.nro || "?"}</b> · {c.producto || "—"}
+                <span style={{ color:"#94a3b8", marginLeft:6 }}>· 👤 {c.cliente || "—"}</span>
+              </div>
+              <div style={{ color:"#64748b", fontSize:11 }}>
+                {c.unidades || 0} und · {fmtN(Number(c.dim_m3)*Number(c.unidades||0)/(c.dim_tipo==="caja"?Number(c.dim_und_caja||1):1),3)} m³
+              </div>
+            </div>
+          ))}
+        </Section>
+
+        {/* Tarifa actual standalone */}
+        <Section title="📊 当前费率 / Tarifa actual standalone (sin descuento)">
+          <div style={{ fontSize:12, color:"#64748b" }}>
+            ▸ Flete actual: <b style={{ color:"#0f172a" }}>{fmtUSD(tarifaActualKg)} / kg</b>
+            <br/>▸ Flete total con tarifa actual: <b style={{ color:"#0f172a" }}>{fmtUSD(fleteOriginal)}</b>
+          </div>
+        </Section>
+
+        {/* Nueva tarifa consolidada */}
+        <Section title="💰 新合并费率 / Nueva tarifa consolidada (descuento por bulk)">
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:8 }}>
+            <Field label="USD/kg consolidado">
+              <input type="number" step="0.01" value={tarifaKg} onChange={e=>setTarifaKg(e.target.value)} placeholder={String(tarifaActualKg)} style={inp}/>
+            </Field>
+            <Field label="USD/CBM consolidado (opcional)">
+              <input type="number" step="0.01" value={tarifaCbm} onChange={e=>setTarifaCbm(e.target.value)} placeholder="—" style={inp}/>
+            </Field>
+          </div>
+          {ahorroFlete > 0 && (
+            <div style={{ background:"#f0fdf4", border:"1px solid #bbf7d0", borderRadius:7, padding:"8px 11px", fontSize:11, color:"#15803d" }}>
+              💎 Ahorro estimado en flete vs tarifa actual: <b style={{ fontSize:13 }}>{fmtUSD(ahorroFlete)}</b>
+            </div>
+          )}
+        </Section>
+
+        {/* Nota opcional */}
+        <Section title="✉️ 备注 / Nota al admin (opcional)">
+          <textarea value={nota} onChange={e=>setNota(e.target.value)} rows={2}
+            placeholder="Ej: descuento por volumen, condición especial..."
+            style={{ ...inp, resize:"vertical", minHeight:50, fontFamily:"inherit" }}/>
+        </Section>
+
+        {msg && (
+          <div style={{
+            marginBottom:10, padding:"8px 12px", borderRadius:7, fontSize:12, fontWeight:600,
+            background: msg.tipo==="ok" ? "#f0fdf4" : "#fef2f2",
+            border:"1px solid " + (msg.tipo==="ok" ? "#bbf7d0" : "#fecaca"),
+            color: msg.tipo==="ok" ? "#15803d" : "#dc2626",
+          }}>{msg.txt}</div>
+        )}
+
+        <button onClick={confirmar} disabled={saving || !tarifaKg}
+          style={{ ...btn, width:"100%", background: tarifaKg ? "#c47830" : "#cbd5e1", color:"#fff", cursor: tarifaKg && !saving ? "pointer" : "not-allowed" }}>
+          ✅ {saving ? "发送中..." : "确认费率 / Confirmar tarifa consolidada"}
+        </button>
+      </div>
     </div>
   )
 }
