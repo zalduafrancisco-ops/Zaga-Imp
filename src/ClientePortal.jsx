@@ -386,7 +386,9 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     if(Number(c.precio_final_acordado_und)>0 && und>0) return s + Number(c.precio_final_acordado_und)*und
     return s+(c.con_iva?(c.calc.totClIva||c.calc.totCl||0):(c.calc.totCl||0))
   },0)
-  var pendientesConf = todas.filter(function(c){ return c.calc&&!(c.checklist&&c.checklist.pago1_cliente)&&!['solicitud','no_prospero','completada'].includes(c.estado) })
+  // "Pendientes de confirmación" = cliente recibió cotización pero aún no confirmó pago.
+  // Solo aplica al estado "cotizada". El resto de estados (pagada, en_camino, etc.) ya están avanzados.
+  var pendientesConf = todas.filter(function(c){ return c.calc&&c.estado==='cotizada'&&!(c.checklist&&c.checklist.pago1_cliente) })
   var proxLlegada = activas.filter(function(c){ return c.fecha_llegada_est }).sort(function(a,b){ return new Date(a.fecha_llegada_est)-new Date(b.fecha_llegada_est) })[0]
 
   var abrirCot = function(id){

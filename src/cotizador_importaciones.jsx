@@ -719,7 +719,7 @@ export default function App({ supabase, usuario, onLogout }){
     await persist(cotizaciones.map(c=>{
       if(c.id!==id) return c;
       let fll=c.fecha_llegada_est;
-      if(estado==="pagada"&&!fll){ const d=new Date(); d.setDate(d.getDate()+90); fll=d.toISOString().split("T")[0]; }
+      if(estado==="pagada"&&!fll){ const d=new Date(); const diasLlegada=c.transporte==="aereo"?25:90; d.setDate(d.getDate()+diasLlegada); fll=d.toISOString().split("T")[0]; }
       return {...c,estado,fecha_llegada_est:fll};
     }));
   };
@@ -738,7 +738,7 @@ export default function App({ supabase, usuario, onLogout }){
       const upd2={};
       if(key==="pago1_cliente"&&val&&!c.fecha_pago1_cliente) upd2.fecha_pago1_cliente=new Date().toISOString().split("T")[0];
       let fll=c.fecha_llegada_est;
-      if(key==="pago_china"&&val&&!fll){ const d=new Date(); d.setDate(d.getDate()+90); fll=d.toISOString().split("T")[0]; }
+      if(key==="pago_china"&&val&&!fll){ const d=new Date(); const diasLlegada=c.transporte==="aereo"?25:90; d.setDate(d.getDate()+diasLlegada); fll=d.toISOString().split("T")[0]; }
       if(key==="pago_china"&&val){ upd2.fecha_pago_china=new Date().toISOString().split("T")[0]; }
       // Auto-registrar fecha real de llegada a bodega
       let fReal=c.fecha_llegada_real||"";
