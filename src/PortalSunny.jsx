@@ -392,7 +392,15 @@ function CotEditable({ c, supabase, isExpanded, onExpand, onSaved }) {
         borderBottom: isExpanded ? "1px solid #fed7aa" : "none",
       }}>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, flexWrap:"wrap" }}>
+            {c.nro && (
+              <span style={{
+                background:"#040c18", color:"#c47830", borderRadius:5,
+                padding:"2px 8px", fontSize:10, fontWeight:800, letterSpacing:0.5,
+              }}>
+                {c.nro}
+              </span>
+            )}
             <span style={{
               background:"#c4783020", color:"#c47830", border:"1px solid #c4783055",
               borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:700,
@@ -404,6 +412,11 @@ function CotEditable({ c, supabase, isExpanded, onExpand, onSaved }) {
           <div style={{ fontWeight:700, fontSize:14, color:"#0f172a", marginBottom:2 }}>
             {c.producto || "Sin nombre"}
           </div>
+          {c.cliente && (
+            <div style={{ fontSize:11, color:"#64748b", marginBottom:2 }}>
+              👤 客户 / Cliente: <b style={{ color:"#475569" }}>{c.cliente}</b>
+            </div>
+          )}
           <div style={{ fontSize:12, color:"#64748b" }}>
             📦 {Number(c.unidades || 0).toLocaleString("es-CL")} 件 unidades
             {c.link_alibaba && <> · <a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{ color:"#2d78c8", textDecoration:"underline" }}>🔗 Link</a></>}
@@ -610,7 +623,15 @@ function CotReadOnly({ c }) {
       border:"1px solid #e2e8f0", display:"flex", alignItems:"center", gap:12,
     }}>
       <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, flexWrap:"wrap" }}>
+          {c.nro && (
+            <span style={{
+              background:"#040c18", color:"#c47830", borderRadius:5,
+              padding:"2px 8px", fontSize:10, fontWeight:800, letterSpacing:0.5,
+            }}>
+              {c.nro}
+            </span>
+          )}
           <span style={{
             background: (EST_COLOR[c.estado]||"#94a3b8") + "20",
             color: EST_COLOR[c.estado]||"#475569",
@@ -624,6 +645,11 @@ function CotReadOnly({ c }) {
         <div style={{ fontWeight:700, fontSize:14, color:"#0f172a", marginBottom:2 }}>
           {c.producto || "—"}
         </div>
+        {c.cliente && (
+          <div style={{ fontSize:11, color:"#64748b", marginBottom:2 }}>
+            👤 客户 / Cliente: <b style={{ color:"#475569" }}>{c.cliente}</b>
+          </div>
+        )}
         <div style={{ fontSize:11, color:"#64748b" }}>
           📦 {Number(c.unidades || 0).toLocaleString("es-CL")} 件 unidades
           {c.sku_china && <> · 🏷 {c.sku_china}</>}
