@@ -470,23 +470,31 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     }
 
     var porCot = misCots.map(function(c){
-      var partVal = distribucion==="cbm" ? cbmDeCot(c) : (Number(c.unidades)||0)
-      var pct = totalDist>0 ? partVal/totalDist : (1/totalCotsOp)
-      var ventaCIvaCot = ventaCIvaTotal * pct
       var und = Number(c.unidades)||0
-      var precioCIvaUnit = und>0 ? ventaCIvaCot/und : 0
-      // Precio standalone c/IVA — prioriza precio_final_acordado_und × und (override del admin)
+      // ── STANDALONE (precio sin consolidar): SIEMPRE el calculado original
+      // No usar precio_final_acordado_und aquí, porque el acordado ya ES el consolidado.
       var cl = c.calc
       var standaloneTotal = 0
-      if(Number(c.precio_final_acordado_und)>0 && und>0){
-        standaloneTotal = Number(c.precio_final_acordado_und) * und
-      } else if(cl){
+      if(cl){
         standaloneTotal = c.con_iva ? (cl.totClIva||cl.totCl||0) : (cl.totCl||0)
         if(!c.con_iva && standaloneTotal>0) standaloneTotal = standaloneTotal*1.19
       } else if(Number(c.precio_venta_cliente)>0){
         standaloneTotal = Number(c.precio_venta_cliente)*und*1.19
       }
       var standaloneUnit = und>0 ? standaloneTotal/und : 0
+
+      // ── CONSOLIDADO: usar precio_final_acordado_und si existe (override admin real)
+      // Sino, calcular prorrateando por CBM/unidades sobre ventaCIvaTotal
+      var partVal = distribucion==="cbm" ? cbmDeCot(c) : (Number(c.unidades)||0)
+      var pct = totalDist>0 ? partVal/totalDist : (1/totalCotsOp)
+      var ventaCIvaCot
+      if(Number(c.precio_final_acordado_und)>0 && und>0){
+        ventaCIvaCot = Number(c.precio_final_acordado_und) * und
+      } else {
+        ventaCIvaCot = ventaCIvaTotal * pct
+      }
+      var precioCIvaUnit = und>0 ? ventaCIvaCot/und : 0
+
       var ahorroUnit = standaloneUnit>0 ? (standaloneUnit-precioCIvaUnit) : 0
       var ahorroTotal = ahorroUnit*und
       // Aplicar modo distribución: si admin eligió 50/50, el cliente solo ve la mitad
