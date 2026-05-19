@@ -835,11 +835,6 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                   Consolidado con otros clientes
                                 </span>
                               )}
-                              {ahorroOpTotal>0 && (
-                                <span style={{background:"#dcfce7",color:"#16a34a",fontSize:11,fontWeight:800,borderRadius:10,padding:"3px 10px"}}>
-                                  💚 Ahorras {fmt(ahorroOpTotal)}
-                                </span>
-                              )}
                             </div>
                             <div style={{fontSize:12,color:"#475569"}}>
                               {calc.cotsOp.length} producto{calc.cotsOp.length!==1?"s":""} tuyo{calc.cotsOp.length!==1?"s":""} · <b>{fmtN(undTotal)}</b> unidades
@@ -856,7 +851,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                         {isOpenOp && (
                           <div style={{padding:"14px 18px 16px",borderTop:"1px solid #f1f5f9",background:"#fafbfc"}}>
                             <div style={{fontSize:11,color:"#64748b",marginBottom:10,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>
-                              Comparativa por producto
+                              Detalle por producto
                             </div>
                             <div style={{display:"flex",flexDirection:"column",gap:8}}>
                               {calc.porCot.map(function(x){
@@ -869,26 +864,15 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                         <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{x.cot.producto}</div>
                                         <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{x.cot.nro} · {fmtN(x.cot.unidades||0)} unidades</div>
                                       </div>
-                                      {x.ahorroUnit>0 && (
-                                        <span style={{background:"#dcfce7",color:"#16a34a",fontSize:11,fontWeight:800,borderRadius:8,padding:"4px 10px",flexShrink:0}}>
-                                          −{x.ahorroPct.toFixed(0)}% · ahorras {fmt(x.ahorroTotal)}
-                                        </span>
-                                      )}
                                     </div>
-                                    <div style={{display:"grid",gridTemplateColumns:x.standaloneUnit>0?"1fr 1fr":"1fr",gap:8}}>
-                                      {x.standaloneUnit>0 && (
-                                        <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 12px",border:"1px solid #e2e8f0",position:"relative"}}>
-                                          <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700}}>Solo este producto</div>
-                                          <div style={{fontSize:17,fontWeight:800,color:"#475569",lineHeight:1}}>{fmt(x.standaloneUnit)}</div>
-                                          <div style={{fontSize:10,color:"#94a3b8",marginTop:3}}>por unidad c/IVA</div>
-                                          <div style={{fontSize:11,color:"#64748b",marginTop:6,paddingTop:6,borderTop:"1px solid #e2e8f0"}}>Total: <b>{fmt(x.standaloneTotal)}</b></div>
-                                        </div>
-                                      )}
-                                      <div style={{background:"linear-gradient(135deg,#fffbeb,#fef3c7)",borderRadius:10,padding:"10px 12px",border:"1px solid #fde68a",position:"relative"}}>
-                                        <div style={{fontSize:9,color:"#92400e",textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700}}>Consolidado contigo</div>
-                                        <div style={{fontSize:17,fontWeight:800,color:"#92400e",lineHeight:1}}>{fmt(x.precioCIvaUnit)}</div>
-                                        <div style={{fontSize:10,color:"#a16207",marginTop:3}}>por unidad c/IVA</div>
-                                        <div style={{fontSize:11,color:"#92400e",marginTop:6,paddingTop:6,borderTop:"1px solid #fde68a"}}>Total: <b>{fmt(x.ventaCIvaCot)}</b></div>
+                                    <div style={{background:"linear-gradient(135deg,#fffbeb,#fef3c7)",borderRadius:10,padding:"12px 14px",border:"1px solid #fde68a",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                                      <div>
+                                        <div style={{fontSize:9,color:"#92400e",textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700}}>Precio por unidad c/IVA</div>
+                                        <div style={{fontSize:20,fontWeight:800,color:"#92400e",lineHeight:1}}>{fmt(x.precioCIvaUnit)}</div>
+                                      </div>
+                                      <div style={{textAlign:"right"}}>
+                                        <div style={{fontSize:9,color:"#92400e",textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700}}>Total c/IVA</div>
+                                        <div style={{fontSize:20,fontWeight:800,color:"#92400e",lineHeight:1}}>{fmt(x.ventaCIvaCot)}</div>
                                       </div>
                                     </div>
                                   </div>
