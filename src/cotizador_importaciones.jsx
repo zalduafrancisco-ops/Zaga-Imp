@@ -528,6 +528,7 @@ export default function App({ supabase, usuario, onLogout }){
   const [filterEstado,setFilterEstado]   = useState("todos");
   const [filterCliente,setFilterCliente] = useState("todos");
   const [filterGestor,setFilterGestor]   = useState("todos");
+  const [mostrarOtrosClientes,setMostrarOtrosClientes] = useState(false);
   const [searchQuery,setSearchQuery]     = useState("");
   const [toast,setToast]                 = useState(null);
   const [vistaId,setVistaId]             = useState(null);
@@ -2620,22 +2621,67 @@ Número de seguimiento: ${c.nro}`;
                 <div key={l} style={{background:"#f1f5f9",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0",textAlign:"center"}}><div style={{fontSize:22,fontWeight:800,color:col}}>{v}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{l}</div></div>
               ))}
             </div>
-            <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-              <span style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>👤 Cliente</span>
-              {[["todos","Todos"],["__propias__","🏠 Propias"],...clientesUnicos.map(cl=>[cl,cl])].map(([k,l])=>{
-                const cnt=k==="todos"?cotizaciones.length:k==="__propias__"?cotizaciones.filter(c=>c.tipo==="propia").length:cotizaciones.filter(c=>c.cliente===k).length;
-                if(k!=="todos"&&k!=="__propias__"&&cnt===0) return null;
-                return(
-                  <button key={k} onClick={()=>setFilterCliente(k)} style={{
-                    background:filterCliente===k?"#1aa35822":"#f8fafc",
-                    color:filterCliente===k?"#1aa358":"#666",
-                    border:`1px solid ${filterCliente===k?"#22c55e55":"#1a2d45"}`,
-                    borderRadius:20,padding:"5px 14px",fontSize:12,cursor:"pointer",
-                    fontWeight:filterCliente===k?700:400
-                  }}>{l} <span style={{opacity:.6}}>({cnt})</span></button>
-                );
-              })}
-            </div>
+            {(()=>{
+              // Ordenar clientes por cantidad de cotizaciones (descendente)
+              const clientesConCount = clientesUnicos.map(cl => ({
+                key: cl,
+                label: cl,
+                count: cotizaciones.filter(c=>c.cliente===cl).length,
+              })).filter(c => c.count > 0).sort((a,b) => b.count - a.count);
+              const TOP_N = 5;
+              const topClientes = clientesConCount.slice(0, TOP_N);
+              const otrosClientes = clientesConCount.slice(TOP_N);
+              const otrosCotsTotal = otrosClientes.reduce((s,c)=>s+c.count, 0);
+              const filtroEnOtros = otrosClientes.some(c => c.key === filterCliente);
+
+              const chipStyle = (activo, esTop) => ({
+                background: activo ? "#1aa35822" : (esTop ? "#fef9c3" : "#f8fafc"),
+                color: activo ? "#1aa358" : (esTop ? "#854d0e" : "#666"),
+                border: `1px solid ${activo ? "#22c55e55" : (esTop ? "#fde68a" : "#e2e8f0")}`,
+                borderRadius: 20, padding: "5px 14px", fontSize: 12, cursor: "pointer",
+                fontWeight: activo ? 700 : (esTop ? 600 : 400),
+              });
+
+              return (
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+                  {/* Fila 1: Todos + Propias + Top clientes */}
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                    <span style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>👤 Cliente</span>
+                    <button key="todos" onClick={()=>setFilterCliente("todos")} style={chipStyle(filterCliente==="todos", false)}>
+                      Todos <span style={{opacity:.6}}>({cotizaciones.length})</span>
+                    </button>
+                    <button key="__propias__" onClick={()=>setFilterCliente("__propias__")} style={chipStyle(filterCliente==="__propias__", false)}>
+                      🏠 Propias <span style={{opacity:.6}}>({cotizaciones.filter(c=>c.tipo==="propia").length})</span>
+                    </button>
+                    {topClientes.map((c, idx) => (
+                      <button key={c.key} onClick={()=>setFilterCliente(c.key)} style={chipStyle(filterCliente===c.key, idx<3)}>
+                        {idx<3 && "⭐ "}{c.label} <span style={{opacity:.6}}>({c.count})</span>
+                      </button>
+                    ))}
+                    {otrosClientes.length > 0 && (
+                      <button onClick={()=>setMostrarOtrosClientes(!mostrarOtrosClientes)} style={{
+                        background: filtroEnOtros ? "#1aa35822" : (mostrarOtrosClientes ? "#eef6ff" : "#f8fafc"),
+                        color: filtroEnOtros ? "#1aa358" : (mostrarOtrosClientes ? "#2d78c8" : "#64748b"),
+                        border: `1px solid ${filtroEnOtros ? "#22c55e55" : (mostrarOtrosClientes ? "#bfdbfe" : "#e2e8f0")}`,
+                        borderRadius: 20, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600,
+                      }}>
+                        {mostrarOtrosClientes ? "▴" : "▾"} Otros {otrosClientes.length} clientes <span style={{opacity:.6}}>({otrosCotsTotal} cots)</span>
+                      </button>
+                    )}
+                  </div>
+                  {/* Fila 2: dropdown con "otros" (oculto por defecto) */}
+                  {mostrarOtrosClientes && otrosClientes.length > 0 && (
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",paddingLeft:80,paddingTop:4,paddingBottom:4,borderLeft:"2px solid #e2e8f0",marginLeft:14}}>
+                      {otrosClientes.map(c => (
+                        <button key={c.key} onClick={()=>setFilterCliente(c.key)} style={chipStyle(filterCliente===c.key, false)}>
+                          {c.label} <span style={{opacity:.6}}>({c.count})</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
               <span style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>🙋 Gestor</span>
               {[["todos","Todos",null],["francisco","👤 Francisco","#2d78c8"],["luisa","👩‍💼 Luisa","#a85590"]].map(([k,l,col])=>{
