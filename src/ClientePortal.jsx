@@ -398,11 +398,23 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     },150)
   }
 
+  // Orden de prioridad: activas (1) → completadas (2) → no_prospero (3)
+  var ordenPrioridad = function(estado){
+    if(estado==="no_prospero") return 3
+    if(estado==="completada") return 2
+    return 1 // solicitud, cotizada, pagada, en_camino, en_bodega
+  }
   var filtradas = todas.filter(function(c){
     if(c.id===openId) return true  // siempre mostrar la card abierta
     var pF = filtro==="todas" ? true : c.estado===filtro
     var q = busqueda.trim().toLowerCase()
     return pF&&(!q||(c.producto&&c.producto.toLowerCase().includes(q))||(c.nro&&c.nro.toLowerCase().includes(q)))
+  }).sort(function(a,b){
+    var pa = ordenPrioridad(a.estado)
+    var pb = ordenPrioridad(b.estado)
+    if(pa !== pb) return pa - pb
+    // Dentro del mismo grupo: por fecha de solicitud descendente (más nueva arriba)
+    return new Date(b.fecha_solicitud||0) - new Date(a.fecha_solicitud||0)
   })
 
   // ── CBM individual de una cotización (m³ totales) ─────────────
