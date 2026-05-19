@@ -348,7 +348,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   var getTab = function(id){
     if(tabs[id]) return tabs[id]
     var cot = cotizaciones.find(function(x){ return x.id===id })
-    if(cot && RECHAZADAS_EST.includes(cot.estado)) return "detalle"
+    if(cot && RECHAZADAS_EST.includes(cot.estado)) return "mensajes"
     return "timeline"
   }
   var setTab = function(id,t){ setTabs(function(p){ var n=Object.assign({},p); n[id]=t; return n }) }
@@ -1050,8 +1050,8 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                         <div style={{borderTop:"1px solid #f1f5f9"}}>
                           <div style={{display:"flex",padding:"0 16px",borderBottom:"1px solid #f1f5f9",overflowX:"auto",gap:0}}>
                             {(isRech
-                              ? [["detalle","📋 Detalle"]]
-                              : [["timeline","🗺️ Seguimiento"],["pagos","💳 Pagos"],["detalle","📋 Detalle"],["mensajes","💬 Mensajes"]]
+                              ? [["mensajes","💬 Mensajes"]]
+                              : [["timeline","🗺️ Seguimiento"],["pagos","💳 Pagos"],["mensajes","💬 Mensajes"]]
                             ).map(function(item){
                               return <button key={item[0]} className={"ztab"+(tab===item[0]?" on":"")} onClick={function(){
                                 setTab(c.id,item[0])
@@ -1169,76 +1169,17 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               </div>
                             )}
 
-                            {/* TAB DETALLE */}
-                            {tab==="detalle"&&(
-                              <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                                {isRech&&(
-                                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                                    <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"12px 14px",display:"flex",gap:10,alignItems:"center"}}>
-                                      <span style={{fontSize:18}}>❌</span>
-                                      <div style={{fontSize:13,fontWeight:700,color:"#dc2626"}}>{label}</div>
-                                    </div>
-                                    <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0"}}>
-                                      <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>📝 Notas internas</div>
-                                      <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{c.motivo_no_procesada||"Sin notas registradas."}</div>
-                                    </div>
-                                  </div>
-                                )}
-                                {!isRech&&(
-                                  <div className="check-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                                    {CHECKLIST_FULL.map(function(step){
-                                      var checked = c.checklist&&c.checklist[step.key]
-                                      return (
-                                        <div key={step.key} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:checked?"#f0fdf4":"#f8fafc",border:"1px solid "+(checked?"#bbf7d0":"#e2e8f0")}}>
-                                          <div style={{width:16,height:16,borderRadius:4,background:checked?"#16a34a":"#fff",border:"2px solid "+(checked?"#16a34a":"#cbd5e1"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#fff",flexShrink:0,fontWeight:800}}>{checked?"✓":""}</div>
-                                          <span style={{fontSize:11,color:checked?"#15803d":"#64748b",lineHeight:1.3}}>{step.icon} {step.label}</span>
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                )}
-                                {c.variantes&&(
+                            {/* Bloque motivo para rechazadas — sin tabs, info esencial */}
+                            {isRech&&(
+                              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10}}>
+                                <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"12px 14px",display:"flex",gap:10,alignItems:"center"}}>
+                                  <span style={{fontSize:18}}>❌</span>
+                                  <div style={{fontSize:13,fontWeight:700,color:"#dc2626"}}>{label}</div>
+                                </div>
+                                {(c.razon_no_prospero||c.motivo_no_procesada)&&(
                                   <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0"}}>
-                                    <div style={{fontSize:10,color:"#c9a055",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>🎨 Especificaciones</div>
-                                    <div style={{fontSize:12,color:"#475569",whiteSpace:"pre-line",lineHeight:1.7}}>{c.variantes}</div>
-                                  </div>
-                                )}
-                                {(()=>{
-                                  var hist = []; try{ if(Array.isArray(c.notas_historial)) hist=c.notas_historial; else if(typeof c.notas_historial==="string"&&c.notas_historial) hist=JSON.parse(c.notas_historial); }catch(e){ hist=[]; }
-                                  if(hist.length===0&&c.notas_internas) hist=[{texto:c.notas_internas,fecha:"Anterior",autor:"Gestor"}]
-                                  hist = hist.filter(function(n){ return n.oculta!==true })
-                                  return hist.length>0&&(
-                                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                                      <div style={{fontSize:10,color:"#2a8aaa",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>📝 Notas del proceso</div>
-                                      {hist.map(function(n,i){
-                                        return (
-                                          <div key={i} style={{background:"#f0f9ff",border:"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
-                                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                                              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                                                <span style={{fontSize:10,fontWeight:700,color:"#2a8aaa"}}>{n.autor||"Gestor"}</span>
-                                                {n.editado&&<span style={{fontSize:9,color:"#94a3b8",fontStyle:"italic"}}>(editado)</span>}
-                                              </div>
-                                              <span style={{fontSize:10,color:"#94a3b8"}}>{n.fecha}</span>
-                                            </div>
-                                            <div style={{fontSize:12,color:"#0f172a",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.texto}</div>
-                                          </div>
-                                        )
-                                      })}
-                                    </div>
-                                  )
-                                })()}
-                                {c.notas&&!(c.notas_historial&&c.notas_historial.length>0)&&!(c.notas_internas)&&(
-                                  <div style={{background:"#f0f9ff",border:"1px solid #06b6d433",borderRadius:8,padding:"10px 12px"}}>
-                                    <div style={{fontSize:10,color:"#2a8aaa",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>📝 Notas</div>
-                                    <div style={{fontSize:12,color:"#475569",lineHeight:1.7}}>{c.notas}</div>
-                                  </div>
-                                )}
-                                {c.negociacion_rondas&&c.negociacion_rondas.length>0&&(
-                                  <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #fde68a"}}>
-                                    <div style={{fontSize:10,color:"#d97706",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>💬 Historial de negociacion</div>
-                                    {c.negociacion_rondas.map(function(r,i){
-                                      return <RondaNeg key={i} r={r} i={i}/>
-                                    })}
+                                    <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>📝 Motivo</div>
+                                    <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{c.razon_no_prospero||c.motivo_no_procesada}</div>
                                   </div>
                                 )}
                               </div>
