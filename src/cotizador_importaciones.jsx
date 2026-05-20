@@ -1063,6 +1063,7 @@ export default function App({ supabase, usuario, onLogout }){
           .op-bottom-actions button{width:100% !important;padding:11px 10px !important;font-size:12px !important}
           /* Vista cliente OP consolidada — optimizada para 1 pantallazo móvil */
           .opvc-wrap{padding:4px 0 !important}
+          .print-modal-inner{padding:46px 14px 20px !important}
           .opvc-header{padding:8px 12px !important;flex-wrap:nowrap !important;gap:6px !important}
           .opvc-header img{height:20px !important}
           .opvc-header-sub{display:none !important}
@@ -1285,7 +1286,7 @@ Número de seguimiento: ${c.nro}`;
           {/* Botón cerrar flotante */}
           <button className="no-print" onClick={cerrarPrint} style={{position:"fixed",top:10,right:10,zIndex:20,background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:20,padding:"6px 14px",fontSize:13,cursor:"pointer",fontWeight:600,boxShadow:"0 2px 8px rgba(0,0,0,0.1)"}}>✕ Cerrar</button>
           {/* Contenido del reporte */}
-          <div style={{maxWidth:820,margin:"0 auto",padding:"24px 20px"}}>
+          <div className="print-modal-inner" style={{maxWidth:820,margin:"0 auto",padding:"24px 20px"}}>
             {printModal==="tracker"&&vistaData&&vistaData.tipo!=="propia"&&(
               <div>
                 {/* Header */}
