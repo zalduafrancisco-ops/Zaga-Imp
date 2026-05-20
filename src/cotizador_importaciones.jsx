@@ -1061,6 +1061,34 @@ export default function App({ supabase, usuario, onLogout }){
           .op-cons-footer{font-size:9px !important}
           .op-bottom-actions{display:grid !important;grid-template-columns:1fr !important;gap:6px !important;margin-top:12px !important}
           .op-bottom-actions button{width:100% !important;padding:11px 10px !important;font-size:12px !important}
+          /* Vista cliente OP consolidada — optimizada para 1 pantallazo móvil */
+          .opvc-wrap{padding:8px 0 !important}
+          .opvc-header{padding:10px 14px !important;flex-wrap:wrap !important;gap:6px !important}
+          .opvc-header img{height:22px !important}
+          .opvc-header-r{text-align:left !important}
+          .opvc-banner{padding:10px 14px !important;gap:8px !important;grid-template-columns:repeat(2,1fr) !important}
+          .opvc-banner .opvc-kpi-lbl{font-size:8px !important;margin-bottom:1px !important}
+          .opvc-banner .opvc-kpi-val{font-size:14px !important}
+          .opvc-alert{padding:8px 14px !important;font-size:10px !important}
+          .opvc-body{padding:10px 14px !important}
+          .opvc-body .opvc-section-ttl{font-size:11px !important;margin-bottom:6px !important}
+          .opvc-cot{margin-bottom:6px !important;border-width:1px !important}
+          .opvc-cot-hdr{padding:6px 10px !important;flex-wrap:wrap !important;gap:4px !important}
+          .opvc-cot-hdr-prod{font-size:11.5px !important}
+          .opvc-cot-hdr-nro{font-size:9px !important}
+          .opvc-cot-hdr-badge{font-size:9px !important;padding:1px 7px !important}
+          .opvc-cot-grid{padding:7px 10px !important;grid-template-columns:repeat(4,1fr) !important;gap:5px !important}
+          .opvc-cot-grid .opvc-cell-lbl{font-size:8px !important;margin-bottom:1px !important}
+          .opvc-cot-grid .opvc-cell-val{font-size:11px !important}
+          .opvc-pay{padding:12px 14px !important;margin-top:8px !important}
+          .opvc-pay-ttl{font-size:9px !important;margin-bottom:8px !important}
+          .opvc-pay-box{padding:8px 11px !important}
+          .opvc-pay-box-lbl{font-size:10.5px !important}
+          .opvc-pay-box-val{font-size:15px !important}
+          .opvc-pay-total{font-size:12px !important;margin-top:8px !important;padding-top:8px !important}
+          .opvc-pay-total-val{font-size:18px !important}
+          .opvc-msg{padding:9px 12px !important;margin-top:8px !important;font-size:10px !important}
+          .opvc-footer{font-size:8.5px !important;margin-top:6px !important}
         }
       `}</style>
 
@@ -1421,8 +1449,8 @@ Número de seguimiento: ${c.nro}`;
               const fechaLlegadaMax = fechasLlegada.length > 0 ? fechasLlegada.sort().slice(-1)[0] : null;
               const diasLlegada = fechaLlegadaMax ? Math.ceil((new Date(fechaLlegadaMax)-new Date())/(1000*60*60*24)) : null;
               return (
-                <div ref={vistaClienteRef}>
-                  <div style={{background:"#f1f5f9",padding:"24px 32px",display:"flex",justifyContent:"space-between",alignItems:"center",borderRadius:"12px 12px 0 0"}}>
+                <div ref={vistaClienteRef} className="opvc-wrap">
+                  <div className="opvc-header" style={{background:"#f1f5f9",padding:"24px 32px",display:"flex",justifyContent:"space-between",alignItems:"center",borderRadius:"12px 12px 0 0"}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:28,width:"auto",objectFit:"contain"}}/>
                       <div>
@@ -1430,100 +1458,98 @@ Número de seguimiento: ${c.nro}`;
                         <div style={{fontSize:14,color:"#c9a055",fontWeight:700}}>{op.nro}</div>
                       </div>
                     </div>
-                    <div style={{textAlign:"right"}}>
+                    <div className="opvc-header-r" style={{textAlign:"right"}}>
                       <div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{vistaOpCliente}</div>
                       <div style={{fontSize:11,color:"#64748b"}}>{todayStr()}</div>
                     </div>
                   </div>
                   <div style={{border:"2px solid #1a1a2e22",borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden",background:"#fff"}}>
                     {/* Banner con resumen + ahorro si aplica */}
-                    <div style={{padding:"18px 32px",background:"#040c18",color:"#fff",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
-                      <div><div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Productos</div><div style={{fontSize:18,fontWeight:800,color:"#c9a055"}}>{cotsCliente.length}</div></div>
-                      <div><div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Unidades</div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{fmtN(totUnd)}</div></div>
-                      <div><div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Total c/IVA</div><div style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(totConsolidadoIva)}</div></div>
+                    <div className="opvc-banner" style={{padding:"18px 32px",background:"#040c18",color:"#fff",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
+                      <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Productos</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#c9a055"}}>{cotsCliente.length}</div></div>
+                      <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Unidades</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#fff"}}>{fmtN(totUnd)}</div></div>
+                      <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Total c/IVA</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(totConsolidadoIva)}</div></div>
                       <div>
-                        <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Transporte</div>
-                        <div style={{fontSize:14,fontWeight:700,color:"#c47830"}}>✈️ Aéreo</div>
+                        <div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Transporte</div>
+                        <div className="opvc-kpi-val" style={{fontSize:14,fontWeight:700,color:"#c47830"}}>✈️ Aéreo</div>
                         {diasLlegada!==null && <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{diasLlegada>0?`${diasLlegada} días`:diasLlegada===0?"Hoy":"Atrasado"}</div>}
                       </div>
                     </div>
 
                     {ahorroIva > 0 && (
-                      <div style={{padding:"12px 32px",background:"#f0fdf4",borderBottom:"1px solid #bbf7d0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div className="opvc-alert" style={{padding:"12px 32px",background:"#f0fdf4",borderBottom:"1px solid #bbf7d0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                         <div style={{fontSize:12,color:"#15803d",fontWeight:700}}>💎 Ahorro por consolidar c/IVA</div>
                         <div style={{fontSize:16,color:"#15803d",fontWeight:800}}>{fmt(ahorroIva)}</div>
                       </div>
                     )}
 
                     {!aplicado && (
-                      <div style={{padding:"10px 32px",background:"#fff7ed",borderBottom:"1px solid #fed7aa",fontSize:11,color:"#92400e",fontStyle:"italic"}}>
+                      <div className="opvc-alert no-print" style={{padding:"10px 32px",background:"#fff7ed",borderBottom:"1px solid #fed7aa",fontSize:11,color:"#92400e",fontStyle:"italic"}}>
                         ⚠️ Esta cotización aún NO ha sido aplicada al cliente (admin debe presionar "✅ Aplicar consolidado al cliente" antes de enviar este PDF).
                       </div>
                     )}
 
                     {/* Detalle productos */}
-                    <div style={{padding:"20px 32px"}}>
-                      <div style={{fontSize:12,fontWeight:700,color:"#333",marginBottom:12}}>Detalle de productos</div>
+                    <div className="opvc-body" style={{padding:"20px 32px"}}>
+                      <div className="opvc-section-ttl" style={{fontSize:12,fontWeight:700,color:"#333",marginBottom:12}}>Detalle de productos</div>
                       {consolidados.map(({cot,calc})=>{
                         const totIva = calc?.consolidado?.totClIva || 0;
                         const pUnd = totIva / (Number(cot.unidades)||1);
                         return (
-                          <div key={cot.id} style={{borderRadius:10,border:"2px solid #1a1a2e22",marginBottom:10,overflow:"hidden"}}>
-                            <div style={{background:"#f8fafc",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #e2e8f0"}}>
+                          <div key={cot.id} className="opvc-cot" style={{borderRadius:10,border:"2px solid #1a1a2e22",marginBottom:10,overflow:"hidden"}}>
+                            <div className="opvc-cot-hdr" style={{background:"#f8fafc",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #e2e8f0"}}>
                               <div>
-                                <span style={{fontWeight:700,fontSize:13,color:"#222"}}>{cot.producto}</span>
-                                <span style={{fontSize:11,color:"#64748b",marginLeft:8}}>{cot.nro}</span>
+                                <span className="opvc-cot-hdr-prod" style={{fontWeight:700,fontSize:13,color:"#222"}}>{cot.producto}</span>
+                                <span className="opvc-cot-hdr-nro" style={{fontSize:11,color:"#64748b",marginLeft:8}}>{cot.nro}</span>
                               </div>
-                              <span style={{background:"#c47830",color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:700}}>✈️ Aéreo consolidado</span>
+                              <span className="opvc-cot-hdr-badge" style={{background:"#c47830",color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:700}}>✈️ Aéreo</span>
                             </div>
-                            <div style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,background:"#fff"}}>
-                              <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Unidades</div><div style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmtN(cot.unidades)}</div></div>
-                              <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Precio/und c/IVA</div><div style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmt(pUnd)}</div></div>
-                              <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Total c/IVA</div><div style={{fontSize:13,fontWeight:800,color:"#1aa358"}}>{fmt(totIva)}</div></div>
-                              <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Llegada est.</div><div style={{fontSize:12,fontWeight:700,color:"#c47830"}}>{calcLlegadaEst(cot)||"—"}</div></div>
+                            <div className="opvc-cot-grid" style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,background:"#fff"}}>
+                              <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Unidades</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmtN(cot.unidades)}</div></div>
+                              <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>$/und c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmt(pUnd)}</div></div>
+                              <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Total c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:800,color:"#1aa358"}}>{fmt(totIva)}</div></div>
+                              <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Llegada</div><div className="opvc-cell-val" style={{fontSize:12,fontWeight:700,color:"#c47830"}}>{calcLlegadaEst(cot)||"—"}</div></div>
                             </div>
                           </div>
                         );
                       })}
 
                       {/* Bloque pagos */}
-                      <div style={{background:"#040c18",borderRadius:12,padding:"18px 22px",color:"#fff",marginTop:14}}>
-                        <div style={{fontSize:10,color:"#c9a055",textTransform:"uppercase",letterSpacing:1.5,fontWeight:700,marginBottom:12}}>💰 Plan de pagos</div>
+                      <div className="opvc-pay" style={{background:"#040c18",borderRadius:12,padding:"18px 22px",color:"#fff",marginTop:14}}>
+                        <div className="opvc-pay-ttl" style={{fontSize:10,color:"#c9a055",textTransform:"uppercase",letterSpacing:1.5,fontWeight:700,marginBottom:12}}>💰 Plan de pagos</div>
                         {tienePago100 ? (
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
-                            <div><div style={{fontSize:12,color:"#94a3b8"}}>💰 Pago único (100%)</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Al confirmar cotización</div></div>
-                            <div style={{fontSize:20,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
+                          <div className="opvc-pay-box" style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
+                            <div><div className="opvc-pay-box-lbl" style={{fontSize:12,color:"#94a3b8"}}>💰 Pago único (100%)</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Al confirmar</div></div>
+                            <div className="opvc-pay-box-val" style={{fontSize:20,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
                           </div>
                         ) : (
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                            <div style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
-                              <div style={{fontSize:11,color:"#94a3b8"}}>1er pago (50%)</div>
-                              <div style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Al confirmar cotización</div>
-                              <div style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
+                            <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
+                              <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>1er pago (50%)</div>
+                              <div style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Al confirmar</div>
+                              <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
                             </div>
-                            <div style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
-                              <div style={{fontSize:11,color:"#94a3b8"}}>2do pago (50%)</div>
+                            <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
+                              <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>2do pago (50%)</div>
                               <div style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Antes del despacho</div>
-                              <div style={{fontSize:18,fontWeight:800,color:"#fbbf24"}}>{fmt(p2)}</div>
+                              <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#fbbf24"}}>{fmt(p2)}</div>
                             </div>
                           </div>
                         )}
-                        <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #1a2740",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div className="opvc-pay-total" style={{marginTop:14,paddingTop:12,borderTop:"1px solid #1a2740",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                           <span style={{fontSize:12,color:"#94a3b8"}}>TOTAL CON IVA</span>
-                          <span style={{fontSize:22,fontWeight:800,color:"#c9a055"}}>{fmt(totConsolidadoIva)}</span>
+                          <span className="opvc-pay-total-val" style={{fontSize:22,fontWeight:800,color:"#c9a055"}}>{fmt(totConsolidadoIva)}</span>
                         </div>
                       </div>
 
                       {/* Mensaje cierre + datos */}
-                      <div style={{marginTop:16,padding:"14px 18px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0",fontSize:12,color:"#475569",lineHeight:1.6}}>
-                        <b style={{color:"#040c18"}}>Vigencia:</b> 7 días desde la fecha de emisión.<br/>
-                        <b style={{color:"#040c18"}}>Modalidad:</b> Importación aérea consolidada — ZAGA gestiona producción en China, flete aéreo, aduana en Chile y entrega en bodega.<br/>
-                        {fechaLlegadaMax && <><b style={{color:"#040c18"}}>Llegada estimada a bodega Chile:</b> {fechaLlegadaMax}<br/></>}
-                        <b style={{color:"#040c18"}}>Datos de pago:</b> coordinar con el equipo ZAGA para recibir la información bancaria al confirmar.
+                      <div className="opvc-msg" style={{marginTop:16,padding:"14px 18px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0",fontSize:12,color:"#475569",lineHeight:1.5}}>
+                        <b style={{color:"#040c18"}}>Vigencia:</b> 7 días · <b style={{color:"#040c18"}}>Modalidad:</b> Aérea consolidada{fechaLlegadaMax && <> · <b style={{color:"#040c18"}}>Llega:</b> {fechaLlegadaMax}</>}<br/>
+                        <b style={{color:"#040c18"}}>Datos de pago:</b> coordinar con ZAGA al confirmar.
                       </div>
 
-                      <div style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>
-                        ZAGA SpA · RUT 77874968-8 · Santiago, Chile · Generado el {todayStr()}
+                      <div className="opvc-footer" style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>
+                        ZAGA SpA · RUT 77874968-8 · Santiago, Chile · {todayStr()}
                       </div>
                     </div>
                   </div>
