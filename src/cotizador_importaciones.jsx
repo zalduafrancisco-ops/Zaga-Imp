@@ -1004,6 +1004,19 @@ export default function App({ supabase, usuario, onLogout }){
           .cot-card-row{flex-direction:column !important}
           .cot-card-right{min-width:0 !important;margin-left:0 !important;margin-top:10px !important;grid-template-columns:1fr 1fr !important}
           .ff-grid{grid-template-columns:1fr !important}
+          .op-card{padding:12px !important}
+          .op-card-header{flex-direction:column !important;align-items:stretch !important;gap:10px !important}
+          .op-title-row{flex-wrap:wrap !important;gap:6px !important}
+          .op-title-row select{flex:1 1 100% !important;padding:8px 10px !important;font-size:12px !important;margin-top:4px !important}
+          .op-card-actions{display:grid !important;grid-template-columns:1fr 1fr !important;gap:6px !important;width:100% !important}
+          .op-card-actions button{width:100% !important;padding:10px 6px !important;font-size:11px !important}
+          .op-card-actions button:first-child{grid-column:1 / -1 !important}
+          .op-cons-block{padding:10px !important;margin-top:12px !important}
+          .op-cons-table th,.op-cons-table td{padding:5px 6px !important;font-size:10px !important}
+          .op-cons-table td:first-child div:first-child{font-size:11px !important}
+          .op-cons-footer{font-size:9px !important}
+          .op-bottom-actions{display:grid !important;grid-template-columns:1fr !important;gap:6px !important;margin-top:12px !important}
+          .op-bottom-actions button{width:100% !important;padding:11px 10px !important;font-size:12px !important}
         }
       `}</style>
 
@@ -4214,10 +4227,10 @@ Número de seguimiento: ${c.nro}`;
                     .filter(x => x.calc) : [];
                   const ahorroTotalOp = consolidados.reduce((s,x) => s + ((x.calc?.standalone?.totClIva || 0) - (x.calc?.consolidado?.totClIva || 0)), 0);
                   return (
-                    <div key={op.id} style={{background:"#fff",borderRadius:10,border:"1px solid #e2e8f0",padding:"14px 18px"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+                    <div key={op.id} className="op-card" style={{background:"#fff",borderRadius:10,border:"1px solid #e2e8f0",padding:"14px 18px"}}>
+                      <div className="op-card-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                          <div className="op-title-row" style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                             <span style={{fontSize:14,fontWeight:800,color:"#c9a055"}}>{op.nro}</span>
                             {clientesOp.map(cl=>(
                               <span key={cl} style={{fontSize:12,fontWeight:700,color:"#040c18",background:"#eef6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"2px 9px"}}>👤 {cl}</span>
@@ -4280,7 +4293,7 @@ Número de seguimiento: ${c.nro}`;
                             {op.cotizaciones?.length||0} cotizaciones · {fmtN(totalUnd)} unidades · Margen {op.margen_objetivo}% · {clienteUnico?"Cliente único":"Multi-cliente"}
                           </div>
                         </div>
-                        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        <div className="op-card-actions" style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           <button onClick={()=>setOpOpenId(expanded?null:op.id)} style={{background:expanded?"#c9a05522":"#f8fafc",color:expanded?"#c9a055":"#64748b",border:`1px solid ${expanded?"#c9a05566":"#e2e8f0"}`,borderRadius:6,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>💎 {expanded?"Ocultar":"Ver"} consolidado</button>
                           <button onClick={()=>{setOpForm(op);setOpEditId(op.id);}} style={{background:"#eef6ff",color:"#2d78c8",border:"1px solid #bfdbfe",borderRadius:6,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:600}}>✏️ Editar</button>
                           <button onClick={async()=>{
@@ -4303,14 +4316,14 @@ Número de seguimiento: ${c.nro}`;
                       </div>
                       {/* Bloque consolidado expandible */}
                       {expanded&&(
-                        <div style={{marginTop:14,padding:14,background:"#fafafa",borderRadius:9,border:"1px solid #e2e8f0"}}>
+                        <div className="op-cons-block" style={{marginTop:14,padding:14,background:"#fafafa",borderRadius:9,border:"1px solid #e2e8f0"}}>
                           <div style={{fontSize:11,color:"#c9a055",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>💎 Comparativa standalone vs consolidado</div>
                           {consolidados.length===0?(
                             <div style={{fontSize:12,color:"#94a3b8",fontStyle:"italic"}}>No hay cotizaciones activas en esta operación (todas están rechazadas/anuladas/no procesadas).</div>
                           ):(
                             <>
-                              <div style={{overflowX:"auto"}}>
-                                <table style={{width:"100%",fontSize:12,borderCollapse:"collapse"}}>
+                              <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+                                <table className="op-cons-table" style={{width:"100%",fontSize:12,borderCollapse:"collapse",minWidth:520}}>
                                   <thead>
                                     <tr style={{background:"#f1f5f9",color:"#64748b"}}>
                                       <th style={{padding:"6px 8px",textAlign:"left",fontWeight:700}}>Cotización</th>
@@ -4359,10 +4372,10 @@ Número de seguimiento: ${c.nro}`;
                                   </tbody>
                                 </table>
                               </div>
-                              <div style={{fontSize:10,color:"#64748b",marginTop:8,fontStyle:"italic",lineHeight:1.5}}>
+                              <div className="op-cons-footer" style={{fontSize:10,color:"#64748b",marginTop:8,fontStyle:"italic",lineHeight:1.5}}>
                                 Distribución de ahorro: <b>{(()=>{ const m=op.distribucion_ahorro||"auto"; if(m==="cliente_100") return "100% al cliente (manual override)"; if(m==="split_50_50") return "50% cliente / 50% ZAGA (manual)"; return clienteUnico?"100% al cliente (auto: cliente único)":"50% cliente / 50% ZAGA (auto: multi-cliente)"; })()}</b> · Reparto de costos compartidos por <b>modo Sunny auto</b> (mayor entre peso o volumen) · Aduana fija prorrateada + flete usando tarifa consolidada Sunny ({op.flete_rmb_kg_consolidado?`RMB/kg ${op.flete_rmb_kg_consolidado}`:(op.flete_usd_kg_consolidado?`USD/kg ${op.flete_usd_kg_consolidado}`:"aún no actualizada")})
                               </div>
-                              <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
+                              <div className="op-bottom-actions" style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
                                 <button onClick={async()=>{
                                   if(!confirm(`📢 Marcar OP ${op.nro} para que Sunny recotize?\n\nSunny verá la operación en su portal y deberá actualizar la tarifa de flete consolidada (USD/kg o USD/CBM según modo).`))return;
                                   try{
