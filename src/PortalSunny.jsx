@@ -455,6 +455,9 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
   const opVinculada = c.operacion_id && Array.isArray(ops) ? ops.find(o => o._id === c.operacion_id) : null
   const [form, setForm] = useState({
     sku_china:             c.sku_china || "",
+    imagen_url_sunny:      c.imagen_url_sunny || "",
+    peso_unitario_g:       c.peso_unitario_g || "",
+    unidad_medida:         c.unidad_medida || "pcs",
     precio_china_rmb:      c.precio_china_rmb || "",
     dim_largo:             c.dim_largo || "",
     dim_ancho:             c.dim_ancho || "",
@@ -525,7 +528,8 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
       // 2) Merge: solo campos de Sunny
       const datosMerged = { ...fresca.datos }
       const camposSunny = [
-        "sku_china", "precio_china_rmb",
+        "sku_china", "imagen_url_sunny", "peso_unitario_g", "unidad_medida",
+        "precio_china_rmb",
         "dim_largo", "dim_ancho", "dim_alto", "dim_und_caja", "dim_tipo",
         "peso_kg",
         "aer_modo_cobro_sunny", "aer_tarifa_sunny_kg", "aer_tarifa_sunny_cbm",
@@ -648,11 +652,34 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
             </div>
           </div>
 
-          {/* SECCIÓN 1: SKU + Precio */}
+          {/* SECCIÓN 1: SKU + Imagen + Precio */}
           <Section title="📋 请填写 / Por favor llenar">
             <Field label="中国 SKU / SKU China">
               <input value={form.sku_china} onChange={e=>setForm(p=>({...p, sku_china:e.target.value}))} placeholder="Ej: SK-EAR-2940-A" style={inp}/>
             </Field>
+            <Field label="📷 图片链接 / Link imagen del producto (URL)">
+              <input value={form.imagen_url_sunny} onChange={e=>setForm(p=>({...p, imagen_url_sunny:e.target.value}))} placeholder="https://drive.google.com/... o WeChat / imgur / etc." style={inp}/>
+            </Field>
+            {form.imagen_url_sunny && /^https?:\/\//i.test(form.imagen_url_sunny) && (
+              <div style={{ marginTop:-4, marginBottom:10, padding:8, background:"#fff", border:"1px solid #e2e8f0", borderRadius:7, display:"flex", alignItems:"center", gap:10 }}>
+                <img src={form.imagen_url_sunny} alt="" style={{ maxWidth:120, maxHeight:120, borderRadius:5, objectFit:"contain", border:"1px solid #f1f5f9" }} onError={e=>{ e.target.style.display="none"; e.target.nextSibling.style.display="block" }}/>
+                <div style={{ display:"none", fontSize:11, color:"#dc2626" }}>⚠️ 无法加载图片 / No se pudo cargar la imagen</div>
+                <a href={form.imagen_url_sunny} target="_blank" rel="noopener noreferrer" style={{ fontSize:11, color:"#2d78c8", textDecoration:"underline" }}>🔗 Abrir en nueva pestaña</a>
+              </div>
+            )}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+              <Field label="单件重量 / Peso unitario (g)">
+                <input type="number" step="0.1" value={form.peso_unitario_g} onChange={e=>setForm(p=>({...p, peso_unitario_g:e.target.value}))} placeholder="Ej: 22" style={inp}/>
+              </Field>
+              <Field label="单位 / Unidad">
+                <select value={form.unidad_medida} onChange={e=>setForm(p=>({...p, unidad_medida:e.target.value}))} style={inp}>
+                  <option value="pcs">pcs / 件 (pieza)</option>
+                  <option value="set">set / 套 (juego)</option>
+                  <option value="par">par / 对</option>
+                  <option value="kg">kg / 公斤</option>
+                </select>
+              </Field>
+            </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
               <Field label="FOB 价格 / Precio FOB (RMB / und)">
                 <input type="number" step="0.01" value={form.precio_china_rmb} onChange={e=>setForm(p=>({...p, precio_china_rmb:e.target.value}))} placeholder="0.00" style={inp}/>
@@ -915,15 +942,27 @@ function CotReadOnly({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
         <div style={{ padding:"12px 16px 16px", borderTop:"1px solid #f1f5f9", background:"#fafafa" }}>
           {/* Info producto */}
           <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:8, padding:"10px 12px", marginBottom:10, fontSize:11, color:"#475569" }}>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
-              {c.sku_china && <div><b>SKU:</b> {c.sku_china}</div>}
-              {c.precio_china_rmb && <div><b>FOB:</b> ¥{c.precio_china_rmb}/und</div>}
-              {Number(c.dim_largo) > 0 && <div><b>Caja:</b> {c.dim_largo}×{c.dim_ancho}×{c.dim_alto} cm</div>}
-              {Number(c.peso_kg) > 0 && <div><b>Peso/caja:</b> {c.peso_kg} kg</div>}
-              {c.dim_und_caja && <div><b>Und/caja:</b> {c.dim_und_caja}</div>}
-              {c.form_f_incluido !== undefined && <div><b>Form F:</b> {c.form_f_incluido ? "✓ Sí" : "✗ No"}</div>}
+            <div style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
+              {c.imagen_url_sunny && /^https?:\/\//i.test(c.imagen_url_sunny) && (
+                <img src={c.imagen_url_sunny} alt="" style={{ width:80, height:80, borderRadius:5, objectFit:"cover", border:"1px solid #e2e8f0", flexShrink:0 }} onError={e=>e.target.style.display="none"}/>
+              )}
+              <div style={{ flex:1, display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+                {c.sku_china && <div><b>SKU:</b> {c.sku_china}</div>}
+                {c.unidad_medida && <div><b>Unidad:</b> {c.unidad_medida}</div>}
+                {c.precio_china_rmb && <div><b>FOB:</b> ¥{c.precio_china_rmb}/und</div>}
+                {Number(c.peso_unitario_g) > 0 && <div><b>Peso/und:</b> {c.peso_unitario_g} g</div>}
+                {Number(c.dim_largo) > 0 && <div><b>Caja:</b> {c.dim_largo}×{c.dim_ancho}×{c.dim_alto} cm</div>}
+                {Number(c.peso_kg) > 0 && <div><b>Peso/caja:</b> {c.peso_kg} kg</div>}
+                {c.dim_und_caja && <div><b>Und/caja:</b> {c.dim_und_caja}</div>}
+                {c.form_f_incluido !== undefined && <div><b>Form F:</b> {c.form_f_incluido ? "✓ Sí" : "✗ No"}</div>}
+              </div>
             </div>
-            {c.link_alibaba && <div style={{ marginTop:6 }}><a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" style={{ color:"#2d78c8" }}>🔗 Link producto</a></div>}
+            {(c.link_alibaba || c.imagen_url_sunny) && (
+              <div style={{ marginTop:6, display:"flex", gap:12, fontSize:11 }}>
+                {c.link_alibaba && <a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" style={{ color:"#2d78c8" }}>🔗 Link producto</a>}
+                {c.imagen_url_sunny && <a href={c.imagen_url_sunny} target="_blank" rel="noopener noreferrer" style={{ color:"#c47830" }}>📷 Ver imagen</a>}
+              </div>
+            )}
           </div>
 
           {/* Chat */}
@@ -1024,47 +1063,76 @@ function Dashboard({ cots, pendCot, confirmadas, camino, completadas }) {
 // ─── Card de operación a recotizar (tab nuevo) ──────────────────────────────
 function OpRecotizarCard({ op, cots, supabase, onSaved }) {
   const cotsEnOp = cots.filter(c => (op.cotizaciones || []).includes(c._id))
-  const [tarifaKg, setTarifaKg] = useState(op.flete_usd_kg_consolidado ?? op.costos_china?.flete_usd_kg ?? "")
-  const [tarifaCbm, setTarifaCbm] = useState(op.flete_usd_cbm_consolidado ?? "")
+  const nCots = cotsEnOp.length
+
+  // Estados del formulario completo (todo en RMB)
+  const [comisionPct, setComisionPct]    = useState(op.comision_sunny_pct ?? 5)
+  const [fleteRmbKg, setFleteRmbKg]      = useState(op.flete_rmb_kg_consolidado ?? "")
+  const [certOrigen, setCertOrigen]      = useState(op.cost_cert_origen_rmb ?? 150)
+  const [docOperacion, setDocOperacion]  = useState(op.cost_doc_operacion_rmb ?? 150)
+  const [despachoAd, setDespachoAd]      = useState(op.cost_despacho_aduanero_rmb ?? 200)
+  const [compraDocs, setCompraDocs]      = useState(op.cost_compra_docs_rmb ?? 350)
+  const [seguroPct, setSeguroPct]        = useState((op.seguro_pct ?? 0.002) * 100)
   const [nota, setNota] = useState("")
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
 
-  // Totales de la operación
+  // ─── Totales mercancía + envío ─────────────────────────────────────────────
   const totalCbm = cotsEnOp.reduce((s, c) => {
     const m3 = Number(c.dim_m3) || 0
-    const u = Number(c.unidades) || 0
+    const u  = Number(c.unidades) || 0
     const undCaja = Number(c.dim_und_caja) || 0
-    const esCaja = c.dim_tipo === "caja"
+    const esCaja  = c.dim_tipo === "caja"
     return s + (esCaja && undCaja > 0 ? m3 * Math.ceil(u/undCaja) : m3 * u)
   }, 0)
   const totalPeso = cotsEnOp.reduce((s, c) => {
     const p = Number(c.peso_kg) || 0
     const u = Number(c.unidades) || 0
     const undCaja = Number(c.dim_und_caja) || 0
-    const esCaja = c.dim_tipo === "caja"
+    const esCaja  = c.dim_tipo === "caja"
     return s + (esCaja && undCaja > 0 ? p * Math.ceil(u/undCaja) : p * u)
   }, 0)
   const totalUnd = cotsEnOp.reduce((s, c) => s + (Number(c.unidades) || 0), 0)
-  const tarifaActualKg = Number(op.costos_china?.flete_usd_kg) || 0
-  const fleteOriginal = totalPeso * tarifaActualKg
-  const fleteConsolidado = totalPeso * (Number(tarifaKg) || 0)
-  const ahorroFlete = Math.max(0, fleteOriginal - fleteConsolidado)
+
+  // Valor mercancía en RMB (Exw, sin comisión)
+  const valorMercanciaRMB = cotsEnOp.reduce((s, c) => {
+    const p = Number(c.precio_china_rmb) || 0
+    const u = Number(c.unidades) || 0
+    return s + p * u
+  }, 0)
+
+  // Cálculos en vivo
+  const comisionRMB     = valorMercanciaRMB * (Number(comisionPct) || 0) / 100
+  const totalFOBRmb     = valorMercanciaRMB + comisionRMB
+  const fleteRMB        = totalPeso * (Number(fleteRmbKg) || 0)
+  const certOrigenTotal = (Number(certOrigen) || 0) * nCots
+  const seguroRMB       = valorMercanciaRMB * (Number(seguroPct) || 0) / 100
+  const otrosGastos     = certOrigenTotal + (Number(docOperacion)||0) + (Number(despachoAd)||0) + (Number(compraDocs)||0) + seguroRMB
+  const totalEnvioRMB   = fleteRMB + otrosGastos
+  const totalChinaRMB   = totalFOBRmb + totalEnvioRMB
+  const totalChinaUSD   = totalChinaRMB / TC_RMB_USD
 
   async function confirmar() {
     setSaving(true)
     setMsg(null)
     try {
-      // Lee fresco
       const { data: fresca, error: errLoad } = await supabase
         .from("operaciones").select("datos").eq("id", op._id).single()
       if (errLoad || !fresca) throw new Error("No se pudo leer operación")
       const datosMerged = { ...fresca.datos }
-      if (tarifaKg !== "") datosMerged.flete_usd_kg_consolidado = Number(tarifaKg)
-      if (tarifaCbm !== "") datosMerged.flete_usd_cbm_consolidado = Number(tarifaCbm)
+      datosMerged.comision_sunny_pct        = Number(comisionPct) || 0
+      if (fleteRmbKg !== "") {
+        datosMerged.flete_rmb_kg_consolidado = Number(fleteRmbKg)
+        datosMerged.flete_usd_kg_consolidado = Number(fleteRmbKg) / TC_RMB_USD
+      }
+      datosMerged.cost_cert_origen_rmb      = Number(certOrigen) || 0
+      datosMerged.cost_doc_operacion_rmb    = Number(docOperacion) || 0
+      datosMerged.cost_despacho_aduanero_rmb= Number(despachoAd) || 0
+      datosMerged.cost_compra_docs_rmb      = Number(compraDocs) || 0
+      datosMerged.seguro_pct                = (Number(seguroPct) || 0) / 100
       datosMerged.recotizacion_completada_sunny = true
-      datosMerged.recotizacion_pendiente_sunny = false
-      datosMerged.fecha_respuesta_sunny = new Date().toISOString()
+      datosMerged.recotizacion_pendiente_sunny  = false
+      datosMerged.fecha_respuesta_sunny     = new Date().toISOString()
       if (nota.trim()) {
         const hist = Array.isArray(fresca.datos.notas_sunny) ? [...fresca.datos.notas_sunny] : []
         hist.push({ fecha: new Date().toISOString(), autor: "Sunny", texto: nota.trim() })
@@ -1074,7 +1142,7 @@ function OpRecotizarCard({ op, cots, supabase, onSaved }) {
         .from("operaciones").update({ datos: datosMerged, updated_at: new Date().toISOString() })
         .eq("id", op._id).select("id")
       if (errSave) throw errSave
-      setMsg({ tipo:"ok", txt:"✅ 已发送 / Tarifa enviada al admin" })
+      setMsg({ tipo:"ok", txt:"✅ 已发送 / Cotización enviada al admin" })
       setTimeout(() => onSaved && onSaved(), 1200)
     } catch (e) {
       console.error(e)
@@ -1092,59 +1160,136 @@ function OpRecotizarCard({ op, cots, supabase, onSaved }) {
             🔄 {op.nro}
           </span>
           <span style={{ fontSize:10, fontWeight:700, color:"#92400e", background:"#fff", border:"1px solid #fed7aa", borderRadius:5, padding:"2px 8px" }}>
-            管理员请求重新报价 / Admin pidió recotización
+            管理员请求合并报价 / Admin pidió cotizar consolidado
           </span>
         </div>
         <div style={{ fontWeight:700, fontSize:14, color:"#0f172a" }}>
-          📦 {cotsEnOp.length} 件 cotizaciones · {fmtN(totalUnd,0)} und · {fmtN(totalCbm,3)} m³ · {fmtN(totalPeso,1)} kg
+          📦 {nCots} 件 cotizaciones · {fmtN(totalUnd,0)} und · {fmtN(totalCbm,3)} m³ · {fmtN(totalPeso,1)} kg
         </div>
       </div>
 
       <div style={{ padding:"16px 20px" }}>
-        {/* Lista de cots */}
+        {/* Lista de cots con valor mercancía */}
         <Section title="📋 操作中的报价 / Cotizaciones en la operación">
-          {cotsEnOp.map(c => (
-            <div key={c._id} style={{ display:"flex", justifyContent:"space-between", padding:"7px 0", borderBottom:"1px solid #f1f5f9", fontSize:12 }}>
-              <div>
-                <b style={{ color:"#0f172a" }}>{c.nro || "?"}</b> · {c.producto || "—"}
-                <span style={{ color:"#94a3b8", marginLeft:6 }}>· 👤 {c.cliente || "—"}</span>
+          {cotsEnOp.map(c => {
+            const p = Number(c.precio_china_rmb) || 0
+            const u = Number(c.unidades) || 0
+            const subtotal = p * u
+            return (
+              <div key={c._id} style={{ display:"flex", justifyContent:"space-between", padding:"7px 0", borderBottom:"1px solid #f1f5f9", fontSize:12 }}>
+                <div>
+                  <b style={{ color:"#0f172a" }}>{c.nro || "?"}</b> · {c.producto || "—"}
+                  <span style={{ color:"#94a3b8", marginLeft:6 }}>· 👤 {c.cliente || "—"}</span>
+                </div>
+                <div style={{ color:"#64748b", fontSize:11, textAlign:"right" }}>
+                  {u} und × ¥{p} = <b style={{ color:"#0f172a" }}>{fmtRMB(subtotal)}</b>
+                </div>
               </div>
-              <div style={{ color:"#64748b", fontSize:11 }}>
-                {c.unidades || 0} und · {fmtN(Number(c.dim_m3)*Number(c.unidades||0)/(c.dim_tipo==="caja"?Number(c.dim_und_caja||1):1),3)} m³
-              </div>
-            </div>
-          ))}
-        </Section>
-
-        {/* Tarifa actual standalone */}
-        <Section title="📊 当前费率 / Tarifa actual standalone (sin descuento)">
-          <div style={{ fontSize:12, color:"#64748b" }}>
-            ▸ Flete actual: <b style={{ color:"#0f172a" }}>{fmtUSD(tarifaActualKg)} / kg</b>
-            <br/>▸ Flete total con tarifa actual: <b style={{ color:"#0f172a" }}>{fmtUSD(fleteOriginal)}</b>
+            )
+          })}
+          <div style={{ display:"flex", justifyContent:"space-between", padding:"8px 0 4px", marginTop:4, borderTop:"2px solid #fed7aa", fontSize:13 }}>
+            <b style={{ color:"#854d0e" }}>总货值 / Valor mercancía total (Exw)</b>
+            <b style={{ color:"#0f172a" }}>{fmtRMB(valorMercanciaRMB)}</b>
           </div>
         </Section>
 
-        {/* Nueva tarifa consolidada */}
-        <Section title="💰 新合并费率 / Nueva tarifa consolidada (descuento por bulk)">
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:8 }}>
-            <Field label="USD/kg consolidado">
-              <input type="number" step="0.01" value={tarifaKg} onChange={e=>setTarifaKg(e.target.value)} placeholder={String(tarifaActualKg)} style={inp}/>
+        {/* SECCIÓN: COMISIÓN SUNNY */}
+        <Section title="💼 佣金 / Comisión Sunny">
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <Field label="佣金% / Comisión (% sobre mercancía)">
+              <input type="number" step="0.1" value={comisionPct} onChange={e=>setComisionPct(e.target.value)} placeholder="5" style={inp}/>
             </Field>
-            <Field label="USD/CBM consolidado (opcional)">
-              <input type="number" step="0.01" value={tarifaCbm} onChange={e=>setTarifaCbm(e.target.value)} placeholder="—" style={inp}/>
+            <Field label="佣金金额 / Comisión RMB (calculado)">
+              <div style={{ ...inp, background:"#fff7ed", color:"#c47830", fontWeight:700 }}>
+                {fmtRMB(comisionRMB)}
+              </div>
             </Field>
           </div>
-          {ahorroFlete > 0 && (
-            <div style={{ background:"#f0fdf4", border:"1px solid #bbf7d0", borderRadius:7, padding:"8px 11px", fontSize:11, color:"#15803d" }}>
-              💎 Ahorro estimado en flete vs tarifa actual: <b style={{ fontSize:13 }}>{fmtUSD(ahorroFlete)}</b>
+        </Section>
+
+        {/* SECCIÓN: FLETE AÉREO */}
+        <Section title="✈️ 空运费 / Flete aéreo consolidado">
+          <Field label="费率 RMB/kg / Tarifa flete RMB por kg">
+            <input type="number" step="0.01" value={fleteRmbKg} onChange={e=>setFleteRmbKg(e.target.value)} placeholder="Ej: 65" style={inp}/>
+          </Field>
+          {fleteRMB > 0 && (
+            <div style={{ background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:7, padding:"8px 11px", fontSize:11, color:"#92400e" }}>
+              ▸ Flete total: <b>{fmtN(totalPeso,1)} kg × ¥{fleteRmbKg} = {fmtRMB(fleteRMB)}</b>
             </div>
           )}
+        </Section>
+
+        {/* SECCIÓN: OTROS GASTOS DEL ENVÍO */}
+        <Section title="📦 其他费用 / Otros gastos del envío (defaults editables)">
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:8 }}>
+            <Field label={`原产地证 RMB / Cert. origen (×${nCots} productos)`}>
+              <input type="number" step="1" value={certOrigen} onChange={e=>setCertOrigen(e.target.value)} placeholder="150" style={inp}/>
+            </Field>
+            <Field label="原产地证 总 / Total cert. (RMB)">
+              <div style={{ ...inp, background:"#f1f5f9", color:"#475569", fontWeight:700 }}>{fmtRMB(certOrigenTotal)}</div>
+            </Field>
+            <Field label="操作文件费 / Doc. operación RMB">
+              <input type="number" step="1" value={docOperacion} onChange={e=>setDocOperacion(e.target.value)} placeholder="150" style={inp}/>
+            </Field>
+            <Field label="报关费 / Despacho aduanero CN RMB">
+              <input type="number" step="1" value={despachoAd} onChange={e=>setDespachoAd(e.target.value)} placeholder="200" style={inp}/>
+            </Field>
+            <Field label="文件采购 / Compra documentos RMB">
+              <input type="number" step="1" value={compraDocs} onChange={e=>setCompraDocs(e.target.value)} placeholder="350" style={inp}/>
+            </Field>
+            <Field label={`保险 % / Seguro % (sobre ¥${fmtN(valorMercanciaRMB,0)})`}>
+              <input type="number" step="0.01" value={seguroPct} onChange={e=>setSeguroPct(e.target.value)} placeholder="0.2" style={inp}/>
+            </Field>
+          </div>
+          <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:7, padding:"8px 11px", fontSize:11, color:"#475569", lineHeight:1.7 }}>
+            ▸ 原产地证 Cert. origen: <b>{fmtRMB(certOrigenTotal)}</b> ({nCots} × ¥{certOrigen})<br/>
+            ▸ 操作文件 Doc. operación: <b>{fmtRMB(Number(docOperacion)||0)}</b><br/>
+            ▸ 报关费 Despacho aduanero: <b>{fmtRMB(Number(despachoAd)||0)}</b><br/>
+            ▸ 文件采购 Compra docs: <b>{fmtRMB(Number(compraDocs)||0)}</b><br/>
+            ▸ 保险 Seguro ({seguroPct}%): <b>{fmtRMB(seguroRMB)}</b><br/>
+            <div style={{ borderTop:"1px solid #e2e8f0", paddingTop:5, marginTop:5 }}>
+              <b style={{ color:"#854d0e" }}>其他总计 / Subtotal otros gastos: {fmtRMB(otrosGastos)}</b>
+            </div>
+          </div>
+        </Section>
+
+        {/* RESUMEN GENERAL */}
+        <Section title="💰 总计 / Resumen total">
+          <div style={{ background:"#fff7ed", border:"2px solid #c47830", borderRadius:10, padding:"12px 14px", fontSize:12, lineHeight:1.8 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", color:"#475569" }}>
+              <span>货值 Mercancía (Exw):</span>
+              <b style={{ color:"#0f172a" }}>{fmtRMB(valorMercanciaRMB)}</b>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", color:"#475569" }}>
+              <span>佣金 Comisión Sunny ({comisionPct}%):</span>
+              <b style={{ color:"#0f172a" }}>{fmtRMB(comisionRMB)}</b>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", borderTop:"1px solid #fed7aa", paddingTop:4, marginTop:4, color:"#475569" }}>
+              <span>FOB con comisión:</span>
+              <b style={{ color:"#0f172a" }}>{fmtRMB(totalFOBRmb)}</b>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", color:"#475569" }}>
+              <span>空运 Flete aéreo:</span>
+              <b style={{ color:"#0f172a" }}>{fmtRMB(fleteRMB)}</b>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", color:"#475569" }}>
+              <span>其他 Otros gastos:</span>
+              <b style={{ color:"#0f172a" }}>{fmtRMB(otrosGastos)}</b>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", borderTop:"2px solid #c47830", paddingTop:7, marginTop:7, fontSize:14 }}>
+              <b style={{ color:"#854d0e" }}>总计 TOTAL CHINA:</b>
+              <div style={{ textAlign:"right" }}>
+                <div><b style={{ color:"#c47830" }}>{fmtRMB(totalChinaRMB)}</b></div>
+                <div style={{ fontSize:11, color:"#64748b", fontWeight:400 }}>≈ {fmtUSD(totalChinaUSD)} (TC {TC_RMB_USD})</div>
+              </div>
+            </div>
+          </div>
         </Section>
 
         {/* Nota opcional */}
         <Section title="✉️ 备注 / Nota al admin (opcional)">
           <textarea value={nota} onChange={e=>setNota(e.target.value)} rows={2}
-            placeholder="Ej: descuento por volumen, condición especial..."
+            placeholder="Ej: condiciones especiales, ETA producción..."
             style={{ ...inp, resize:"vertical", minHeight:50, fontFamily:"inherit" }}/>
         </Section>
 
@@ -1157,9 +1302,9 @@ function OpRecotizarCard({ op, cots, supabase, onSaved }) {
           }}>{msg.txt}</div>
         )}
 
-        <button onClick={confirmar} disabled={saving || !tarifaKg}
-          style={{ ...btn, width:"100%", background: tarifaKg ? "#c47830" : "#cbd5e1", color:"#fff", cursor: tarifaKg && !saving ? "pointer" : "not-allowed" }}>
-          ✅ {saving ? "发送中..." : "确认费率 / Confirmar tarifa consolidada"}
+        <button onClick={confirmar} disabled={saving || !fleteRmbKg}
+          style={{ ...btn, width:"100%", background: fleteRmbKg ? "#c47830" : "#cbd5e1", color:"#fff", cursor: fleteRmbKg && !saving ? "pointer" : "not-allowed" }}>
+          ✅ {saving ? "发送中..." : "确认报价 / Confirmar cotización consolidada"}
         </button>
       </div>
     </div>
