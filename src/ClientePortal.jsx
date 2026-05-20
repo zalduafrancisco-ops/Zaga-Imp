@@ -12,6 +12,11 @@ const EST_LABEL = {
   completada:  "✓ Completada",
   no_prospero: "❌ No prosperó",
 }
+// Devuelve el label del estado adaptado al transporte (cambia emoji En camino)
+function getEstLabel(c){
+  if (c.estado === "en_camino") return (c.transporte === "aereo" ? "✈️" : "🚢") + " En camino"
+  return EST_LABEL[c.estado] || c.estado
+}
 const EST_COLOR = {
   solicitud:   "#6a9fd4",
   cotizada:    "#2d78c8",
@@ -145,6 +150,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   var [loading, setLoading] = useState(true)
   var [openId, setOpenId] = useState(null)
   var [filtro, setFiltro] = useState("todas")
+  var [filtroTransporte, setFiltroTransporte] = useState("todos")
   var [busqueda, setBusqueda] = useState("")
   var [tabs, setTabs] = useState({})
   var [alertas, setAlertas] = useState([])      // cambios detectados al cargar
@@ -423,8 +429,11 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   var filtradas = todas.filter(function(c){
     if(c.id===openId) return true  // siempre mostrar la card abierta
     var pF = filtro==="todas" ? true : c.estado===filtro
+    var pT = filtroTransporte==="todos" ? true
+           : filtroTransporte==="aereo" ? c.transporte==="aereo"
+           : (!c.transporte || c.transporte==="maritimo" || c.transporte==="ambos") // marítimo incluye legacy sin definir
     var q = busqueda.trim().toLowerCase()
-    return pF&&(!q||(c.producto&&c.producto.toLowerCase().includes(q))||(c.nro&&c.nro.toLowerCase().includes(q)))
+    return pF&&pT&&(!q||(c.producto&&c.producto.toLowerCase().includes(q))||(c.nro&&c.nro.toLowerCase().includes(q)))
   }).sort(function(a,b){
     var pa = ordenPrioridad(a.estado)
     var pb = ordenPrioridad(b.estado)
@@ -925,6 +934,33 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
 
             {/* FILTROS + BUSQUEDA */}
             <div style={{marginBottom:12}}>
+              {/* Filtro tipo transporte */}
+              {(() => {
+                var aereo = todas.filter(function(c){ return c.transporte==="aereo" }).length
+                var maritimo = todas.filter(function(c){ return !c.transporte || c.transporte==="maritimo" || c.transporte==="ambos" }).length
+                if (aereo === 0 || maritimo === 0) return null // solo mostrar si tiene ambos tipos
+                return (
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
+                    <span style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginRight:4}}>Transporte</span>
+                    {[
+                      ["todos","Todos",todas.length,"#64748b"],
+                      ["maritimo","🚢 Marítimo",maritimo,"#2d78c8"],
+                      ["aereo","✈️ Aéreo",aereo,"#c47830"],
+                    ].map(function(arr){
+                      var k=arr[0], l=arr[1], cnt=arr[2], col=arr[3]
+                      return (
+                        <button key={k} onClick={function(){ setFiltroTransporte(k) }} style={{
+                          background:filtroTransporte===k?col+"22":"#f8fafc",
+                          color:filtroTransporte===k?col:"#64748b",
+                          border:"1px solid "+(filtroTransporte===k?col+"66":"#e2e8f0"),
+                          borderRadius:20,padding:"5px 14px",fontSize:12,cursor:"pointer",
+                          fontWeight:filtroTransporte===k?700:400,fontFamily:"inherit",whiteSpace:"nowrap"
+                        }}>{l} ({cnt})</button>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
                 <button className={"zfbtn"+(filtro==="todas"?" on":"")} onClick={function(){ setFiltro("todas") }}>
                   Todos ({todas.length})
@@ -968,7 +1004,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                   var isRech = RECHAZADAS_EST.includes(c.estado)
                   var color = EST_COLOR[c.estado]||"#3b82f6"
                   var bg = EST_BG[c.estado]||"#eff6ff"
-                  var label = EST_LABEL[c.estado]||c.estado
+                  var label = getEstLabel(c)
                   var cl = c.calc; var conIva = !!c.con_iva
                   // Si admin fijó precio_final_acordado_und, usarlo como fuente de verdad para los montos.
                   // (Override del calculado: prioriza lo que el cliente efectivamente pagó.)
