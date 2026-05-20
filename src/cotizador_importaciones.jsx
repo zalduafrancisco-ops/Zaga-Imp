@@ -1401,8 +1401,23 @@ Número de seguimiento: ${c.nro}`;
               const tienePago100 = cotsCliente.every(c => c.pago_100);
               const p1 = tienePago100 ? totConsolidadoIva : totConsolidadoIva / 2;
               const p2 = tienePago100 ? 0 : totConsolidadoIva / 2;
-              // Fecha estimada de llegada (máxima de las cots)
-              const fechasLlegada = cotsCliente.map(c=>c.fecha_llegada_est).filter(Boolean);
+              // Llegada estimada aérea = base + 25 días
+              // Base = fecha pago cliente si ya pagó (más preciso, ya corren los 25d reales),
+              // sino fecha solicitud (estimado teórico antes de pago)
+              const calcLlegadaEst = (cot) => {
+                if (cot.fecha_llegada_real) return cot.fecha_llegada_real; // ya llegó
+                let base;
+                if ((cot.checklist?.pago1_cliente || cot.estado === "pagada" || cot.estado === "en_camino" || cot.estado === "en_bodega" || cot.estado === "completada") && cot.fecha_pago1_cliente) {
+                  base = cot.fecha_pago1_cliente;
+                } else {
+                  base = cot.fecha_solicitud || cot.fecha_respuesta_china;
+                }
+                if (!base) return null;
+                const d = new Date(base);
+                d.setDate(d.getDate() + 25);
+                return d.toISOString().split("T")[0];
+              };
+              const fechasLlegada = cotsCliente.map(calcLlegadaEst).filter(Boolean);
               const fechaLlegadaMax = fechasLlegada.length > 0 ? fechasLlegada.sort().slice(-1)[0] : null;
               const diasLlegada = fechaLlegadaMax ? Math.ceil((new Date(fechaLlegadaMax)-new Date())/(1000*60*60*24)) : null;
               return (
@@ -1465,7 +1480,7 @@ Número de seguimiento: ${c.nro}`;
                               <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Unidades</div><div style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmtN(cot.unidades)}</div></div>
                               <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Precio/und c/IVA</div><div style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmt(pUnd)}</div></div>
                               <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Total c/IVA</div><div style={{fontSize:13,fontWeight:800,color:"#1aa358"}}>{fmt(totIva)}</div></div>
-                              <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Llegada est.</div><div style={{fontSize:12,fontWeight:700,color:"#c47830"}}>{cot.fecha_llegada_est||"—"}</div></div>
+                              <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Llegada est.</div><div style={{fontSize:12,fontWeight:700,color:"#c47830"}}>{calcLlegadaEst(cot)||"—"}</div></div>
                             </div>
                           </div>
                         );
