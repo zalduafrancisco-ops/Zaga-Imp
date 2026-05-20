@@ -372,12 +372,13 @@ function calcConsolidado(cot, op, cotsEnOp) {
   const valorMercanciaCotRMB = (Number(cot.precio_china_rmb) || 0) * uCot;
   const valorMercanciaOpRMB  = cotsEnOp.reduce((s,c) => s + (Number(c.precio_china_rmb) || 0) * (Number(c.unidades) || 0), 0);
 
-  const comisionPct = Number(op.comision_sunny_pct) || 0;
-  const seguroPct   = Number(op.seguro_pct) || 0; // ej 0.002 = 0.2%
-  const certOrigen      = Number(op.cost_cert_origen_rmb) || 0;
-  const docOperacion    = Number(op.cost_doc_operacion_rmb) || 0;
-  const despachoAd      = Number(op.cost_despacho_aduanero_rmb) || 0;
-  const compraDocs      = Number(op.cost_compra_docs_rmb) || 0;
+  // Fallback: si OP no tiene el campo (Sunny todavía no recotizó), usar el de la cot individual
+  const comisionPct = Number(op.comision_sunny_pct ?? cot.comision_sunny_pct) || 0;
+  const seguroPct   = Number(op.seguro_pct ?? cot.seguro_pct) || 0; // ej 0.002 = 0.2%
+  const certOrigen      = Number(op.cost_cert_origen_rmb ?? cot.cost_cert_origen_rmb) || 0;
+  const docOperacion    = Number(op.cost_doc_operacion_rmb ?? cot.cost_doc_operacion_rmb) || 0;
+  const despachoAd      = Number(op.cost_despacho_aduanero_rmb ?? cot.cost_despacho_aduanero_rmb) || 0;
+  const compraDocs      = Number(op.cost_compra_docs_rmb ?? cot.cost_compra_docs_rmb) || 0;
 
   const comisionCotRMB     = valorMercanciaCotRMB * comisionPct / 100;
   const seguroCotRMB       = valorMercanciaCotRMB * seguroPct;

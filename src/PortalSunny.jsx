@@ -468,6 +468,13 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
     aer_modo_cobro_sunny:  c.aer_modo_cobro_sunny || "auto",
     aer_tarifa_sunny_kg:   c.aer_tarifa_sunny_kg ?? 9.55,
     aer_tarifa_sunny_cbm:  c.aer_tarifa_sunny_cbm ?? "",
+    aer_tarifa_sunny_rmb_kg: c.aer_tarifa_sunny_rmb_kg ?? "",
+    comision_sunny_pct:    c.comision_sunny_pct ?? 5,
+    cost_cert_origen_rmb:  c.cost_cert_origen_rmb ?? 150,
+    cost_doc_operacion_rmb: c.cost_doc_operacion_rmb ?? 150,
+    cost_despacho_aduanero_rmb: c.cost_despacho_aduanero_rmb ?? 200,
+    cost_compra_docs_rmb:  c.cost_compra_docs_rmb ?? 350,
+    seguro_pct:            ((c.seguro_pct ?? 0.002) * 100),
     form_f_incluido:       c.form_f_incluido !== false,
     dias_estimados_china:  c.dias_estimados_china || "",
     nota_nueva:            "",
@@ -490,22 +497,36 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
   const precioUSD = Number(form.precio_china_rmb) > 0 ? Number(form.precio_china_rmb) / TC_RMB_USD : 0
   const totalFOB  = precioUSD * unidades
 
-  // Flete según modo
+  // Flete según modo — usa tarifa RMB/kg si está, fallback a USD/kg
   const modo = form.aer_modo_cobro_sunny || "auto"
-  const tarifaKg  = Number(form.aer_tarifa_sunny_kg) || 0
+  const tarifaRmbKg = Number(form.aer_tarifa_sunny_rmb_kg) || 0
+  const tarifaKgUSD = tarifaRmbKg > 0 ? tarifaRmbKg / TC_RMB_USD : (Number(form.aer_tarifa_sunny_kg) || 0)
   const tarifaCbm = Number(form.aer_tarifa_sunny_cbm) || 0
-  let fleteEstimado = 0
+  let fleteEstimado = 0  // en USD
   let fleteBase = ""
-  if (modo === "peso" && tarifaKg > 0) {
-    fleteEstimado = pesoTotal * tarifaKg
-    fleteBase = `${fmtN(pesoTotal,1)} kg × ${fmtN(tarifaKg,2)} USD/kg`
+  if (modo === "peso" && tarifaKgUSD > 0) {
+    fleteEstimado = pesoTotal * tarifaKgUSD
+    fleteBase = `${fmtN(pesoTotal,1)} kg × ${tarifaRmbKg>0 ? `¥${fmtN(tarifaRmbKg,2)}/kg` : `${fmtN(tarifaKgUSD,2)} USD/kg`}`
   } else if (modo === "volumen" && tarifaCbm > 0) {
     fleteEstimado = m3Total * tarifaCbm
     fleteBase = `${fmtN(m3Total,3)} m³ × ${fmtN(tarifaCbm,2)} USD/m³`
-  } else if (modo === "auto" && tarifaKg > 0) {
-    fleteEstimado = pesoCobrable * tarifaKg
-    fleteBase = `${fmtN(pesoCobrable,1)} kg cobrable × ${fmtN(tarifaKg,2)} USD/kg`
+  } else if (modo === "auto" && tarifaKgUSD > 0) {
+    fleteEstimado = pesoCobrable * tarifaKgUSD
+    fleteBase = `${fmtN(pesoCobrable,1)} kg cobrable × ${tarifaRmbKg>0 ? `¥${fmtN(tarifaRmbKg,2)}/kg` : `${fmtN(tarifaKgUSD,2)} USD/kg`}`
   }
+  const fleteEstimadoRMB = fleteEstimado * TC_RMB_USD
+
+  // ─── Cálculo desglose completo Sunny (comisión + extras envío) ──────────
+  const subtotalMercanciaRMB = Number(form.precio_china_rmb) * unidades || 0
+  const comisionRMB     = subtotalMercanciaRMB * (Number(form.comision_sunny_pct) || 0) / 100
+  const seguroRMBcot    = subtotalMercanciaRMB * (Number(form.seguro_pct) || 0) / 100
+  const certOrigenRMB   = Number(form.cost_cert_origen_rmb) || 0
+  const docOperacionRMB = Number(form.cost_doc_operacion_rmb) || 0
+  const despachoRMB     = Number(form.cost_despacho_aduanero_rmb) || 0
+  const compraDocsRMB   = Number(form.cost_compra_docs_rmb) || 0
+  const otrosGastosRMB  = certOrigenRMB + docOperacionRMB + despachoRMB + compraDocsRMB + seguroRMBcot
+  const totalCotRMB     = subtotalMercanciaRMB + comisionRMB + fleteEstimadoRMB + otrosGastosRMB
+  const totalCotUSD     = totalCotRMB / TC_RMB_USD
 
   // ─── Calcular m³ cuando cambia L/A/H ─────────────────────────────────────
   function onDim(field, v) {
@@ -533,10 +554,18 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
         "dim_largo", "dim_ancho", "dim_alto", "dim_und_caja", "dim_tipo",
         "peso_kg",
         "aer_modo_cobro_sunny", "aer_tarifa_sunny_kg", "aer_tarifa_sunny_cbm",
+        "aer_tarifa_sunny_rmb_kg",
+        "comision_sunny_pct",
+        "cost_cert_origen_rmb", "cost_doc_operacion_rmb",
+        "cost_despacho_aduanero_rmb", "cost_compra_docs_rmb",
         "form_f_incluido", "dias_estimados_china",
       ]
       for (const k of camposSunny) {
         if (form[k] !== undefined && form[k] !== "") datosMerged[k] = form[k]
+      }
+      // seguro_pct: se guarda como decimal (0.002), pero en form está como %
+      if (form.seguro_pct !== undefined && form.seguro_pct !== "") {
+        datosMerged.seguro_pct = (Number(form.seguro_pct) || 0) / 100
       }
       // 3) Calcular m³ por unidad o caja (cuadrado)
       if (Number(form.dim_largo) && Number(form.dim_ancho) && Number(form.dim_alto)) {
@@ -690,9 +719,16 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
                 </div>
               </Field>
             </div>
-            {totalFOB > 0 && (
-              <div style={{ fontSize:11, color:"#64748b", marginTop:-6, marginBottom:8 }}>
-                总 FOB / Total FOB: <b style={{ color:"#0f172a" }}>{fmtUSD(totalFOB)}</b> · ({fmtRMB(Number(form.precio_china_rmb)*unidades)})
+            {subtotalMercanciaRMB > 0 && (
+              <div style={{ background:"#fff7ed", border:"1.5px solid #c47830", borderRadius:8, padding:"10px 14px", marginTop:4, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div>
+                  <div style={{ fontSize:10, color:"#92400e", fontWeight:700, textTransform:"uppercase", letterSpacing:1 }}>总金额 / Total Valor (Exw)</div>
+                  <div style={{ fontSize:10, color:"#64748b", marginTop:2 }}>{unidades} und × ¥{form.precio_china_rmb}</div>
+                </div>
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:"#c47830" }}>{fmtRMB(subtotalMercanciaRMB)}</div>
+                  <div style={{ fontSize:11, color:"#64748b" }}>≈ {fmtUSD(totalFOB)}</div>
+                </div>
               </div>
             )}
           </Section>
@@ -761,18 +797,56 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               ))}
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-              <Field label="USD/kg (重量)">
-                <input type="number" step="0.01" value={form.aer_tarifa_sunny_kg} onChange={e=>setForm(p=>({...p, aer_tarifa_sunny_kg:e.target.value}))} placeholder="9.55" style={inp}/>
+              <Field label="RMB/kg (人民币 / 重量)">
+                <input type="number" step="0.01" value={form.aer_tarifa_sunny_rmb_kg} onChange={e=>setForm(p=>({...p, aer_tarifa_sunny_rmb_kg:e.target.value}))} placeholder="Ej: 65" style={inp}/>
               </Field>
               <Field label="USD/m³ (体积)">
                 <input type="number" step="0.01" value={form.aer_tarifa_sunny_cbm} onChange={e=>setForm(p=>({...p, aer_tarifa_sunny_cbm:e.target.value}))} placeholder="—" style={inp}/>
               </Field>
             </div>
+            <div style={{ fontSize:10, color:"#94a3b8", marginTop:-4, marginBottom:8, fontStyle:"italic" }}>
+              💡 Si llenas RMB/kg, el USD se calcula automático (TC 7.2). Tarifa USD legacy: {fmtUSD(Number(form.aer_tarifa_sunny_kg)||0)}
+            </div>
             {fleteEstimado > 0 && (
-              <div style={{ marginTop:8, background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:7, padding:"7px 11px", fontSize:11, color:"#92400e" }}>
-                ▸ 估算运费 / Flete estimado: <b style={{ fontSize:13 }}>{fmtUSD(fleteEstimado)}</b> ({fleteBase})
+              <div style={{ marginTop:4, background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:7, padding:"7px 11px", fontSize:11, color:"#92400e" }}>
+                ▸ 估算运费 / Flete estimado: <b style={{ fontSize:13 }}>{fmtRMB(fleteEstimadoRMB)}</b> ≈ {fmtUSD(fleteEstimado)} ({fleteBase})
               </div>
             )}
+          </Section>
+
+          {/* SECCIÓN 4: Comisión Sunny + costos del envío */}
+          <Section title="💼 佣金 + 其他费用 / Comisión Sunny + Otros costos del envío (RMB)">
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+              <Field label="佣金 % / Comisión (% mercancía)">
+                <input type="number" step="0.1" value={form.comision_sunny_pct} onChange={e=>setForm(p=>({...p, comision_sunny_pct:e.target.value}))} placeholder="5" style={inp}/>
+              </Field>
+              <Field label="佣金金额 / Comisión RMB">
+                <div style={{ ...inp, background:"#fff7ed", color:"#c47830", fontWeight:700 }}>{fmtRMB(comisionRMB)}</div>
+              </Field>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:8 }}>
+              <Field label="原产地证 / Cert. origen RMB">
+                <input type="number" step="1" value={form.cost_cert_origen_rmb} onChange={e=>setForm(p=>({...p, cost_cert_origen_rmb:e.target.value}))} placeholder="150" style={inp}/>
+              </Field>
+              <Field label="操作文件费 / Doc. operación RMB">
+                <input type="number" step="1" value={form.cost_doc_operacion_rmb} onChange={e=>setForm(p=>({...p, cost_doc_operacion_rmb:e.target.value}))} placeholder="150" style={inp}/>
+              </Field>
+              <Field label="报关费 / Despacho aduanero CN RMB">
+                <input type="number" step="1" value={form.cost_despacho_aduanero_rmb} onChange={e=>setForm(p=>({...p, cost_despacho_aduanero_rmb:e.target.value}))} placeholder="200" style={inp}/>
+              </Field>
+              <Field label="文件采购 / Compra docs RMB">
+                <input type="number" step="1" value={form.cost_compra_docs_rmb} onChange={e=>setForm(p=>({...p, cost_compra_docs_rmb:e.target.value}))} placeholder="350" style={inp}/>
+              </Field>
+              <Field label={`保险 % / Seguro % (sobre ¥${fmtN(subtotalMercanciaRMB,0)})`}>
+                <input type="number" step="0.01" value={form.seguro_pct} onChange={e=>setForm(p=>({...p, seguro_pct:e.target.value}))} placeholder="0.2" style={inp}/>
+              </Field>
+              <Field label="保险金额 / Seguro RMB">
+                <div style={{ ...inp, background:"#f1f5f9", color:"#475569", fontWeight:700 }}>{fmtRMB(seguroRMBcot)}</div>
+              </Field>
+            </div>
+            <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:7, padding:"7px 11px", fontSize:11, color:"#475569" }}>
+              ▸ 其他总计 / Subtotal otros gastos (sin flete): <b style={{ color:"#0f172a" }}>{fmtRMB(otrosGastosRMB)}</b>
+            </div>
           </Section>
 
           {/* SECCIÓN 4: Form F + días producción */}
@@ -798,6 +872,47 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               <input type="number" value={form.dias_estimados_china} onChange={e=>setForm(p=>({...p, dias_estimados_china:e.target.value}))} placeholder="Ej: 15" style={inp}/>
             </Field>
           </Section>
+
+          {/* SECCIÓN RESUMEN ECONÓMICO TOTAL */}
+          {totalCotRMB > 0 && (
+            <div style={{ background:"linear-gradient(135deg,#fff7ed 0%,#fef3c7 100%)", border:"2px solid #c47830", borderRadius:12, padding:"14px 16px", marginBottom:12 }}>
+              <div style={{ fontSize:11, color:"#854d0e", fontWeight:800, letterSpacing:1, textTransform:"uppercase", marginBottom:10 }}>
+                💰 报价总览 / Resumen económico de la cotización
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:5, fontSize:12 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", color:"#475569" }}>
+                  <span>货值 Mercancía (Exw):</span>
+                  <b style={{ color:"#0f172a" }}>{fmtRMB(subtotalMercanciaRMB)}</b>
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between", color:"#475569" }}>
+                  <span>佣金 Comisión Sunny ({form.comision_sunny_pct||0}%):</span>
+                  <b style={{ color:"#0f172a" }}>{fmtRMB(comisionRMB)}</b>
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between", color:"#475569", borderTop:"1px solid #fed7aa", paddingTop:4 }}>
+                  <span>FOB con comisión:</span>
+                  <b style={{ color:"#0f172a" }}>{fmtRMB(subtotalMercanciaRMB + comisionRMB)}</b>
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between", color:"#475569" }}>
+                  <span>空运 Flete aéreo:</span>
+                  <b style={{ color:"#0f172a" }}>{fmtRMB(fleteEstimadoRMB)}</b>
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between", color:"#475569" }}>
+                  <span>其他 Otros gastos (cert+doc+despacho+compra+seguro):</span>
+                  <b style={{ color:"#0f172a" }}>{fmtRMB(otrosGastosRMB)}</b>
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", borderTop:"2px solid #c47830", paddingTop:8, marginTop:5 }}>
+                  <b style={{ color:"#854d0e", fontSize:14 }}>总计 TOTAL CHINA:</b>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:18, fontWeight:800, color:"#c47830" }}>{fmtRMB(totalCotRMB)}</div>
+                    <div style={{ fontSize:11, color:"#64748b", fontWeight:400 }}>≈ {fmtUSD(totalCotUSD)} (TC {TC_RMB_USD})</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize:10, color:"#92400e", marginTop:10, lineHeight:1.5, fontStyle:"italic", textAlign:"center" }}>
+                Este total es lo que cobras a ZAGA (puerta a puerta hasta despacho desde China). ZAGA agrega después aduana Chile + margen.
+              </div>
+            </div>
+          )}
 
           {/* SECCIÓN 5: Nota */}
           <Section title="✉️ 备注 / Nota para admin">
@@ -964,6 +1079,47 @@ function CotReadOnly({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               </div>
             )}
           </div>
+
+          {/* Resumen económico (read-only) */}
+          {(() => {
+            const u = Number(c.unidades) || 0
+            const precioRmb = Number(c.precio_china_rmb) || 0
+            const subtotalMerc = precioRmb * u
+            if (subtotalMerc === 0) return null
+            const comisionPct = Number(c.comision_sunny_pct) || 0
+            const seguroPct = Number(c.seguro_pct) || 0
+            const undCaja = Number(c.dim_und_caja) || 0
+            const esCaja = c.dim_tipo === "caja"
+            const nCajas = esCaja && undCaja > 0 ? Math.ceil(u/undCaja) : 0
+            const pesoTotal = (Number(c.peso_kg)||0) * (esCaja ? nCajas : u)
+            const tarifaRmbKg = Number(c.aer_tarifa_sunny_rmb_kg) || (Number(c.aer_tarifa_sunny_kg)||0) * TC_RMB_USD
+            const flete = pesoTotal * tarifaRmbKg
+            const comision = subtotalMerc * comisionPct / 100
+            const seguro = subtotalMerc * seguroPct
+            const otros = (Number(c.cost_cert_origen_rmb)||0) + (Number(c.cost_doc_operacion_rmb)||0) + (Number(c.cost_despacho_aduanero_rmb)||0) + (Number(c.cost_compra_docs_rmb)||0) + seguro
+            const total = subtotalMerc + comision + flete + otros
+            if (total === 0) return null
+            return (
+              <div style={{ background:"#fff7ed", border:"1.5px solid #c47830", borderRadius:8, padding:"10px 12px", marginBottom:10 }}>
+                <div style={{ fontSize:10, color:"#854d0e", fontWeight:700, textTransform:"uppercase", letterSpacing:1, marginBottom:6 }}>
+                  💰 报价总览 / Resumen Sunny
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"2px 12px", fontSize:11, color:"#475569" }}>
+                  <span>货值 Mercancía:</span><b style={{ color:"#0f172a", textAlign:"right" }}>{fmtRMB(subtotalMerc)}</b>
+                  {comision > 0 && <><span>佣金 Comisión ({comisionPct}%):</span><b style={{ color:"#0f172a", textAlign:"right" }}>{fmtRMB(comision)}</b></>}
+                  {flete > 0 && <><span>空运 Flete:</span><b style={{ color:"#0f172a", textAlign:"right" }}>{fmtRMB(flete)}</b></>}
+                  {otros > 0 && <><span>其他 Otros gastos:</span><b style={{ color:"#0f172a", textAlign:"right" }}>{fmtRMB(otros)}</b></>}
+                </div>
+                <div style={{ borderTop:"2px solid #c47830", marginTop:6, paddingTop:5, display:"flex", justifyContent:"space-between", alignItems:"baseline" }}>
+                  <b style={{ color:"#854d0e", fontSize:12 }}>总计 TOTAL:</b>
+                  <div style={{ textAlign:"right" }}>
+                    <b style={{ color:"#c47830", fontSize:15 }}>{fmtRMB(total)}</b>
+                    <span style={{ fontSize:10, color:"#64748b", marginLeft:6 }}>≈ {fmtUSD(total/TC_RMB_USD)}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Chat */}
           <Section title="💬 消息 / Mensajes">
