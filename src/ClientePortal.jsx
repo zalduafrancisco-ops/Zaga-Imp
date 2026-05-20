@@ -900,7 +900,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                 return (
                                   <div key={x.cot.id} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"12px 14px"}}>
                                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}}>
-                                      {img && <img src={img} alt={x.cot.producto} onError={function(e){e.target.style.display='none'}} style={{width:48,height:48,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                                      {img && <img src={img} alt={x.cot.producto} referrerPolicy="no-referrer" onError={function(e){e.target.style.display='none'}} style={{width:48,height:48,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",flexShrink:0}}/>}
                                       <div style={{flex:1,minWidth:140}}>
                                         <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{x.cot.producto}</div>
                                         <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{x.cot.nro} · {fmtN(x.cot.unidades||0)} unidades</div>
@@ -1066,7 +1066,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                           </div>
                         </div>
                         {/* Imagen — columna propia, centrada verticalmente */}
-                        {getImagenes(c.imagen_url)[0]&&<img src={getImagenes(c.imagen_url)[0]} alt={c.producto} onError={e=>{e.target.style.display='none'}} style={{width:76,height:76,objectFit:"cover",borderRadius:10,border:"1px solid #e2e8f0",flexShrink:0,alignSelf:"center"}}/>}
+                        {getImagenes(c.imagen_url)[0]&&<img src={getImagenes(c.imagen_url)[0]} alt={c.producto} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:76,height:76,objectFit:"cover",borderRadius:10,border:"1px solid #e2e8f0",flexShrink:0,alignSelf:"center"}}/>}
 
                         <div className="cot-meta" style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
                           {!isRech&&(
