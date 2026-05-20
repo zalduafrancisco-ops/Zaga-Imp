@@ -366,6 +366,29 @@ function calcConsolidado(cot, op, cotsEnOp) {
     pCUndConsolidado = uCot > 0 ? totClConsolidado / uCot : 0;
   }
 
+  // ─── Desglose extras China nuevos (comisión Sunny + 5 extras envío) ────────
+  // Solo se computan si la OP tiene los campos seteados (Sunny ya recotizó consolidado)
+  const nCots = cotsEnOp.length;
+  const valorMercanciaCotRMB = (Number(cot.precio_china_rmb) || 0) * uCot;
+  const valorMercanciaOpRMB  = cotsEnOp.reduce((s,c) => s + (Number(c.precio_china_rmb) || 0) * (Number(c.unidades) || 0), 0);
+
+  const comisionPct = Number(op.comision_sunny_pct) || 0;
+  const seguroPct   = Number(op.seguro_pct) || 0; // ej 0.002 = 0.2%
+  const certOrigen      = Number(op.cost_cert_origen_rmb) || 0;
+  const docOperacion    = Number(op.cost_doc_operacion_rmb) || 0;
+  const despachoAd      = Number(op.cost_despacho_aduanero_rmb) || 0;
+  const compraDocs      = Number(op.cost_compra_docs_rmb) || 0;
+
+  const comisionCotRMB     = valorMercanciaCotRMB * comisionPct / 100;
+  const seguroCotRMB       = valorMercanciaCotRMB * seguroPct;
+  const certOrigenCotRMB   = certOrigen; // 1 por cotización
+  const docOperacionCotRMB = docOperacion * share;
+  const despachoCotRMB     = despachoAd   * share;
+  const compraDocsCotRMB   = compraDocs   * share;
+  const extrasChinaCotRMB  = comisionCotRMB + seguroCotRMB + certOrigenCotRMB + docOperacionCotRMB + despachoCotRMB + compraDocsCotRMB;
+  const extrasChinaCotCl   = extrasChinaCotRMB / TC_RMB_USD * tc; // RMB → USD → CLP
+  const tieneExtrasChina   = (comisionPct + seguroPct + certOrigen + docOperacion + despachoAd + compraDocs) > 0;
+
   return {
     standalone: {
       totCl: calcStand.totCl,
@@ -395,6 +418,22 @@ function calcConsolidado(cot, op, cotsEnOp) {
       sharePeso,
       modoUsado,
     },
+    extrasChina: tieneExtrasChina ? {
+      comisionPct,
+      seguroPct,
+      valorMercanciaCotRMB,
+      valorMercanciaOpRMB,
+      comisionCotRMB,
+      seguroCotRMB,
+      certOrigenCotRMB,
+      docOperacionCotRMB,
+      despachoCotRMB,
+      compraDocsCotRMB,
+      extrasChinaCotRMB,
+      extrasChinaCotCl,
+      nCots,
+      tcRmbUsd: TC_RMB_USD,
+    } : null,
   };
 }
 
@@ -4375,6 +4414,67 @@ Número de seguimiento: ${c.nro}`;
                               <div className="op-cons-footer" style={{fontSize:10,color:"#64748b",marginTop:8,fontStyle:"italic",lineHeight:1.5}}>
                                 Distribución de ahorro: <b>{(()=>{ const m=op.distribucion_ahorro||"auto"; if(m==="cliente_100") return "100% al cliente (manual override)"; if(m==="split_50_50") return "50% cliente / 50% ZAGA (manual)"; return clienteUnico?"100% al cliente (auto: cliente único)":"50% cliente / 50% ZAGA (auto: multi-cliente)"; })()}</b> · Reparto de costos compartidos por <b>modo Sunny auto</b> (mayor entre peso o volumen) · Aduana fija prorrateada + flete usando tarifa consolidada Sunny ({op.flete_rmb_kg_consolidado?`RMB/kg ${op.flete_rmb_kg_consolidado}`:(op.flete_usd_kg_consolidado?`USD/kg ${op.flete_usd_kg_consolidado}`:"aún no actualizada")})
                               </div>
+
+                              {/* DESGLOSE EXTRAS CHINA (cuando Sunny ya recotizó con desglose completo) */}
+                              {consolidados.some(x => x.calc?.extrasChina) && (
+                                <div style={{marginTop:14,padding:12,background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8}}>
+                                  <div style={{fontSize:11,color:"#c47830",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>
+                                    🇨🇳 Desglose extras China (cotización Sunny consolidada)
+                                  </div>
+                                  <div style={{fontSize:10,color:"#92400e",marginBottom:8,fontStyle:"italic"}}>
+                                    Comisión Sunny {op.comision_sunny_pct||0}% · Seguro {((op.seguro_pct||0)*100).toFixed(2)}% sobre mercancía · Cert. origen ¥{op.cost_cert_origen_rmb||0}/cot · Doc operación ¥{op.cost_doc_operacion_rmb||0} · Despacho aduanero ¥{op.cost_despacho_aduanero_rmb||0} · Compra docs ¥{op.cost_compra_docs_rmb||0} (los últimos 3 prorrateados por share)
+                                  </div>
+                                  <div style={{overflowX:"auto"}}>
+                                    <table style={{width:"100%",fontSize:11,borderCollapse:"collapse",minWidth:600}}>
+                                      <thead>
+                                        <tr style={{background:"#fef3c7",color:"#854d0e"}}>
+                                          <th style={{padding:"5px 7px",textAlign:"left",fontWeight:700}}>Cot</th>
+                                          <th style={{padding:"5px 7px",textAlign:"right",fontWeight:700}}>Comisión</th>
+                                          <th style={{padding:"5px 7px",textAlign:"right",fontWeight:700}}>Seguro</th>
+                                          <th style={{padding:"5px 7px",textAlign:"right",fontWeight:700}}>Cert.</th>
+                                          <th style={{padding:"5px 7px",textAlign:"right",fontWeight:700}}>Doc</th>
+                                          <th style={{padding:"5px 7px",textAlign:"right",fontWeight:700}}>Despacho</th>
+                                          <th style={{padding:"5px 7px",textAlign:"right",fontWeight:700}}>Compra docs</th>
+                                          <th style={{padding:"5px 7px",textAlign:"right",fontWeight:700}}>Total RMB</th>
+                                          <th style={{padding:"5px 7px",textAlign:"right",fontWeight:700,color:"#c47830"}}>Total CLP</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {consolidados.filter(x => x.calc?.extrasChina).map(({cot,calc}) => {
+                                          const e = calc.extrasChina;
+                                          return (
+                                          <tr key={cot.id} style={{borderTop:"1px solid #fed7aa"}}>
+                                            <td style={{padding:"5px 7px",fontWeight:600,color:"#0f172a"}}>{cot.nro}</td>
+                                            <td style={{padding:"5px 7px",textAlign:"right",color:"#475569"}}>¥{fmtN(e.comisionCotRMB)}</td>
+                                            <td style={{padding:"5px 7px",textAlign:"right",color:"#475569"}}>¥{fmtN(e.seguroCotRMB)}</td>
+                                            <td style={{padding:"5px 7px",textAlign:"right",color:"#475569"}}>¥{fmtN(e.certOrigenCotRMB)}</td>
+                                            <td style={{padding:"5px 7px",textAlign:"right",color:"#475569"}}>¥{fmtN(e.docOperacionCotRMB)}</td>
+                                            <td style={{padding:"5px 7px",textAlign:"right",color:"#475569"}}>¥{fmtN(e.despachoCotRMB)}</td>
+                                            <td style={{padding:"5px 7px",textAlign:"right",color:"#475569"}}>¥{fmtN(e.compraDocsCotRMB)}</td>
+                                            <td style={{padding:"5px 7px",textAlign:"right",fontWeight:700,color:"#0f172a"}}>¥{fmtN(e.extrasChinaCotRMB)}</td>
+                                            <td style={{padding:"5px 7px",textAlign:"right",fontWeight:700,color:"#c47830"}}>{fmt(e.extrasChinaCotCl)}</td>
+                                          </tr>
+                                          );
+                                        })}
+                                        {(()=>{
+                                          const totRMB = consolidados.filter(x=>x.calc?.extrasChina).reduce((s,x)=>s+x.calc.extrasChina.extrasChinaCotRMB,0);
+                                          const totCl  = consolidados.filter(x=>x.calc?.extrasChina).reduce((s,x)=>s+x.calc.extrasChina.extrasChinaCotCl,0);
+                                          return (
+                                            <tr style={{borderTop:"2px solid #c47830",background:"#fff"}}>
+                                              <td colSpan={7} style={{padding:"7px",fontSize:11,fontWeight:800,color:"#854d0e",textAlign:"right"}}>TOTAL EXTRAS CHINA OP →</td>
+                                              <td style={{padding:"7px",textAlign:"right",fontSize:12,fontWeight:800,color:"#0f172a"}}>¥{fmtN(totRMB)}</td>
+                                              <td style={{padding:"7px",textAlign:"right",fontSize:12,fontWeight:800,color:"#c47830"}}>{fmt(totCl)}</td>
+                                            </tr>
+                                          );
+                                        })()}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  <div style={{marginTop:8,fontSize:10,color:"#92400e",lineHeight:1.5,fontStyle:"italic"}}>
+                                    💡 Estos extras son <b>costos adicionales para ZAGA</b> (van más allá del flete ya capturado en la tabla principal). Usarlos para ajustar margen al cliente o saber rentabilidad real por cot.
+                                  </div>
+                                </div>
+                              )}
                               <div className="op-bottom-actions" style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
                                 <button onClick={async()=>{
                                   if(!confirm(`📢 Marcar OP ${op.nro} para que Sunny recotize?\n\nSunny verá la operación en su portal y deberá actualizar la tarifa de flete consolidada (USD/kg o USD/CBM según modo).`))return;
