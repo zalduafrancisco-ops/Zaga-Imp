@@ -474,7 +474,9 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
     cost_doc_operacion_rmb: c.cost_doc_operacion_rmb ?? 150,
     cost_despacho_aduanero_rmb: c.cost_despacho_aduanero_rmb ?? 200,
     cost_compra_docs_rmb:  c.cost_compra_docs_rmb ?? 350,
+    cost_transporte_interno_cn_rmb: c.cost_transporte_interno_cn_rmb ?? 0,
     seguro_pct:            ((c.seguro_pct ?? 0.002) * 100),
+    seguro_min_rmb:        c.seguro_min_rmb ?? 150,
     form_f_incluido:       c.form_f_incluido !== false,
     dias_estimados_china:  c.dias_estimados_china || "",
     nota_nueva:            "",
@@ -519,12 +521,15 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
   // ─── Cálculo desglose completo Sunny (comisión + extras envío) ──────────
   const subtotalMercanciaRMB = Number(form.precio_china_rmb) * unidades || 0
   const comisionRMB     = subtotalMercanciaRMB * (Number(form.comision_sunny_pct) || 0) / 100
-  const seguroRMBcot    = subtotalMercanciaRMB * (Number(form.seguro_pct) || 0) / 100
+  const seguroMinRMB    = Number(form.seguro_min_rmb) || 0
+  const seguroCalculado = subtotalMercanciaRMB * (Number(form.seguro_pct) || 0) / 100
+  const seguroRMBcot    = Math.max(seguroMinRMB, seguroCalculado)
   const certOrigenRMB   = Number(form.cost_cert_origen_rmb) || 0
   const docOperacionRMB = Number(form.cost_doc_operacion_rmb) || 0
   const despachoRMB     = Number(form.cost_despacho_aduanero_rmb) || 0
   const compraDocsRMB   = Number(form.cost_compra_docs_rmb) || 0
-  const otrosGastosRMB  = certOrigenRMB + docOperacionRMB + despachoRMB + compraDocsRMB + seguroRMBcot
+  const transporteCnRMB = Number(form.cost_transporte_interno_cn_rmb) || 0
+  const otrosGastosRMB  = certOrigenRMB + docOperacionRMB + despachoRMB + compraDocsRMB + transporteCnRMB + seguroRMBcot
   const totalCotRMB     = subtotalMercanciaRMB + comisionRMB + fleteEstimadoRMB + otrosGastosRMB
   const totalCotUSD     = totalCotRMB / TC_RMB_USD
 
@@ -558,6 +563,8 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
         "comision_sunny_pct",
         "cost_cert_origen_rmb", "cost_doc_operacion_rmb",
         "cost_despacho_aduanero_rmb", "cost_compra_docs_rmb",
+        "cost_transporte_interno_cn_rmb",
+        "seguro_min_rmb",
         "form_f_incluido", "dias_estimados_china",
       ]
       for (const k of camposSunny) {
@@ -837,15 +844,21 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               <Field label="文件采购 / Compra docs RMB">
                 <input type="number" step="1" value={form.cost_compra_docs_rmb} onChange={e=>setForm(p=>({...p, cost_compra_docs_rmb:e.target.value}))} placeholder="350" style={inp}/>
               </Field>
+              <Field label="国内运输 / Transporte interno CN RMB">
+                <input type="number" step="1" value={form.cost_transporte_interno_cn_rmb} onChange={e=>setForm(p=>({...p, cost_transporte_interno_cn_rmb:e.target.value}))} placeholder="0" style={inp}/>
+              </Field>
               <Field label={`保险 % / Seguro % (sobre ¥${fmtN(subtotalMercanciaRMB,0)})`}>
                 <input type="number" step="0.01" value={form.seguro_pct} onChange={e=>setForm(p=>({...p, seguro_pct:e.target.value}))} placeholder="0.2" style={inp}/>
               </Field>
-              <Field label="保险金额 / Seguro RMB">
-                <div style={{ ...inp, background:"#f1f5f9", color:"#475569", fontWeight:700 }}>{fmtRMB(seguroRMBcot)}</div>
+              <Field label="保险最低 / Seguro mínimo RMB">
+                <input type="number" step="1" value={form.seguro_min_rmb} onChange={e=>setForm(p=>({...p, seguro_min_rmb:e.target.value}))} placeholder="150" style={inp}/>
               </Field>
             </div>
             <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:7, padding:"7px 11px", fontSize:11, color:"#475569" }}>
-              ▸ 其他总计 / Subtotal otros gastos (sin flete): <b style={{ color:"#0f172a" }}>{fmtRMB(otrosGastosRMB)}</b>
+              ▸ 保险金额 / Seguro RMB: <b style={{ color:"#0f172a" }}>{fmtRMB(seguroRMBcot)}</b>
+              {seguroRMBcot > seguroCalculado && <span style={{ color:"#c47830", marginLeft:6, fontStyle:"italic" }}>({form.seguro_pct}% = ¥{fmtN(seguroCalculado,0)} → mínimo ¥{fmtN(seguroMinRMB,0)} aplicado)</span>}
+              {transporteCnRMB > 0 && <><br/>▸ 国内运输 / Transporte interno CN: <b style={{ color:"#0f172a" }}>{fmtRMB(transporteCnRMB)}</b></>}
+              <br/>▸ 其他总计 / Subtotal otros gastos (sin flete): <b style={{ color:"#0f172a" }}>{fmtRMB(otrosGastosRMB)}</b>
             </div>
           </Section>
 
@@ -1099,8 +1112,10 @@ function CotReadOnly({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
             const tarifaRmbKg = Number(c.aer_tarifa_sunny_rmb_kg) || (Number(c.aer_tarifa_sunny_kg)||0) * TC_RMB_USD
             const flete = pesoTotal * tarifaRmbKg
             const comision = subtotalMerc * comisionPct / 100
-            const seguro = subtotalMerc * seguroPct
-            const otros = (Number(c.cost_cert_origen_rmb)||0) + (Number(c.cost_doc_operacion_rmb)||0) + (Number(c.cost_despacho_aduanero_rmb)||0) + (Number(c.cost_compra_docs_rmb)||0) + seguro
+            const seguroMin = Number(c.seguro_min_rmb) || 0
+            const seguro = Math.max(seguroMin, subtotalMerc * seguroPct)
+            const transporteCn = Number(c.cost_transporte_interno_cn_rmb) || 0
+            const otros = (Number(c.cost_cert_origen_rmb)||0) + (Number(c.cost_doc_operacion_rmb)||0) + (Number(c.cost_despacho_aduanero_rmb)||0) + (Number(c.cost_compra_docs_rmb)||0) + transporteCn + seguro
             const total = subtotalMerc + comision + flete + otros
             if (total === 0) return null
             return (
@@ -1233,7 +1248,9 @@ function OpRecotizarCard({ op, cots, supabase, onSaved }) {
   const [docOperacion, setDocOperacion]  = useState(op.cost_doc_operacion_rmb ?? 150)
   const [despachoAd, setDespachoAd]      = useState(op.cost_despacho_aduanero_rmb ?? 200)
   const [compraDocs, setCompraDocs]      = useState(op.cost_compra_docs_rmb ?? 350)
+  const [transporteCn, setTransporteCn]  = useState(op.cost_transporte_interno_cn_rmb ?? 0)
   const [seguroPct, setSeguroPct]        = useState((op.seguro_pct ?? 0.002) * 100)
+  const [seguroMinRmb, setSeguroMinRmb]  = useState(op.seguro_min_rmb ?? 150)
   const [nota, setNota] = useState("")
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
@@ -1267,8 +1284,11 @@ function OpRecotizarCard({ op, cots, supabase, onSaved }) {
   const totalFOBRmb     = valorMercanciaRMB + comisionRMB
   const fleteRMB        = totalPeso * (Number(fleteRmbKg) || 0)
   const certOrigenTotal = (Number(certOrigen) || 0) * nCots
-  const seguroRMB       = valorMercanciaRMB * (Number(seguroPct) || 0) / 100
-  const otrosGastos     = certOrigenTotal + (Number(docOperacion)||0) + (Number(despachoAd)||0) + (Number(compraDocs)||0) + seguroRMB
+  const seguroMin       = Number(seguroMinRmb) || 0
+  const seguroCalc      = valorMercanciaRMB * (Number(seguroPct) || 0) / 100
+  const seguroRMB       = Math.max(seguroMin, seguroCalc)
+  const transporteCnRMB = Number(transporteCn) || 0
+  const otrosGastos     = certOrigenTotal + (Number(docOperacion)||0) + (Number(despachoAd)||0) + (Number(compraDocs)||0) + transporteCnRMB + seguroRMB
   const totalEnvioRMB   = fleteRMB + otrosGastos
   const totalChinaRMB   = totalFOBRmb + totalEnvioRMB
   const totalChinaUSD   = totalChinaRMB / TC_RMB_USD
@@ -1290,7 +1310,9 @@ function OpRecotizarCard({ op, cots, supabase, onSaved }) {
       datosMerged.cost_doc_operacion_rmb    = Number(docOperacion) || 0
       datosMerged.cost_despacho_aduanero_rmb= Number(despachoAd) || 0
       datosMerged.cost_compra_docs_rmb      = Number(compraDocs) || 0
+      datosMerged.cost_transporte_interno_cn_rmb = Number(transporteCn) || 0
       datosMerged.seguro_pct                = (Number(seguroPct) || 0) / 100
+      datosMerged.seguro_min_rmb            = Number(seguroMinRmb) || 0
       datosMerged.recotizacion_completada_sunny = true
       datosMerged.recotizacion_pendiente_sunny  = false
       datosMerged.fecha_respuesta_sunny     = new Date().toISOString()
@@ -1398,8 +1420,14 @@ function OpRecotizarCard({ op, cots, supabase, onSaved }) {
             <Field label="文件采购 / Compra documentos RMB">
               <input type="number" step="1" value={compraDocs} onChange={e=>setCompraDocs(e.target.value)} placeholder="350" style={inp}/>
             </Field>
+            <Field label="国内运输 / Transporte interno CN RMB">
+              <input type="number" step="1" value={transporteCn} onChange={e=>setTransporteCn(e.target.value)} placeholder="0" style={inp}/>
+            </Field>
             <Field label={`保险 % / Seguro % (sobre ¥${fmtN(valorMercanciaRMB,0)})`}>
               <input type="number" step="0.01" value={seguroPct} onChange={e=>setSeguroPct(e.target.value)} placeholder="0.2" style={inp}/>
+            </Field>
+            <Field label="保险最低 / Seguro mínimo RMB">
+              <input type="number" step="1" value={seguroMinRmb} onChange={e=>setSeguroMinRmb(e.target.value)} placeholder="150" style={inp}/>
             </Field>
           </div>
           <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:7, padding:"8px 11px", fontSize:11, color:"#475569", lineHeight:1.7 }}>
@@ -1407,7 +1435,9 @@ function OpRecotizarCard({ op, cots, supabase, onSaved }) {
             ▸ 操作文件 Doc. operación: <b>{fmtRMB(Number(docOperacion)||0)}</b><br/>
             ▸ 报关费 Despacho aduanero: <b>{fmtRMB(Number(despachoAd)||0)}</b><br/>
             ▸ 文件采购 Compra docs: <b>{fmtRMB(Number(compraDocs)||0)}</b><br/>
-            ▸ 保险 Seguro ({seguroPct}%): <b>{fmtRMB(seguroRMB)}</b><br/>
+            {transporteCnRMB > 0 && <>▸ 国内运输 Transporte interno CN: <b>{fmtRMB(transporteCnRMB)}</b><br/></>}
+            ▸ 保险 Seguro ({seguroPct}%): <b>{fmtRMB(seguroRMB)}</b>
+              {seguroRMB > seguroCalc && <span style={{ color:"#c47830", marginLeft:6, fontStyle:"italic" }}>(calc ¥{fmtN(seguroCalc,0)} → mín ¥{fmtN(seguroMin,0)})</span>}<br/>
             <div style={{ borderTop:"1px solid #e2e8f0", paddingTop:5, marginTop:5 }}>
               <b style={{ color:"#854d0e" }}>其他总计 / Subtotal otros gastos: {fmtRMB(otrosGastos)}</b>
             </div>

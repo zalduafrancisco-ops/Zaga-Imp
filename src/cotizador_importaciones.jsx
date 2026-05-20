@@ -375,20 +375,27 @@ function calcConsolidado(cot, op, cotsEnOp) {
   // Fallback: si OP no tiene el campo (Sunny todavía no recotizó), usar el de la cot individual
   const comisionPct = Number(op.comision_sunny_pct ?? cot.comision_sunny_pct) || 0;
   const seguroPct   = Number(op.seguro_pct ?? cot.seguro_pct) || 0; // ej 0.002 = 0.2%
+  const seguroMin   = Number(op.seguro_min_rmb ?? cot.seguro_min_rmb) || 0; // mínimo RMB (default 150 cuando Sunny lo setea)
   const certOrigen      = Number(op.cost_cert_origen_rmb ?? cot.cost_cert_origen_rmb) || 0;
   const docOperacion    = Number(op.cost_doc_operacion_rmb ?? cot.cost_doc_operacion_rmb) || 0;
   const despachoAd      = Number(op.cost_despacho_aduanero_rmb ?? cot.cost_despacho_aduanero_rmb) || 0;
   const compraDocs      = Number(op.cost_compra_docs_rmb ?? cot.cost_compra_docs_rmb) || 0;
+  const transporteCnRmb = Number(op.cost_transporte_interno_cn_rmb ?? cot.cost_transporte_interno_cn_rmb) || 0;
+
+  // Seguro a nivel OP con mínimo, prorrateado por valor de la cot
+  const seguroOpTotalRMB    = Math.max(seguroMin, valorMercanciaOpRMB * seguroPct);
+  const shareValorMercancia = valorMercanciaOpRMB > 0 ? valorMercanciaCotRMB / valorMercanciaOpRMB : 0;
+  const seguroCotRMB        = seguroOpTotalRMB * shareValorMercancia;
 
   const comisionCotRMB     = valorMercanciaCotRMB * comisionPct / 100;
-  const seguroCotRMB       = valorMercanciaCotRMB * seguroPct;
   const certOrigenCotRMB   = certOrigen; // 1 por cotización
   const docOperacionCotRMB = docOperacion * share;
   const despachoCotRMB     = despachoAd   * share;
   const compraDocsCotRMB   = compraDocs   * share;
-  const extrasChinaCotRMB  = comisionCotRMB + seguroCotRMB + certOrigenCotRMB + docOperacionCotRMB + despachoCotRMB + compraDocsCotRMB;
+  const transporteCnCotRMB = transporteCnRmb * share; // prorrateado por share
+  const extrasChinaCotRMB  = comisionCotRMB + seguroCotRMB + certOrigenCotRMB + docOperacionCotRMB + despachoCotRMB + compraDocsCotRMB + transporteCnCotRMB;
   const extrasChinaCotCl   = extrasChinaCotRMB / TC_RMB_USD * tc; // RMB → USD → CLP
-  const tieneExtrasChina   = (comisionPct + seguroPct + certOrigen + docOperacion + despachoAd + compraDocs) > 0;
+  const tieneExtrasChina   = (comisionPct + seguroPct + certOrigen + docOperacion + despachoAd + compraDocs + transporteCnRmb) > 0;
 
   return {
     standalone: {
@@ -430,6 +437,7 @@ function calcConsolidado(cot, op, cotsEnOp) {
       docOperacionCotRMB,
       despachoCotRMB,
       compraDocsCotRMB,
+      transporteCnCotRMB,
       extrasChinaCotRMB,
       extrasChinaCotCl,
       nCots,
