@@ -687,7 +687,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               <input value={form.sku_china} onChange={e=>setForm(p=>({...p, sku_china:e.target.value}))} placeholder="Ej: SK-EAR-2940-A" style={inp}/>
             </Field>
             <Field label="📷 图片链接 / Link imagen del producto (URL)">
-              <input value={form.imagen_url_sunny} onChange={e=>setForm(p=>({...p, imagen_url_sunny:e.target.value}))} placeholder="https://drive.google.com/... o WeChat / imgur / etc." style={inp}/>
+              <input value={form.imagen_url_sunny} onChange={e=>setForm(p=>({...p, imagen_url_sunny:e.target.value}))} placeholder="https://... (微信/网盘/imgur)" style={inp}/>
             </Field>
             {form.imagen_url_sunny && /^https?:\/\//i.test(form.imagen_url_sunny) && (
               <div style={{ marginTop:-4, marginBottom:10, padding:8, background:"#fff", border:"1px solid #e2e8f0", borderRadius:7, display:"flex", alignItems:"center", gap:10 }}>
@@ -698,7 +698,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
             )}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
               <Field label="单件重量 / Peso unitario (g)">
-                <input type="number" step="0.1" value={form.peso_unitario_g} onChange={e=>setForm(p=>({...p, peso_unitario_g:e.target.value}))} placeholder="Ej: 22" style={inp}/>
+                <input type="number" step="0.1" value={form.peso_unitario_g} onChange={e=>setForm(p=>({...p, peso_unitario_g:e.target.value}))} placeholder="例如 22 / Ej: 22" style={inp}/>
               </Field>
               <Field label="单位 / Unidad">
                 <select value={form.unidad_medida} onChange={e=>setForm(p=>({...p, unidad_medida:e.target.value}))} style={inp}>
@@ -737,10 +737,10 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
           <Section title="📐 箱尺寸 / Dimensiones de la caja">
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:6 }}>
               <Field label="箱装 / Und por caja">
-                <input type="number" value={form.dim_und_caja} onChange={e=>onDim("dim_und_caja", e.target.value)} placeholder="Ej: 200" style={inp}/>
+                <input type="number" value={form.dim_und_caja} onChange={e=>onDim("dim_und_caja", e.target.value)} placeholder="例如 200 / Ej: 200" style={inp}/>
               </Field>
               <Field label="单箱重量 / Peso por caja (kg)">
-                <input type="number" step="0.01" value={form.peso_kg} onChange={e=>onDim("peso_kg", e.target.value)} placeholder="Ej: 8.5" style={inp}/>
+                <input type="number" step="0.01" value={form.peso_kg} onChange={e=>onDim("peso_kg", e.target.value)} placeholder="例如 8.5 / Ej: 8.5" style={inp}/>
               </Field>
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:8 }}>
@@ -798,14 +798,14 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
               <Field label="RMB/kg (人民币 / 重量)">
-                <input type="number" step="0.01" value={form.aer_tarifa_sunny_rmb_kg} onChange={e=>setForm(p=>({...p, aer_tarifa_sunny_rmb_kg:e.target.value}))} placeholder="Ej: 65" style={inp}/>
+                <input type="number" step="0.01" value={form.aer_tarifa_sunny_rmb_kg} onChange={e=>setForm(p=>({...p, aer_tarifa_sunny_rmb_kg:e.target.value}))} placeholder="例如 65 / Ej: 65" style={inp}/>
               </Field>
               <Field label="USD/m³ (体积)">
                 <input type="number" step="0.01" value={form.aer_tarifa_sunny_cbm} onChange={e=>setForm(p=>({...p, aer_tarifa_sunny_cbm:e.target.value}))} placeholder="—" style={inp}/>
               </Field>
             </div>
             <div style={{ fontSize:10, color:"#94a3b8", marginTop:-4, marginBottom:8, fontStyle:"italic" }}>
-              💡 Si llenas RMB/kg, el USD se calcula automático (TC 7.2). Tarifa USD legacy: {fmtUSD(Number(form.aer_tarifa_sunny_kg)||0)}
+              💡 填写 RMB/kg 后，USD 自动计算（汇率 7.2）/ Si llenas RMB/kg, el USD se calcula automático (TC 7.2). USD legacy: {fmtUSD(Number(form.aer_tarifa_sunny_kg)||0)}
             </div>
             {fleteEstimado > 0 && (
               <div style={{ marginTop:4, background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:7, padding:"7px 11px", fontSize:11, color:"#92400e" }}>
@@ -869,7 +869,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               </label>
             </div>
             <Field label="预计生产时间 / Días estimados producción">
-              <input type="number" value={form.dias_estimados_china} onChange={e=>setForm(p=>({...p, dias_estimados_china:e.target.value}))} placeholder="Ej: 15" style={inp}/>
+              <input type="number" value={form.dias_estimados_china} onChange={e=>setForm(p=>({...p, dias_estimados_china:e.target.value}))} placeholder="例如 15 / Ej: 15" style={inp}/>
             </Field>
           </Section>
 
@@ -908,8 +908,12 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
                   </div>
                 </div>
               </div>
-              <div style={{ fontSize:10, color:"#92400e", marginTop:10, lineHeight:1.5, fontStyle:"italic", textAlign:"center" }}>
-                Este total es lo que cobras a ZAGA (puerta a puerta hasta despacho desde China). ZAGA agrega después aduana Chile + margen.
+              <div style={{ fontSize:10, color:"#92400e", marginTop:10, lineHeight:1.6, fontStyle:"italic", textAlign:"center" }}>
+                这是您向 ZAGA 收取的总金额（从中国出货为止，包括所有费用）。<br/>
+                ZAGA 之后会加上智利海关 + 利润。
+                <div style={{ marginTop:3, opacity:0.85 }}>
+                  Este total es lo que cobras a ZAGA (todo incluido hasta despacho desde China). ZAGA agrega después aduana Chile + margen.
+                </div>
               </div>
             </div>
           )}
@@ -917,7 +921,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
           {/* SECCIÓN 5: Nota */}
           <Section title="✉️ 备注 / Nota para admin">
             <textarea value={form.nota_nueva} onChange={e=>setForm(p=>({...p, nota_nueva:e.target.value}))} rows={3}
-              placeholder="可选 / Opcional. Ej: stock disponible, restricción de color, lead time variable..."
+              placeholder="可选 / Opcional. 例如：库存情况、颜色限制、生产周期变化... / Ej: stock, restricción color, lead time..."
               style={{ ...inp, resize:"vertical", minHeight:60, fontFamily:"inherit" }}/>
           </Section>
 
@@ -951,7 +955,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
           </div>
           {!form.precio_china_rmb && !form.nota_nueva && (
             <div style={{ marginTop:8, fontSize:11, color:"#94a3b8", fontStyle:"italic", textAlign:"center" }}>
-              💡 建议先填写 FOB 价格或备注 / Recomendado llenar precio FOB o agregar una nota antes de enviar
+              💡 建议先填写 FOB 价格或备注 再发送 / Llena precio FOB o agrega una nota antes de enviar
             </div>
           )}
         </div>
@@ -1127,6 +1131,7 @@ function CotReadOnly({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               <div style={{ fontSize:11, color:"#94a3b8", fontStyle:"italic", textAlign:"center", padding:"10px 0" }}>
                 还没有消息 / Aún sin mensajes
               </div>
+
             ) : (
               <div style={{ display:"flex", flexDirection:"column", gap:6, maxHeight:240, overflowY:"auto", marginBottom:8 }}>
                 {historial.filter(n=>!n.oculta).map((n, i) => {
@@ -1206,12 +1211,12 @@ function Dashboard({ cots, pendCot, confirmadas, camino, completadas }) {
         📊 仪表板 / Dashboard
       </div>
       <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:18 }}>
-        <Kpi label="待报价 Pend. cotizar" value={pendCot.length} hint={pendCot.length > 0 ? "Hay solicitudes esperando" : "Todo al día"} color="#c47830"/>
-        <Kpi label="本月已报价 Cotizadas mes" value={respuestasMes} hint="Respuestas enviadas este mes" color="#1aa358"/>
-        <Kpi label="运输中 En tránsito" value={enTransito} hint="Envíos en camino" color="#a85590"/>
-        <Kpi label="本月完成 Cerradas mes" value={cerradasMes} hint="Llegaron en este mes" color="#0d9870"/>
+        <Kpi label="待报价 Pend. cotizar" value={pendCot.length} hint={pendCot.length > 0 ? "有等待中的请求 / Hay solicitudes esperando" : "全部就绪 / Todo al día"} color="#c47830"/>
+        <Kpi label="本月已报价 Cotizadas mes" value={respuestasMes} hint="本月发送的回复 / Respuestas enviadas este mes" color="#1aa358"/>
+        <Kpi label="运输中 En tránsito" value={enTransito} hint="在途货物 / Envíos en camino" color="#a85590"/>
+        <Kpi label="本月完成 Cerradas mes" value={cerradasMes} hint="本月到达 / Llegaron en este mes" color="#0d9870"/>
       </div>
-      <Kpi label="总活跃 Total activas" value={totalCot} hint="Todas las cotizaciones aéreas que ves"/>
+      <Kpi label="总活跃 Total activas" value={totalCot} hint="所有可见的航空报价 / Todas las cotizaciones aéreas que ves"/>
     </div>
   )
 }
@@ -1445,7 +1450,7 @@ function OpRecotizarCard({ op, cots, supabase, onSaved }) {
         {/* Nota opcional */}
         <Section title="✉️ 备注 / Nota al admin (opcional)">
           <textarea value={nota} onChange={e=>setNota(e.target.value)} rows={2}
-            placeholder="Ej: condiciones especiales, ETA producción..."
+            placeholder="例如：特殊条件、生产 ETA... / Ej: condiciones especiales, ETA producción..."
             style={{ ...inp, resize:"vertical", minHeight:50, fontFamily:"inherit" }}/>
         </Section>
 
