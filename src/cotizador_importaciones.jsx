@@ -568,6 +568,7 @@ export default function App({ supabase, usuario, onLogout }){
   const [filterEstado,setFilterEstado]   = useState("todos");
   const [filterCliente,setFilterCliente] = useState("todos");
   const [filterGestor,setFilterGestor]   = useState("todos");
+  const [filterTransporte,setFilterTransporte] = useState("todos");
   const [mostrarOtrosClientes,setMostrarOtrosClientes] = useState(false);
   const [searchQuery,setSearchQuery]     = useState("");
   const [toast,setToast]                 = useState(null);
@@ -905,9 +906,10 @@ export default function App({ supabase, usuario, onLogout }){
     const passEstado=filterEstado==="todos"||c.estado===filterEstado;
     const passCliente=filterCliente==="todos"||(filterCliente==="__propias__"?c.tipo==="propia":c.cliente===filterCliente);
     const passGestor=filterGestor==="todos"||c.gestor===filterGestor||(filterGestor==="francisco"&&!c.gestor);
+    const passTransporte=filterTransporte==="todos"||c.transporte===filterTransporte||(filterTransporte==="maritimo"&&(!c.transporte||c.transporte==="ambos"));
     const q=searchQuery.trim().toLowerCase();
     const passSearch=!q||(c.nro&&c.nro.toString().toLowerCase().includes(q))||(c.cliente&&c.cliente.toLowerCase().includes(q))||(c.producto&&c.producto.toLowerCase().includes(q))||(c.sku_china&&c.sku_china.toLowerCase().includes(q))||(c.sku_bodega&&c.sku_bodega.toLowerCase().includes(q));
-    return passEstado&&passCliente&&passGestor&&passSearch;
+    return passEstado&&passCliente&&passGestor&&passTransporte&&passSearch;
   });
 
   // Export via print dialog (no CDN needed)
@@ -2757,17 +2759,33 @@ Número de seguimiento: ${c.nro}`;
                 );
               })}
             </div>
+            <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+              <span style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>🚢 Transporte</span>
+              {[["todos","Todos",null],["maritimo","🚢 Marítimo","#2d78c8"],["aereo","✈️ Aéreo","#c47830"]].map(([k,l,col])=>{
+                const cnt=k==="todos"?cotizaciones.length:k==="aereo"?cotizaciones.filter(c=>c.transporte==="aereo").length:cotizaciones.filter(c=>!c.transporte||c.transporte==="maritimo"||c.transporte==="ambos").length;
+                return(
+                  <button key={k} onClick={()=>setFilterTransporte(k)} style={{
+                    background:filterTransporte===k?(col||"#c9a055")+"22":"#f8fafc",
+                    color:filterTransporte===k?(col||"#c9a055"):"#666",
+                    border:`1px solid ${filterTransporte===k?(col||"#c9a055")+"55":"#e2e8f0"}`,
+                    borderRadius:20,padding:"5px 14px",fontSize:12,cursor:"pointer",
+                    fontWeight:filterTransporte===k?700:400
+                  }}>{l} <span style={{opacity:.6}}>({cnt})</span></button>
+                );
+              })}
+            </div>
             <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap",alignItems:"center"}}>
               <span style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>📋 Estado</span>
               {[["todos","Todos",null],...Object.entries(EST_LABEL).map(([k,l])=>[k,l,EST_COLOR[k]])].map(([k,l,col])=>{
-                // Base filtrada por cliente + gestor + búsqueda (sin filtro de estado) para conteos precisos
+                // Base filtrada por cliente + gestor + transporte + búsqueda (sin filtro de estado) para conteos precisos
                 const baseParaConteo=cotizaciones.filter(c=>{
                   if(c.id===openId) return false; // no contar el abierto doble
                   const passCliente=filterCliente==="todos"||(filterCliente==="__propias__"?c.tipo==="propia":c.cliente===filterCliente);
                   const passGestor=filterGestor==="todos"||c.gestor===filterGestor||(filterGestor==="francisco"&&!c.gestor);
+                  const passTransporte=filterTransporte==="todos"||c.transporte===filterTransporte||(filterTransporte==="maritimo"&&(!c.transporte||c.transporte==="ambos"));
                   const q=searchQuery.trim().toLowerCase();
                   const passSearch=!q||(c.nro&&c.nro.toString().toLowerCase().includes(q))||(c.cliente&&c.cliente.toLowerCase().includes(q))||(c.producto&&c.producto.toLowerCase().includes(q));
-                  return passCliente&&passGestor&&passSearch;
+                  return passCliente&&passGestor&&passTransporte&&passSearch;
                 });
                 const cnt=k==="todos"?baseParaConteo.length:baseParaConteo.filter(c=>c.estado===k).length;
                 if(k!=="todos"&&cnt===0) return null;
