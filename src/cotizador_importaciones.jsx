@@ -1388,7 +1388,8 @@ Número de seguimiento: ${c.nro}`;
               const op = operaciones.find(o=>o.id===vistaOpId);
               if (!op) return null;
               const cotsOp = cotizaciones.filter(c => (op.cotizaciones||[]).includes(c.id));
-              const cotsCliente = cotsOp.filter(c => c.cliente === vistaOpCliente && !["no_prospero"].includes(c.estado));
+              const vistaOpClienteT = (vistaOpCliente||"").trim();
+              const cotsCliente = cotsOp.filter(c => (c.cliente||"").trim() === vistaOpClienteT && !["no_prospero"].includes(c.estado));
               if (cotsCliente.length === 0) return null;
               const aplicado = op.consolidado_aplicado_cliente === true;
               const consolidados = cotsCliente.map(c => ({ cot:c, calc: calcConsolidado(c, op, cotsOp) }));
@@ -4717,15 +4718,16 @@ Número de seguimiento: ${c.nro}`;
                                 </div>
                                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                                   {clientesOp.map(cl => {
-                                    const cotsCl = cots.filter(c => c.cliente === cl && !["no_prospero"].includes(c.estado));
+                                    const clT = (cl||"").trim();
+                                    const cotsCl = cots.filter(c => (c.cliente||"").trim() === clT && !["no_prospero"].includes(c.estado));
                                     if (cotsCl.length === 0) return null;
                                     return (
                                       <button key={cl} onClick={()=>{
                                         setVistaOpId(op.id);
-                                        setVistaOpCliente(cl);
+                                        setVistaOpCliente(clT);
                                         setPrintModal("op_cliente");
                                       }} style={{background:"#fff",color:"#2d78c8",border:"1px solid #2d78c8",borderRadius:7,padding:"7px 12px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                                        👁 {cl} <span style={{opacity:.6,fontWeight:400}}>({cotsCl.length} cots)</span>
+                                        👁 {clT} <span style={{opacity:.6,fontWeight:400}}>({cotsCl.length} cots)</span>
                                       </button>
                                     );
                                   })}
