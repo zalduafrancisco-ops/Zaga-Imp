@@ -483,6 +483,11 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
   })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg]       = useState(null)
+  const [nuevaImgUrl, setNuevaImgUrl] = useState("")
+
+  // Lista de URLs de imagen separadas por "|||" (consistente con el admin)
+  const imagenes = (form.imagen_url_sunny || "").split("|||").map(s=>s.trim()).filter(Boolean)
+  const setImagenes = (arr) => setForm(p => ({ ...p, imagen_url_sunny: arr.join("|||") }))
 
   // ─── Cálculo en vivo ──────────────────────────────────────────────────────
   const unidades = Number(c.unidades) || 0
@@ -693,16 +698,47 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
             <Field label="中国 SKU / SKU China">
               <input value={form.sku_china} onChange={e=>setForm(p=>({...p, sku_china:e.target.value}))} placeholder="Ej: SK-EAR-2940-A" style={inp}/>
             </Field>
-            <Field label="📷 图片链接 / Link imagen del producto (URL)">
-              <input value={form.imagen_url_sunny} onChange={e=>setForm(p=>({...p, imagen_url_sunny:e.target.value}))} placeholder="https://... (微信/网盘/imgur)" style={inp}/>
-            </Field>
-            {form.imagen_url_sunny && /^https?:\/\//i.test(form.imagen_url_sunny) && (
-              <div style={{ marginTop:-4, marginBottom:10, padding:8, background:"#fff", border:"1px solid #e2e8f0", borderRadius:7, display:"flex", alignItems:"center", gap:10 }}>
-                <img src={form.imagen_url_sunny} alt="" style={{ maxWidth:120, maxHeight:120, borderRadius:5, objectFit:"contain", border:"1px solid #f1f5f9" }} onError={e=>{ e.target.style.display="none"; e.target.nextSibling.style.display="block" }}/>
-                <div style={{ display:"none", fontSize:11, color:"#dc2626" }}>⚠️ 无法加载图片 / No se pudo cargar la imagen</div>
-                <a href={form.imagen_url_sunny} target="_blank" rel="noopener noreferrer" style={{ fontSize:11, color:"#2d78c8", textDecoration:"underline" }}>🔗 Abrir en nueva pestaña</a>
+            <Field label={`📷 图片链接 / Imágenes del producto (URLs)${imagenes.length>0?` · ${imagenes.length}`:""}`}>
+              <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:7, padding:8 }}>
+                {/* Miniaturas con botón eliminar */}
+                {imagenes.length > 0 && (
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
+                    {imagenes.map((url, idx) => (
+                      <div key={idx} style={{ position:"relative", width:64, height:64 }}>
+                        <img src={url} alt="" style={{ width:64, height:64, objectFit:"cover", borderRadius:5, border:"1px solid #e2e8f0", display:"block" }} onError={e=>{ e.target.parentNode.style.opacity=".3" }}/>
+                        <button type="button" onClick={()=>setImagenes(imagenes.filter((_,i)=>i!==idx))} title="删除 / Eliminar" style={{ position:"absolute", top:-5, right:-5, width:18, height:18, background:"#c0392b", color:"#fff", border:"none", borderRadius:"50%", cursor:"pointer", fontSize:13, lineHeight:"18px", textAlign:"center", padding:0, fontWeight:900 }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Input agregar nueva URL */}
+                <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                  {nuevaImgUrl && /^https?:\/\//i.test(nuevaImgUrl) && (
+                    <img src={nuevaImgUrl} alt="" style={{ width:32, height:32, objectFit:"cover", borderRadius:4, border:"1px solid #e2e8f0", flexShrink:0 }} onError={e=>{ e.target.style.display="none" }}/>
+                  )}
+                  <input
+                    value={nuevaImgUrl}
+                    onChange={e=>setNuevaImgUrl(e.target.value)}
+                    onKeyDown={e=>{
+                      if (e.key === "Enter" && nuevaImgUrl.trim()) {
+                        setImagenes([...imagenes, nuevaImgUrl.trim()])
+                        setNuevaImgUrl("")
+                      }
+                    }}
+                    placeholder="粘贴URL并按回车 / Pegar URL y Enter"
+                    style={{ ...inp, padding:"6px 9px", fontSize:12 }}
+                  />
+                  <button type="button" disabled={!nuevaImgUrl.trim()} onClick={()=>{
+                    if (!nuevaImgUrl.trim()) return
+                    setImagenes([...imagenes, nuevaImgUrl.trim()])
+                    setNuevaImgUrl("")
+                  }} style={{ background: nuevaImgUrl.trim() ? "#c47830" : "#cbd5e1", color:"#fff", border:"none", borderRadius:6, padding:"6px 12px", fontSize:12, fontWeight:700, cursor: nuevaImgUrl.trim() ? "pointer" : "not-allowed", whiteSpace:"nowrap", fontFamily:"inherit" }}>➕ 添加 Agregar</button>
+                </div>
+                <div style={{ fontSize:10, color:"#94a3b8", marginTop:6, fontStyle:"italic" }}>
+                  可添加多张图片 / Puedes agregar varias imágenes (URL de Google Drive, WeChat, Imgur, etc.)
+                </div>
               </div>
-            )}
+            </Field>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
               <Field label="单件重量 / Peso unitario (g)">
                 <input type="number" step="0.1" value={form.peso_unitario_g} onChange={e=>setForm(p=>({...p, peso_unitario_g:e.target.value}))} placeholder="例如 22 / Ej: 22" style={inp}/>
@@ -1075,9 +1111,18 @@ function CotReadOnly({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
           {/* Info producto */}
           <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:8, padding:"10px 12px", marginBottom:10, fontSize:11, color:"#475569" }}>
             <div style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
-              {c.imagen_url_sunny && /^https?:\/\//i.test(c.imagen_url_sunny) && (
-                <img src={c.imagen_url_sunny} alt="" style={{ width:80, height:80, borderRadius:5, objectFit:"cover", border:"1px solid #e2e8f0", flexShrink:0 }} onError={e=>e.target.style.display="none"}/>
-              )}
+              {c.imagen_url_sunny && (() => {
+                const imgs = c.imagen_url_sunny.split("|||").map(s=>s.trim()).filter(s => /^https?:\/\//i.test(s))
+                if (imgs.length === 0) return null
+                return (
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:4, flexShrink:0, maxWidth:170 }}>
+                    {imgs.slice(0,4).map((url, idx) => (
+                      <img key={idx} src={url} alt="" style={{ width:imgs.length===1?80:50, height:imgs.length===1?80:50, borderRadius:5, objectFit:"cover", border:"1px solid #e2e8f0" }} onError={e=>e.target.style.display="none"}/>
+                    ))}
+                    {imgs.length > 4 && <div style={{ width:50, height:50, borderRadius:5, background:"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center", color:"#64748b", fontSize:11, fontWeight:700 }}>+{imgs.length-4}</div>}
+                  </div>
+                )
+              })()}
               <div style={{ flex:1, display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
                 {c.sku_china && <div><b>SKU:</b> {c.sku_china}</div>}
                 {c.unidad_medida && <div><b>Unidad:</b> {c.unidad_medida}</div>}
