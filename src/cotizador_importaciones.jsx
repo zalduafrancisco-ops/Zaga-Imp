@@ -1082,11 +1082,14 @@ export default function App({ supabase, usuario, onLogout }){
           .opvc-cot{margin-bottom:4px !important;border-width:1px !important;border-radius:6px !important}
           .opvc-cot-hdr{display:none !important}
           .opvc-cot-grid{padding:0 !important;display:block !important;background:#fff !important}
-          .opvc-cot-mob{display:block !important;padding:6px 9px !important;font-size:11px !important;line-height:1.35 !important}
-          .opvc-cot-mob .row1{display:flex !important;justify-content:space-between !important;align-items:baseline !important;gap:8px !important;margin-bottom:2px !important}
-          .opvc-cot-mob .row1 .prod{font-weight:700 !important;color:#0f172a !important;font-size:11.5px !important;flex:1 !important;overflow:hidden !important;text-overflow:ellipsis !important;white-space:nowrap !important}
-          .opvc-cot-mob .row1 .tot{font-weight:800 !important;color:#1aa358 !important;font-size:12.5px !important;flex-shrink:0 !important}
-          .opvc-cot-mob .row2{display:flex !important;justify-content:space-between !important;color:#64748b !important;font-size:10px !important}
+          .opvc-cot-mob{display:block !important;padding:7px 10px !important;font-size:11px !important;line-height:1.4 !important}
+          .opvc-cot-mob .row1{display:flex !important;justify-content:space-between !important;align-items:flex-start !important;gap:10px !important;margin-bottom:3px !important}
+          .opvc-cot-mob .prod-wrap{flex:1 !important;min-width:0 !important}
+          .opvc-cot-mob .nro-chip{display:inline-block !important;background:#040c18 !important;color:#c47830 !important;font-size:8.5px !important;font-weight:800 !important;padding:1px 6px !important;border-radius:3px !important;margin-right:6px !important;vertical-align:middle !important;letter-spacing:0.3px !important}
+          .opvc-cot-mob .prod{font-weight:700 !important;color:#0f172a !important;font-size:11.5px !important;word-wrap:break-word !important}
+          .opvc-cot-mob .tot{font-weight:800 !important;color:#1aa358 !important;font-size:12.5px !important;flex-shrink:0 !important;white-space:nowrap !important}
+          .opvc-cot-mob .row2{display:flex !important;justify-content:space-between !important;align-items:center !important;color:#64748b !important;font-size:10px !important;gap:8px !important}
+          .opvc-cot-mob .llegada{color:#c47830 !important;font-weight:700 !important;font-style:italic !important;white-space:nowrap !important}
           .opvc-pay{padding:10px 12px !important;margin-top:8px !important;border-radius:9px !important}
           .opvc-pay-ttl{font-size:9px !important;margin-bottom:7px !important;letter-spacing:1px !important}
           .opvc-pay-box{padding:7px 10px !important;border-radius:6px !important}
@@ -1475,7 +1478,7 @@ Número de seguimiento: ${c.nro}`;
                       <div className="opvc-kpi-hide-mob">
                         <div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Transporte</div>
                         <div className="opvc-kpi-val" style={{fontSize:14,fontWeight:700,color:"#c47830"}}>✈️ Aéreo</div>
-                        {diasLlegada!==null && <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{diasLlegada>0?`${diasLlegada} días`:diasLlegada===0?"Hoy":"Atrasado"}</div>}
+                        {diasLlegada!==null && <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{diasLlegada>0?`≈ ${diasLlegada} días`:diasLlegada===0?"≈ Hoy":"Atrasado"}</div>}
                       </div>
                     </div>
 
@@ -1511,17 +1514,20 @@ Número de seguimiento: ${c.nro}`;
                               <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Unidades</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmtN(cot.unidades)}</div></div>
                               <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>$/und c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmt(pUnd)}</div></div>
                               <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Total c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:800,color:"#1aa358"}}>{fmt(totIva)}</div></div>
-                              <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Llegada</div><div className="opvc-cell-val" style={{fontSize:12,fontWeight:700,color:"#c47830"}}>{calcLlegadaEst(cot)||"—"}</div></div>
+                              <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Llegada esti.</div><div className="opvc-cell-val" style={{fontSize:12,fontWeight:700,color:"#c47830",fontStyle:"italic"}}>≈ {calcLlegadaEst(cot)||"—"}</div></div>
                             </div>
                             {/* Versión compacta móvil (display:none desktop, block en mobile via @media) */}
                             <div className="opvc-cot-mob" style={{display:"none"}}>
                               <div className="row1">
-                                <span className="prod">{cot.producto}</span>
+                                <div className="prod-wrap">
+                                  <span className="nro-chip">{cot.nro}</span>
+                                  <span className="prod">{cot.producto}</span>
+                                </div>
                                 <span className="tot">{fmt(totIva)}</span>
                               </div>
                               <div className="row2">
                                 <span>{fmtN(cot.unidades)} und × {fmt(pUnd)}</span>
-                                <span style={{color:"#c47830",fontWeight:700}}>📅 {calcLlegadaEst(cot)||"—"}</span>
+                                <span className="llegada">≈ Llegada esti. {calcLlegadaEst(cot)||"—"}</span>
                               </div>
                             </div>
                           </div>
@@ -1558,8 +1564,8 @@ Número de seguimiento: ${c.nro}`;
 
                       {/* Mensaje cierre + datos */}
                       <div className="opvc-msg" style={{marginTop:16,padding:"14px 18px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0",fontSize:12,color:"#475569",lineHeight:1.5}}>
-                        <b style={{color:"#040c18"}}>Vigencia:</b> 7 días · <b style={{color:"#040c18"}}>Modalidad:</b> Aérea consolidada{fechaLlegadaMax && <> · <b style={{color:"#040c18"}}>Llega:</b> {fechaLlegadaMax}</>}<br/>
-                        <b style={{color:"#040c18"}}>Datos de pago:</b> coordinar con ZAGA al confirmar.
+                        <b style={{color:"#040c18"}}>Vigencia:</b> 7 días · <b style={{color:"#040c18"}}>Modalidad:</b> Aérea consolidada{fechaLlegadaMax && <> · <b style={{color:"#040c18"}}>Llegada esti.:</b> {fechaLlegadaMax}</>}<br/>
+                        <b style={{color:"#040c18"}}>Datos de pago:</b> coordinar con ZAGA al confirmar. <em>* Las fechas son estimadas y pueden variar según producción y aduana.</em>
                       </div>
 
                       <div className="opvc-footer" style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>
