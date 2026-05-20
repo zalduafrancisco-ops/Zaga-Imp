@@ -3398,6 +3398,7 @@ Número de seguimiento: ${c.nro}`;
                             {!isPropia&&(!c.categoria_cliente||c.categoria_cliente==="nuevo")&&<span style={{background:"#06b6d418",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:20,padding:"2px 9px",fontSize:10}}>🆕 Nuevo</span>}
                             {c.transporte==="aereo"&&<span style={{background:"#c4783022",color:"#f97416",border:"1px solid #f9741633",borderRadius:20,padding:"2px 9px",fontSize:10}}>✈️ Aéreo</span>}
                             {c.transporte==="ambos"&&<span style={{background:"#3d7fc422",color:"#3d7fc4",border:"1px solid #8b5cf633",borderRadius:20,padding:"2px 9px",fontSize:10}}>🚢✈️ Ambos</span>}
+                            {(!c.transporte||c.transporte==="maritimo")&&!isPropia&&<span style={{background:"#2d78c818",color:"#2d78c8",border:"1px solid #2d78c833",borderRadius:20,padding:"2px 9px",fontSize:10}}>🚢 Marítimo</span>}
                             {c.gestor==="luisa"&&<span style={{background:"#a8559022",color:"#a85590",border:"1px solid #ec489933",borderRadius:20,padding:"2px 9px",fontSize:10}}>👩‍💼 Luisa</span>}
                             <span style={{fontSize:11,color:"#64748b"}}>{c.nro}</span>
                             <span style={{background:sc+"22",color:sc,border:`1px solid ${sc}44`,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600}}>{sl}</span>
