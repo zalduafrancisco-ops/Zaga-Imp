@@ -82,7 +82,6 @@ export default function PortalSunny({ supabase, onLogout }) {
   const [cots, setCots]         = useState([])
   const [ops, setOps]           = useState([])
   const [loading, setLoading]   = useState(true)
-  const [editingCotInline, setEditingCotInline] = useState(null) // ID cot para abrir editor desde Recotizar
   const [pulse, setPulse]       = useState(false)
   const [editingId, setEditing] = useState(null)
 
@@ -126,22 +125,7 @@ export default function PortalSunny({ supabase, onLogout }) {
   }
 
   // ─── Grupos por tab ───────────────────────────────────────────────────────
-  // Pend. cotizar incluye:
-  //   1. cots con estado 'solicitud' (admin pide cotización)
-  //   2. cots editables (solicitud/cotizada) que pertenecen a OP en borrador
-  const opsBorrador = new Set(
-    (Array.isArray(ops) ? ops : [])
-      .filter(o => o && (!o.estado || o.estado === "borrador"))
-      .map(o => o._id)
-      .filter(Boolean)
-  )
-  const ESTADOS_EDITABLES_OP = ["solicitud", "cotizada"]
-  const pendCot = cots.filter(c => {
-    if (!c) return false
-    if (ESTADOS_PEND_COT.includes(c.estado)) return true
-    if (c.operacion_id && opsBorrador.has(c.operacion_id) && ESTADOS_EDITABLES_OP.includes(c.estado)) return true
-    return false
-  })
+  const pendCot = cots.filter(c => ESTADOS_PEND_COT.includes(c.estado))
   const pendCliente = cots.filter(c => ESTADOS_PEND_CLIENTE.includes(c.estado))
   const confirmadas = cots.filter(c => ESTADOS_CONFIRMADAS.includes(c.estado))
   const camino      = cots.filter(c => ESTADOS_CAMINO.includes(c.estado))
@@ -268,7 +252,7 @@ export default function PortalSunny({ supabase, onLogout }) {
           loading ? <Empty zh="加载中" es="Cargando..." emoji="⏳" /> :
           opsPendientes.length === 0 ? <Empty zh="暂无重新报价请求" es="No hay operaciones esperando recotización" emoji="🔄" /> :
           opsPendientes.map(op => (
-            <OpRecotizarCard key={op._id} op={op} cots={cots} supabase={supabase} onSaved={loadData} onEditCot={setEditingCotInline} />
+            <OpRecotizarCard key={op._id} op={op} cots={cots} supabase={supabase} onSaved={loadData} />
           ))
         ) : loading ? (
           <Empty zh="加载中" es="Cargando..." emoji="⏳" />
@@ -465,31 +449,6 @@ function OpGroupCard({ op, cots, supabase, onSaved, children }) {
         </div>
         </>
       )}
-
-      {/* MODAL OVERLAY — editar cot inline desde el Recotizar */}
-      {editingCotInline && (() => {
-        const c = cots.find(x => x._id === editingCotInline)
-        if (!c) return null
-        return (
-          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.65)", zIndex:1500, overflowY:"auto", padding:"16px 8px" }}
-               onClick={e => e.target===e.currentTarget && setEditingCotInline(null)}>
-            <div style={{ maxWidth:900, margin:"0 auto" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                <div style={{ color:"#fff", fontSize:13, fontWeight:600 }}>✏️ 编辑报价 / Editar cotización · {c.nro}</div>
-                <button onClick={() => setEditingCotInline(null)} style={{ background:"#fff", color:"#0f172a", border:"none", borderRadius:8, padding:"6px 14px", fontSize:13, cursor:"pointer", fontWeight:600 }}>✕ Cerrar</button>
-              </div>
-              <CotEditable
-                c={c}
-                supabase={supabase}
-                ops={ops}
-                isExpanded={true}
-                onExpand={() => {}}
-                onSaved={() => { loadData(); }}
-              />
-            </div>
-          </div>
-        )
-      })()}
     </div>
   )
 }
@@ -1353,7 +1312,7 @@ function Dashboard({ cots, pendCot, confirmadas, camino, completadas }) {
 }
 
 // ─── Card de operación a recotizar (tab nuevo) ──────────────────────────────
-function OpRecotizarCard({ op, cots, supabase, onSaved, onEditCot }) {
+function OpRecotizarCard({ op, cots, supabase, onSaved }) {
   const cotsEnOp = cots.filter(c => (op.cotizaciones || []).includes(c._id))
   const nCots = cotsEnOp.length
 
@@ -1474,20 +1433,15 @@ function OpRecotizarCard({ op, cots, supabase, onSaved, onEditCot }) {
             const p = Number(c.precio_china_rmb) || 0
             const u = Number(c.unidades) || 0
             const subtotal = p * u
-            const sinDatos = p === 0
             return (
-              <div key={c._id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 0", borderBottom:"1px solid #f1f5f9", fontSize:12, gap:8 }}>
-                <div style={{ flex:1, minWidth:0 }}>
+              <div key={c._id} style={{ display:"flex", justifyContent:"space-between", padding:"7px 0", borderBottom:"1px solid #f1f5f9", fontSize:12 }}>
+                <div>
                   <b style={{ color:"#0f172a" }}>{c.nro || "?"}</b> · {c.producto || "—"}
                   <span style={{ color:"#94a3b8", marginLeft:6 }}>· 👤 {c.cliente || "—"}</span>
-                  {sinDatos && <span style={{ marginLeft:6, fontSize:10, color:"#dc2626", background:"#fef2f2", border:"1px solid #fecaca", padding:"1px 6px", borderRadius:8, fontWeight:700 }}>⚠️ Sin datos</span>}
                 </div>
-                <div style={{ color:"#64748b", fontSize:11, textAlign:"right", whiteSpace:"nowrap" }}>
+                <div style={{ color:"#64748b", fontSize:11, textAlign:"right" }}>
                   {u} und × ¥{p} = <b style={{ color:"#0f172a" }}>{fmtRMB(subtotal)}</b>
                 </div>
-                {onEditCot && (
-                  <button onClick={()=>onEditCot(c._id)} title="编辑 / Editar esta cotización" style={{ background:"#fff", color:"#c47830", border:"1px solid #fed7aa", borderRadius:6, padding:"4px 9px", fontSize:11, cursor:"pointer", fontWeight:700, fontFamily:"inherit", whiteSpace:"nowrap" }}>✏️ 编辑</button>
-                )}
               </div>
             )
           })}
