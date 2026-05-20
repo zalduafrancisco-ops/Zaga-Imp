@@ -246,9 +246,14 @@ function calcCostoRealZaga(d, op) {
   const tc = Number(op?.pago?.tc_efectivo) || Number(d?.pago?.tc_efectivo) || 950;
   const calc = calcCliente(d);
 
-  // ─── LADO CHINA (en RMB) ──────────────────────────────────────────────────
+  // ─── LADO CHINA ───────────────────────────────────────────────────────────
+  // Fallback: si la cot no tiene precio_china_rmb (legacy), usar precio_china (CLP).
+  // Para legacy CLP, los extras RMB de Sunny no aplican (no fueron capturados).
   const precioRmb = Number(d.precio_china_rmb) || 0;
+  const precioCLPLegacy = Number(d.precio_china) || 0;
+  const tieneDataRmb = precioRmb > 0;
   const valorMercanciaRMB = precioRmb * u;
+  const valorMercanciaCLPLegacy = precioCLPLegacy * u;
 
   // Helpers fallback: si OP no tiene el campo (cot sola), usar el de la cot
   const _take = (k) => Number(op?.[k] ?? d?.[k]) || 0;
@@ -261,7 +266,7 @@ function calcCostoRealZaga(d, op) {
   const compraDocs  = _take("cost_compra_docs_rmb");
   const transporteCn= _take("cost_transporte_interno_cn_rmb");
 
-  // Peso total y flete RMB
+  // Peso total y flete RMB (solo aplica si Sunny ya llenó la cot)
   const undCaja = Number(d.dim_und_caja) || 0;
   const esCaja = d.dim_tipo === "caja";
   const nCajas = esCaja && undCaja > 0 ? Math.ceil(u / undCaja) : 0;
@@ -272,10 +277,14 @@ function calcCostoRealZaga(d, op) {
 
   const comisionRMB = valorMercanciaRMB * comisionPct / 100;
   const seguroCalc = valorMercanciaRMB * seguroPct;
-  const seguroRMB = Math.max(seguroMin, seguroCalc);
+  const seguroRMB = tieneDataRmb ? Math.max(seguroMin, seguroCalc) : 0; // sin mínimo si no hay data RMB
   const otrosGastosRMB = certOrigen + docOp + despacho + compraDocs + transporteCn + seguroRMB;
   const totalChinaRMB = valorMercanciaRMB + comisionRMB + fleteRMB + otrosGastosRMB;
-  const totalChinaCLP = (totalChinaRMB / TC_RMB_USD) * tc;
+
+  // Total China CLP: si hay data RMB → convierte. Si NO hay data RMB → usa precio legacy CLP (mercancía sin extras Sunny)
+  const totalChinaCLP = tieneDataRmb
+    ? (totalChinaRMB / TC_RMB_USD) * tc
+    : valorMercanciaCLPLegacy;
 
   // ─── LADO CHILE (en CLP, ya calculado por calcCliente) ────────────────────
   // cda = aduana fija + arancel real (ZAGA lo paga, neto)
@@ -308,6 +317,7 @@ function calcCostoRealZaga(d, op) {
   return {
     // China
     valorMercanciaRMB, comisionRMB, fleteRMB, otrosGastosRMB, totalChinaRMB, totalChinaCLP,
+    valorMercanciaCLPLegacy, tieneDataRmb,
     detalleChina: { certOrigen, docOp, despacho, compraDocs, transporteCn, seguroRMB, seguroCalc, seguroMin, seguroAplicaMin: seguroRMB > seguroCalc },
     pesoTotal, tarifaRmbKg, comisionPct, seguroPct,
     // Chile
@@ -4245,9 +4255,12 @@ Número de seguimiento: ${c.nro}`;
                             if (cz.totalChinaRMB === 0 && cz.totalChileCLP === 0) return null;
                             return (
                               <div style={{marginTop:16,padding:16,background:"linear-gradient(135deg,#0f1e30 0%,#040c18 100%)",borderRadius:12,color:"#fff",border:"1px solid #c9a05544"}}>
-                                <div style={{fontSize:11,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                                <div style={{fontSize:11,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"baseline",flexWrap:"wrap",gap:6}}>
                                   <span>💼 Costo real ZAGA (paso a paso)</span>
-                                  {opVinc && <span style={{fontSize:10,background:"#c9a05522",color:"#c9a055",padding:"2px 8px",borderRadius:10}}>en {opVinc.nro}</span>}
+                                  <div style={{display:"flex",gap:6}}>
+                                    {!cz.tieneDataRmb && <span title="Cot legacy CLP sin desglose Sunny" style={{fontSize:10,background:"#fbbf2422",color:"#fbbf24",padding:"2px 8px",borderRadius:10,fontWeight:700}}>⚠️ Legacy CLP</span>}
+                                    {opVinc && <span style={{fontSize:10,background:"#c9a05522",color:"#c9a055",padding:"2px 8px",borderRadius:10}}>en {opVinc.nro}</span>}
+                                  </div>
                                 </div>
                                 {/* Lado China */}
                                 <div style={{background:"#040c18",borderRadius:8,padding:"10px 12px",marginBottom:8,border:"1px solid #1a2740"}}>
@@ -4875,8 +4888,8 @@ Número de seguimiento: ${c.nro}`;
                                         </thead>
                                         <tbody>
                                           {rows.map(({cot, cz}) => (
-                                            <tr key={cot.id} style={{borderTop:"1px solid #1a2740"}}>
-                                              <td style={{padding:"6px 8px",color:"#fff",fontWeight:700}}>{cot.nro}</td>
+                                            <tr key={cot.id} style={{borderTop:"1px solid #1a2740",opacity:cz.tieneDataRmb?1:0.65}}>
+                                              <td style={{padding:"6px 8px",color:"#fff",fontWeight:700}}>{cot.nro}{!cz.tieneDataRmb && <span title="Sin desglose Sunny (legacy)" style={{marginLeft:5,color:"#fbbf24",fontSize:11}}>⚠️</span>}</td>
                                               <td style={{padding:"6px 8px",textAlign:"right",color:"#cbd5e1"}}>{fmt(cz.totalChinaCLP)}</td>
                                               <td style={{padding:"6px 8px",textAlign:"right",color:"#cbd5e1"}}>{fmt(cz.totalChileCLP)}</td>
                                               <td style={{padding:"6px 8px",textAlign:"right",color:"#c9a055",fontWeight:700}}>{fmt(cz.costoZAGAReal)}</td>
@@ -4899,6 +4912,7 @@ Número de seguimiento: ${c.nro}`;
                                     </div>
                                     <div style={{fontSize:10,color:"#64748b",marginTop:8,fontStyle:"italic"}}>
                                       💡 Costo ZAGA = China (mercancía + comisión Sunny + flete + 5 extras) + Chile (aduana fija + arancel). Ganancia = Cliente neto − Costo ZAGA. Para detalle por cot, expande la cot en Tracker.
+                                      {rows.some(r => !r.cz.tieneDataRmb) && <><br/>⚠️ Cots con ícono naranja: legacy CLP sin desglose Sunny (mercancía sí, pero sin flete RMB ni 5 extras). Para obtener cifras precisas, pídele a Sunny que llene la cot en su portal.</>}
                                     </div>
                                   </div>
                                 );
