@@ -732,6 +732,8 @@ export default function App({ supabase, usuario, onLogout }){
   const [printModal,setPrintModal]       = useState(null); // "tracker" | "cliente" | "op_cliente"
   const [vistaOpId,setVistaOpId]         = useState(null);
   const [vistaOpCliente,setVistaOpCliente] = useState(null);
+  const [vistaValidarId,setVistaValidarId] = useState(null); // ID de cot aérea para validar
+  const [validarForm,setValidarForm]     = useState({}); // costos Chile editables + margen + precio acordado
   const [dashFilter,setDashFilter]       = useState("todas");
   const [dashTipo,setDashTipo]           = useState("clientes");
   const [dashClienteFiltro,setDashClienteFiltro] = useState("todos");
@@ -1795,6 +1797,236 @@ Número de seguimiento: ${c.nro}`;
           </div>
         </div>
       )}
+
+      {/* MODAL VISTA VALIDAR — cotización aérea con desglose costos + precio sugerido */}
+      {vistaValidarId && (()=>{
+        const c = cotizaciones.find(x => x.id === vistaValidarId);
+        if (!c) return null;
+        const u = Number(c.unidades) || 0;
+        const TC_RMB_USD = 7.2;
+        const tc = Number(c?.pago?.tc_efectivo) || 950;
+        const opVinc = c.operacion_id ? operaciones.find(o => o.id === c.operacion_id) : null;
+        const cotsOpVinc = opVinc ? cotizaciones.filter(x => (opVinc.cotizaciones||[]).includes(x.id)) : [];
+
+        // ─── Lado China (desde Sunny) ──────────────────────────────────────
+        const precioRmb = Number(c.precio_china_rmb) || 0;
+        const valorMercanciaRMB = precioRmb * u;
+        const undCaja = Number(c.dim_und_caja) || 0;
+        const esCaja = c.dim_tipo === "caja";
+        const nCajas = esCaja && undCaja > 0 ? Math.ceil(u/undCaja) : 0;
+        const pesoCaja = Number(c.peso_kg) || 0;
+        const pesoTotal = esCaja && undCaja > 0 ? pesoCaja * nCajas : pesoCaja * u;
+        const tarifaRmbKg = Number(opVinc?.flete_rmb_kg_consolidado ?? c.aer_tarifa_sunny_rmb_kg) || 0;
+        const fleteRMB = pesoTotal * tarifaRmbKg;
+        const _t = (k) => Number(opVinc?.[k] ?? c[k]) || 0;
+        const comisionPct = _t("comision_sunny_pct");
+        const seguroPct = _t("seguro_pct");
+        const seguroMin = _t("seguro_min_rmb");
+        const certOrigen = _t("cost_cert_origen_rmb");
+        const docOp = _t("cost_doc_operacion_rmb");
+        const despacho = _t("cost_despacho_aduanero_rmb");
+        const compraDocs = _t("cost_compra_docs_rmb");
+        const transporteCn = _t("cost_transporte_interno_cn_rmb");
+        const comisionRMB = valorMercanciaRMB * comisionPct / 100;
+        const seguroRMB = Math.max(seguroMin, valorMercanciaRMB * seguroPct);
+        const otrosRMB = certOrigen + docOp + despacho + compraDocs + transporteCn + seguroRMB;
+        const totalChinaRMB = valorMercanciaRMB + comisionRMB + fleteRMB + otrosRMB;
+        const totalChinaCLP = (totalChinaRMB / TC_RMB_USD) * tc;
+
+        // Si está en OP, prorratear aduana por share equitativo (igual lógica que calcCostoRealZaga)
+        let shareAduana = 1;
+        if (opVinc && cotsOpVinc.length > 1) {
+          const todasTienenPeso = cotsOpVinc.every(x => Number(x.peso_kg) > 0);
+          if (!todasTienenPeso) {
+            shareAduana = 1 / cotsOpVinc.length;
+          } else {
+            const totalPesoOp = cotsOpVinc.reduce((s,x) => {
+              const p = Number(x.peso_kg) || 0;
+              const uc = Number(x.unidades) || 0;
+              const udC = Number(x.dim_und_caja) || 0;
+              const esC = x.dim_tipo === "caja";
+              return s + (esC && udC > 0 ? p * Math.ceil(uc/udC) : p * uc);
+            }, 0);
+            shareAduana = totalPesoOp > 0 ? pesoTotal / totalPesoOp : 1/cotsOpVinc.length;
+          }
+        }
+
+        // ─── Lado Chile (editable por admin en validarForm) ────────────────
+        const honorarios = Number(validarForm.aer_honorarios) || 0;
+        const edi = Number(validarForm.aer_edi) || 0;
+        const despChile = Number(validarForm.aer_despacho) || 0;
+        const aeropuerto = Number(validarForm.aer_aeropuerto) || 0;
+        const aforoMonto = validarForm.incluir_aforo ? (Number(validarForm.aer_aforo) || 0) : 0;
+        const transpInterno = Number(validarForm.transp_interno_cl) || 0;
+        const agencia = Number(validarForm.agencia) || 0;
+        const formF = c.form_f_incluido !== false;
+        const arancelPct = formF ? 0 : 0.06;
+        const cifReal = (totalChinaCLP); // costo China en CLP es la base CIF
+        const arancelReal = cifReal * arancelPct;
+        const aduanaFijaCompleta = honorarios + edi + despChile + aeropuerto + aforoMonto + arancelReal;
+        const aduanaFijaProrra = aduanaFijaCompleta * shareAduana;
+        const totalChileCLP = aduanaFijaProrra + transpInterno + agencia;
+
+        // ─── Costo ZAGA + precio sugerido ──────────────────────────────────
+        const costoZAGA = totalChinaCLP + totalChileCLP;
+        const costoZAGAUnd = u > 0 ? costoZAGA / u : 0;
+        const margenPct = Number(validarForm.margen_obj_pct) || 25;
+        const precioSugUnd = costoZAGAUnd / (1 - margenPct/100);
+        const precioSugUndIva = precioSugUnd * 1.19;
+        const precioAcordado = Number(validarForm.precio_acordado_und) || 0;
+        const precioFinalUnd = precioAcordado > 0 ? precioAcordado : precioSugUndIva;
+        const precioFinalNetoUnd = precioFinalUnd / 1.19;
+        const totalClienteIva = precioFinalUnd * u;
+        const gananciaReal = (precioFinalNetoUnd - costoZAGAUnd) * u;
+        const margenReal = precioFinalNetoUnd > 0 ? ((precioFinalNetoUnd - costoZAGAUnd) / precioFinalNetoUnd) * 100 : 0;
+
+        const cerrar = () => { setVistaValidarId(null); setValidarForm({}); };
+        const guardar = async () => {
+          await persist(cotizaciones.map(x => {
+            if (x.id !== c.id) return x;
+            return {
+              ...x,
+              aer_honorarios: honorarios,
+              aer_edi: edi,
+              aer_despacho: despChile,
+              aer_aeropuerto: aeropuerto,
+              aer_aforo: Number(validarForm.aer_aforo) || 0,
+              incluir_aforo: validarForm.incluir_aforo !== false,
+              transp_interno_cl: transpInterno,
+              agencia,
+              margen_obj_pct: margenPct,
+              precio_final_acordado_und: precioAcordado > 0 ? precioAcordado : precioSugUndIva,
+            };
+          }));
+          showToast(`✓ ${c.nro || "cot"} validada · Precio acordado: ${fmt(precioFinalUnd)}/und. Estado NO cambió.`);
+          cerrar();
+        };
+
+        return (
+          <div style={{position:"fixed",inset:0,background:"#000c",zIndex:1200,overflowY:"auto",padding:"20px 16px"}} onClick={e=>e.target===e.currentTarget&&cerrar()}>
+            <div style={{maxWidth:980,margin:"0 auto",background:"#fff",borderRadius:14,overflow:"hidden",border:"1px solid #e2e8f0"}}>
+              {/* Header */}
+              <div style={{background:"#040c18",padding:"18px 24px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:11,color:"#94a3b8",letterSpacing:1.5,textTransform:"uppercase",fontWeight:700,marginBottom:2}}>🛬 Validar cotización aérea</div>
+                  <div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{c.nro || "—"} · {c.producto || ""}</div>
+                  <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>👤 {c.cliente} · {fmtN(u)} und · {opVinc?<span style={{color:"#c47830"}}>en {opVinc.nro} (share aduana {fmtP(shareAduana*100)})</span>:"cot individual"}</div>
+                </div>
+                <button onClick={cerrar} style={{background:"#1a2740",color:"#94a3b8",border:"1px solid #2d4163",borderRadius:8,padding:"7px 14px",fontSize:13,cursor:"pointer"}}>✕ Cerrar</button>
+              </div>
+
+              <div style={{padding:"20px 24px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                {/* SECCIÓN 1 — 🇨🇳 Datos confirmados por Sunny (read-only) */}
+                <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:14}}>
+                  <div style={{fontSize:11,color:"#92400e",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>🇨🇳 1. Datos confirmados por Sunny (read-only)</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr auto",rowGap:5,columnGap:10,fontSize:12,color:"#475569"}}>
+                    {c.material_china && <><span>🧪 Material:</span><b style={{color:"#0f172a",textAlign:"right"}}>{c.material_china}</b></>}
+                    <span>FOB Exw / und:</span><b style={{color:"#0f172a",textAlign:"right"}}>¥{precioRmb}</b>
+                    <span>Mercancía total ({u} und):</span><b style={{color:"#0f172a",textAlign:"right"}}>{fmtRMB(valorMercanciaRMB)}</b>
+                    <span>Comisión Sunny ({comisionPct}%):</span><b style={{color:"#0f172a",textAlign:"right"}}>{fmtRMB(comisionRMB)}</b>
+                    <span>Peso/caja × cajas ({pesoCaja}×{nCajas||"?"}):</span><b style={{color:"#0f172a",textAlign:"right"}}>{fmtN(pesoTotal,1)} kg</b>
+                    <span>CBM/caja × cajas:</span><b style={{color:"#0f172a",textAlign:"right"}}>{fmtN(Number(c.dim_m3)||0,4)} × {nCajas} = {fmtN((Number(c.dim_m3)||0)*nCajas,3)} m³</b>
+                    <span>Flete RMB/kg:</span><b style={{color:"#0f172a",textAlign:"right"}}>¥{fmtN(tarifaRmbKg,2)}</b>
+                    <span>Flete total ({fmtN(pesoTotal,1)}×{fmtN(tarifaRmbKg,2)}):</span><b style={{color:"#0f172a",textAlign:"right"}}>{fmtRMB(fleteRMB)}</b>
+                    <span>+ Cert origen ({certOrigen}):</span><b style={{color:"#0f172a",textAlign:"right"}}>¥{certOrigen}</b>
+                    <span>+ Doc op / despacho / compra:</span><b style={{color:"#0f172a",textAlign:"right"}}>¥{docOp+despacho+compraDocs}</b>
+                    <span>+ Transporte CN:</span><b style={{color:"#0f172a",textAlign:"right"}}>{fmtRMB(transporteCn)}</b>
+                    <span>+ Seguro:</span><b style={{color:"#0f172a",textAlign:"right"}}>{fmtRMB(seguroRMB)}</b>
+                  </div>
+                  <div style={{borderTop:"2px solid #c47830",marginTop:10,paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:800}}>
+                    <span style={{color:"#854d0e"}}>Total China:</span>
+                    <span style={{color:"#c47830"}}>{fmtRMB(totalChinaRMB)} ≈ {fmt(totalChinaCLP)}</span>
+                  </div>
+                </div>
+
+                {/* SECCIÓN 2 — 🇨🇱 Costos Chile (editable) */}
+                <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:14}}>
+                  <div style={{fontSize:11,color:"#1e40af",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>🇨🇱 2. Costos Chile (editable)</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr auto",rowGap:6,columnGap:10,fontSize:12,color:"#475569",alignItems:"center"}}>
+                    <label>Honorarios agente:</label>
+                    <input type="number" value={validarForm.aer_honorarios||0} onChange={e=>setValidarForm(p=>({...p,aer_honorarios:e.target.value}))} style={{width:120,padding:"5px 8px",border:"1px solid #cbd5e1",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit"}}/>
+                    <label>EDI:</label>
+                    <input type="number" value={validarForm.aer_edi||0} onChange={e=>setValidarForm(p=>({...p,aer_edi:e.target.value}))} style={{width:120,padding:"5px 8px",border:"1px solid #cbd5e1",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit"}}/>
+                    <label>Despacho aduanero:</label>
+                    <input type="number" value={validarForm.aer_despacho||0} onChange={e=>setValidarForm(p=>({...p,aer_despacho:e.target.value}))} style={{width:120,padding:"5px 8px",border:"1px solid #cbd5e1",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit"}}/>
+                    <label>Cargos aeropuerto:</label>
+                    <input type="number" value={validarForm.aer_aeropuerto||0} onChange={e=>setValidarForm(p=>({...p,aer_aeropuerto:e.target.value}))} style={{width:120,padding:"5px 8px",border:"1px solid #cbd5e1",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit"}}/>
+                    <label style={{display:"flex",alignItems:"center",gap:6}}><input type="checkbox" checked={validarForm.incluir_aforo!==false} onChange={e=>setValidarForm(p=>({...p,incluir_aforo:e.target.checked}))}/>Aforo:</label>
+                    <input type="number" value={validarForm.aer_aforo||0} onChange={e=>setValidarForm(p=>({...p,aer_aforo:e.target.value}))} disabled={validarForm.incluir_aforo===false} style={{width:120,padding:"5px 8px",border:"1px solid #cbd5e1",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",opacity:validarForm.incluir_aforo===false?0.5:1}}/>
+                    <label>Arancel {formF?"0% (Form F)":"6%"}:</label>
+                    <b style={{textAlign:"right",color:"#0f172a"}}>{fmt(arancelReal)}</b>
+                    <label>Transporte interno CL:</label>
+                    <input type="number" value={validarForm.transp_interno_cl||0} onChange={e=>setValidarForm(p=>({...p,transp_interno_cl:e.target.value}))} style={{width:120,padding:"5px 8px",border:"1px solid #cbd5e1",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit"}}/>
+                    <label>Agencia / extras:</label>
+                    <input type="number" value={validarForm.agencia||0} onChange={e=>setValidarForm(p=>({...p,agencia:e.target.value}))} style={{width:120,padding:"5px 8px",border:"1px solid #cbd5e1",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit"}}/>
+                  </div>
+                  {opVinc && shareAduana < 1 && (
+                    <div style={{marginTop:8,fontSize:10,color:"#1e40af",fontStyle:"italic",lineHeight:1.4}}>📐 Aduana fija + arancel prorrateados por share {fmtP(shareAduana*100)} (1 envío consolidado).</div>
+                  )}
+                  <div style={{borderTop:"2px solid #2d78c8",marginTop:10,paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:800}}>
+                    <span style={{color:"#1e40af"}}>Total Chile:</span>
+                    <span style={{color:"#2d78c8"}}>{fmt(totalChileCLP)}</span>
+                  </div>
+                </div>
+
+                {/* SECCIÓN 3 — 💰 Cálculo final */}
+                <div style={{gridColumn:"1 / -1",background:"#040c18",borderRadius:10,padding:16,color:"#fff"}}>
+                  <div style={{fontSize:11,color:"#c9a055",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>💰 3. Cálculo final</div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14}}>
+                    <div style={{background:"#0f1e30",borderRadius:8,padding:"10px 12px"}}>
+                      <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Costo China / und</div>
+                      <div style={{fontSize:18,fontWeight:800,color:"#c47830"}}>{fmt(totalChinaCLP/u)}</div>
+                    </div>
+                    <div style={{background:"#0f1e30",borderRadius:8,padding:"10px 12px"}}>
+                      <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Costo Chile / und</div>
+                      <div style={{fontSize:18,fontWeight:800,color:"#2d78c8"}}>{fmt(totalChileCLP/u)}</div>
+                    </div>
+                    <div style={{background:"#1a2740",borderRadius:8,padding:"10px 12px",border:"1px solid #c9a05544"}}>
+                      <div style={{fontSize:9,color:"#c9a055",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>💼 Costo ZAGA / und</div>
+                      <div style={{fontSize:20,fontWeight:800,color:"#c9a055"}}>{fmt(costoZAGAUnd)}</div>
+                    </div>
+                    <div style={{background:"#0f1e30",borderRadius:8,padding:"10px 12px"}}>
+                      <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3,display:"flex",justifyContent:"space-between"}}>
+                        <span>🎯 Precio sugerido c/IVA</span>
+                        <input type="number" step="1" value={validarForm.margen_obj_pct||25} onChange={e=>setValidarForm(p=>({...p,margen_obj_pct:e.target.value}))} style={{width:50,padding:"1px 4px",border:"1px solid #1a2740",borderRadius:3,fontSize:9,textAlign:"right",background:"#1a2740",color:"#94a3b8"}}/>
+                      </div>
+                      <div style={{fontSize:20,fontWeight:800,color:"#22c55e"}}>{fmt(precioSugUndIva)}</div>
+                      <div style={{fontSize:9,color:"#94a3b8",marginTop:2}}>Neto: {fmt(precioSugUnd)}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECCIÓN 4 — 🎯 Aplicar precio */}
+                <div style={{gridColumn:"1 / -1",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:16}}>
+                  <div style={{fontSize:11,color:"#15803d",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>🎯 4. Precio final acordado</div>
+                  <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                    <div style={{flex:1,minWidth:240}}>
+                      <label style={{fontSize:11,color:"#475569",fontWeight:600,display:"block",marginBottom:4}}>Precio final por unidad (c/IVA) — editable</label>
+                      <input type="number" step="1" value={validarForm.precio_acordado_und||""} onChange={e=>setValidarForm(p=>({...p,precio_acordado_und:e.target.value}))} placeholder={`Sugerido: ${fmt(precioSugUndIva)}`} style={{width:"100%",padding:"10px 14px",border:"1px solid #bbf7d0",borderRadius:8,fontSize:18,fontWeight:700,color:"#15803d",fontFamily:"inherit",background:"#fff",outline:"none"}}/>
+                      <div style={{fontSize:10,color:"#15803d",marginTop:4,fontStyle:"italic"}}>Si dejás vacío, se usa el sugerido ({fmt(precioSugUndIva)} = costo + 25% margen).</div>
+                    </div>
+                    <div style={{flex:1,minWidth:240,background:"#fff",borderRadius:8,padding:"10px 14px",border:"1px solid #bbf7d0"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#475569",marginBottom:4}}>
+                        <span>Total cliente c/IVA ({u} und):</span>
+                        <b style={{color:"#15803d",fontSize:15}}>{fmt(totalClienteIva)}</b>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#475569"}}>
+                        <span>Ganancia real / margen:</span>
+                        <b style={{color:gananciaReal>=0?"#15803d":"#c0392b",fontSize:13}}>{fmt(gananciaReal)} · {fmtP(margenReal)}</b>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:10,marginTop:14,justifyContent:"flex-end"}}>
+                    <button onClick={cerrar} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancelar</button>
+                    <button onClick={guardar} style={{background:"#16a34a",color:"#fff",border:"none",borderRadius:8,padding:"10px 22px",fontSize:14,fontWeight:800,cursor:"pointer",boxShadow:"0 2px 6px rgba(22,163,74,0.3)"}}>💾 Guardar precio acordado</button>
+                  </div>
+                  <div style={{marginTop:8,fontSize:10,color:"#475569",fontStyle:"italic",textAlign:"right"}}>El estado NO cambia. Tú decides cuándo pasar la cot a "Cotizada" para que el cliente la vea.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* MODAL PREVIEW INTERNO */}
       {(()=>{
@@ -3695,6 +3927,21 @@ Número de seguimiento: ${c.nro}`;
                         <button onClick={()=>setPreviewId(c.id)} style={{background:"#f8fafc",color:"#475569",border:"1px solid #e2e8f0",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>👁 Ver</button>
                         {c.estado==="solicitud"&&<button onClick={()=>setResumenChina(c)} style={{background:"#6a9fd422",color:"#334155",border:"1px solid #ddd6fe",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📋 Resumen China</button>}
                         <button onClick={()=>setOpenId(isOpen?null:c.id)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>{isOpen?"▲ Cerrar":"▼ Gestionar"}</button>
+                        {c.transporte==="aereo"&&!isPropia&&<button onClick={()=>{
+                          setValidarForm({
+                            aer_honorarios: c.aer_honorarios ?? 150000,
+                            aer_edi: c.aer_edi ?? 15000,
+                            aer_despacho: c.aer_despacho ?? 50000,
+                            aer_aeropuerto: c.aer_aeropuerto ?? 68000,
+                            aer_aforo: c.aer_aforo ?? 48000,
+                            incluir_aforo: c.incluir_aforo !== false,
+                            transp_interno_cl: Number(c.transp_interno_cl) || 0,
+                            agencia: Number(c.agencia) || 0,
+                            margen_obj_pct: Number(c.margen_obj_pct) || 25,
+                            precio_acordado_und: Number(c.precio_final_acordado_und) || 0,
+                          });
+                          setVistaValidarId(c.id);
+                        }} style={{background:"#c4783022",color:"#c47830",border:"1px solid #c4783055",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700}}>🛬 Validar</button>}
                         {!isPropia&&<button onClick={()=>setVistaId(c.id)} style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📄 Vista cliente</button>}
                         <button onClick={()=>handleEdit(c)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>✏️ Editar</button>
                         <button onClick={()=>handleDelete(c.id)} style={{background:"#fff1f2",color:"#c0392b",border:"1px solid #ef444433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>🗑</button>
