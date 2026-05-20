@@ -469,6 +469,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
   const opVinculada = c.operacion_id && Array.isArray(ops) ? ops.find(o => o._id === c.operacion_id) : null
   const [form, setForm] = useState({
     sku_china:             c.sku_china || "",
+    material_china:        c.material_china || "",
     imagen_url_sunny:      c.imagen_url_sunny || "",
     peso_unitario_g:       c.peso_unitario_g || "",
     unidad_medida:         c.unidad_medida || "pcs",
@@ -573,7 +574,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
       // 2) Merge: solo campos de Sunny
       const datosMerged = { ...fresca.datos }
       const camposSunny = [
-        "sku_china", "imagen_url_sunny", "peso_unitario_g", "unidad_medida",
+        "sku_china", "material_china", "imagen_url_sunny", "peso_unitario_g", "unidad_medida",
         "precio_china_rmb",
         "dim_largo", "dim_ancho", "dim_alto", "dim_und_caja", "dim_tipo",
         "peso_kg",
@@ -712,6 +713,9 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
             <Field label="中国 SKU / SKU China">
               <input value={form.sku_china} onChange={e=>setForm(p=>({...p, sku_china:e.target.value}))} placeholder="Ej: SK-EAR-2940-A" style={inp}/>
             </Field>
+            <Field label="🧪 材料 / Material">
+              <input value={form.material_china} onChange={e=>setForm(p=>({...p, material_china:e.target.value}))} placeholder="例如：塑胶+橡胶+不锈钢 / Ej: Plástico + Caucho + Acero inoxidable" style={inp}/>
+            </Field>
             <Field label={`📷 图片链接 / Imágenes del producto (URLs)${imagenes.length>0?` · ${imagenes.length}`:""}`}>
               <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:7, padding:8 }}>
                 {/* Miniaturas con botón eliminar */}
@@ -829,6 +833,17 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
             {m3Total > 0 && m3Total < 1 && (
               <div style={{ marginTop:8, background:"#fef2f2", border:"1px solid #fecaca", borderRadius:8, padding:"8px 12px", fontSize:11, color:"#dc2626", lineHeight:1.5 }}>
                 ⚠️ <b>体积小于 1 m³ / Volumen menor a 1 m³</b> ({fmtN(m3Total,3)} m³). 需要与其他订单合并发货 / Hay que consolidar con otra cotización.
+              </div>
+            )}
+
+            {/* ALERTA cantidad ajustada al embalaje (cuando real != pedido) */}
+            {esCaja && nCajas > 0 && undCaja > 0 && (nCajas * undCaja) !== unidades && (
+              <div style={{ marginTop:8, background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:8, padding:"9px 12px", fontSize:11, color:"#92400e", lineHeight:1.5 }}>
+                📦 <b>实际数量 / Cantidad real con embalaje: {nCajas * undCaja} und</b> ({nCajas} cajas × {undCaja} und).
+                <br/>客户要求 / Cliente pidió: <b>{unidades} und</b>.
+                {(nCajas * undCaja) > unidades
+                  ? <> 差额 / Diferencia: <b>+{(nCajas * undCaja) - unidades} und</b> extra por completar caja. ⚠️ Confirmar con admin si cobra cantidad real o pedida.</>
+                  : <> ⚠️ El embalaje no cubre la cantidad pedida.</>}
               </div>
             )}
           </Section>
@@ -1140,6 +1155,7 @@ function CotReadOnly({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               <div style={{ flex:1, display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
                 {c.sku_china && <div><b>SKU:</b> {c.sku_china}</div>}
                 {c.unidad_medida && <div><b>Unidad:</b> {c.unidad_medida}</div>}
+                {c.material_china && <div style={{ gridColumn:"1 / -1" }}><b>🧪 Material:</b> {c.material_china}</div>}
                 {c.precio_china_rmb && <div><b>FOB:</b> ¥{c.precio_china_rmb}/und</div>}
                 {Number(c.peso_unitario_g) > 0 && <div><b>Peso/und:</b> {c.peso_unitario_g} g</div>}
                 {Number(c.dim_largo) > 0 && <div><b>Caja:</b> {c.dim_largo}×{c.dim_ancho}×{c.dim_alto} cm</div>}

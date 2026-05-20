@@ -3387,6 +3387,9 @@ Número de seguimiento: ${c.nro}`;
                               {c.sku_bodega&&<span style={{color:"#3d7fc4"}}>📦 Bodega: <b>{c.sku_bodega}</b></span>}
                             </div>
                           )}
+                          {c.material_china&&(
+                            <div style={{fontSize:11,marginBottom:2,color:"#64748b"}}>🧪 Material: <b style={{color:"#475569"}}>{c.material_china}</b></div>
+                          )}
                           {c.notas&&<div style={{color:"#64748b",fontSize:12}}>📝 {c.notas}</div>}
                           {(()=>{
                             var ult = (c.notas_historial&&c.notas_historial.length>0)?c.notas_historial[c.notas_historial.length-1]:null
