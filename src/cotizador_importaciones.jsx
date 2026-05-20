@@ -759,47 +759,47 @@ export default function App({ supabase, usuario, onLogout }){
     catch(e){ return {}; }
   });
 
-  // ── CARGA INICIAL DESDE SUPABASE ──────────────────────────────
-  useEffect(()=>{
-    const cargar=async()=>{
-      setCargando(true);
-      try{
-        const {data,error}=await supabase
-          .from("cotizaciones")
-          .select("id,datos")
-          .order("created_at",{ascending:false});
-        if(error) throw error;
-        if(data&&data.length>0){
-          // FIX: garantizar id real de columna Supabase, no datos.id (puede ser null)
-          const lista=data.map(r=>Object.assign({},r.datos,{id:r.id}));
-          cotizacionesRef.current=lista;
-          setCotizaciones(lista);
-        } else {
-          const local=localStorage.getItem("zaga_v6");
-          if(local){
-            const lista=JSON.parse(local);
-            if(Array.isArray(lista)&&lista.length>0){
-              const rows=lista.map(c=>({id:c.id,nro:c.nro||"",cliente:c.cliente||"",gestor:c.gestor||"francisco",estado:c.estado||"solicitud",tipo:c.tipo||"cliente",datos:c}));
-              await supabase.from("cotizaciones").upsert(rows,{onConflict:"id"});
-              cotizacionesRef.current=lista;
-              setCotizaciones(lista);
-              showToast(`✓ ${lista.length} cotizaciones migradas a la nube`);
-            }
+  // ── Recargar datos desde Supabase (carga inicial + botón Refrescar) ─────
+  const cargar = async () => {
+    setCargando(true);
+    try{
+      const {data,error}=await supabase
+        .from("cotizaciones")
+        .select("id,datos")
+        .order("created_at",{ascending:false});
+      if(error) throw error;
+      if(data&&data.length>0){
+        const lista=data.map(r=>Object.assign({},r.datos,{id:r.id}));
+        cotizacionesRef.current=lista;
+        setCotizaciones(lista);
+      } else {
+        const local=localStorage.getItem("zaga_v6");
+        if(local){
+          const lista=JSON.parse(local);
+          if(Array.isArray(lista)&&lista.length>0){
+            const rows=lista.map(c=>({id:c.id,nro:c.nro||"",cliente:c.cliente||"",gestor:c.gestor||"francisco",estado:c.estado||"solicitud",tipo:c.tipo||"cliente",datos:c}));
+            await supabase.from("cotizaciones").upsert(rows,{onConflict:"id"});
+            cotizacionesRef.current=lista;
+            setCotizaciones(lista);
+            showToast(`✓ ${lista.length} cotizaciones migradas a la nube`);
           }
         }
-      }catch(e){
-        try{ const r=localStorage.getItem("zaga_v6"); if(r){ const d=JSON.parse(r); cotizacionesRef.current=d; setCotizaciones(d); } }catch(_){}
-        showToast("Error de conexión — usando datos locales","err");
       }
-      // Cargar operaciones consolidadas
-      try{
-        const {data:opData}=await supabase.from("operaciones").select("id,datos,created_at,updated_at").order("created_at",{ascending:false});
-        if(opData&&Array.isArray(opData)){
-          setOperaciones(opData.map(r=>({...r.datos,id:r.id,_created:r.created_at,_updated:r.updated_at})));
-        }
-      }catch(e){ /* tabla operaciones puede no existir aún */ }
-      setCargando(false);
-    };
+    }catch(e){
+      try{ const r=localStorage.getItem("zaga_v6"); if(r){ const d=JSON.parse(r); cotizacionesRef.current=d; setCotizaciones(d); } }catch(_){}
+      showToast("Error de conexión — usando datos locales","err");
+    }
+    try{
+      const {data:opData}=await supabase.from("operaciones").select("id,datos,created_at,updated_at").order("created_at",{ascending:false});
+      if(opData&&Array.isArray(opData)){
+        setOperaciones(opData.map(r=>({...r.datos,id:r.id,_created:r.created_at,_updated:r.updated_at})));
+      }
+    }catch(e){ /* tabla operaciones puede no existir aún */ }
+    setCargando(false);
+  };
+
+  // ── CARGA INICIAL + REAL-TIME ──────────────────────────────
+  useEffect(()=>{
     cargar();
     // ── REAL-TIME: detectar cambios del agente China (notas) ──
     const channel=supabase.channel("zaga-cotizador-admin-v1")
@@ -1286,6 +1286,7 @@ export default function App({ supabase, usuario, onLogout }){
 
             <div style={{width:1,height:18,background:"rgba(255,255,255,0.1)"}}/>
 
+            <button onClick={cargar} title="Refrescar datos (recarga cotizaciones + operaciones)" style={{background:"transparent",color:"rgba(255,255,255,0.5)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:500}}>🔄 Refrescar</button>
             <button onClick={exportarDatos} style={{background:"transparent",color:"rgba(255,255,255,0.5)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:500}}>↓ Exportar</button>
             <button onClick={importarDatos} style={{background:"transparent",color:"rgba(255,255,255,0.5)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:500}}>↑ Importar</button>
 

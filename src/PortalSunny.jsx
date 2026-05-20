@@ -194,6 +194,12 @@ export default function PortalSunny({ supabase, onLogout }) {
               </span>
             </div>
           )}
+          <button onClick={loadData}
+            title="刷新 / Refrescar datos"
+            style={{ background:"transparent", border:"1px solid #ffffff20", color:"#94a3b8",
+              borderRadius:8, padding:"6px 12px", cursor:"pointer", fontSize:12, fontWeight:600, fontFamily:"inherit" }}>
+            🔄 刷新
+          </button>
           <button onClick={() => onLogout && onLogout()}
             style={{ background:"transparent", border:"1px solid #ffffff20", color:"#94a3b8",
               borderRadius:8, padding:"6px 16px", cursor:"pointer", fontSize:12, fontWeight:600, fontFamily:"inherit" }}>

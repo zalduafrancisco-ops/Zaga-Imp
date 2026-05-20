@@ -628,6 +628,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
               <span className="zdot"/>En vivo
             </span>
             <span style={{fontSize:12,color:"#c9a055",fontWeight:600,background:"rgba(201,160,85,0.12)",borderRadius:20,padding:"4px 14px",border:"1px solid rgba(201,160,85,0.25)",whiteSpace:"nowrap"}}>👤 {perfil.nombre}</span>
+            <button className="zbtn-outline" onClick={cargar} title="Refrescar datos" style={{color:"#94a3b8",borderColor:"rgba(255,255,255,0.15)"}}>🔄</button>
             <button className="zbtn-outline" onClick={onLogout} style={{color:"#94a3b8",borderColor:"rgba(255,255,255,0.15)"}}>Salir</button>
           </div>
         </div>
