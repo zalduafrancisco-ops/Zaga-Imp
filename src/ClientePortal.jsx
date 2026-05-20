@@ -1062,7 +1062,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                           </div>
                           <div style={{fontSize:15,fontWeight:700,color:isRech?"#94a3b8":"#0f172a",marginBottom:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.producto}</div>
                           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                            {c.unidades&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>📦 {fmtN(c.unidades)} und</span>}
+                            {c.unidades&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>📦 {fmtN(c.unidades)} und{c.unidades_originales && Number(c.unidades_originales) !== Number(c.unidades) && <span style={{color:"#c47830",marginLeft:4}} title={`Ajustado de ${c.unidades_originales} und para completar caja`}>📐</span>}</span>}
                             {c.transporte&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>{c.transporte==='aereo'?'✈️ Aereo':c.transporte==='ambos'?'🚢✈️ Ambos':'🚢 Maritimo'}</span>}
                             {c.fecha_solicitud&&<span style={{fontSize:11,color:"#64748b",background:"#f8fafc",borderRadius:6,padding:"2px 8px",border:"1px solid #e2e8f0"}}>📅 {fmtDate(c.fecha_solicitud)}</span>}
                             {c.operacion_id&&(function(){
@@ -1204,6 +1204,13 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                                       </div>
                                     )
                                   })
+                                )}
+                                {c.unidades_originales && Number(c.unidades_originales) !== Number(c.unidades) && (
+                                  <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,padding:"10px 14px",marginBottom:10,fontSize:12,color:"#92400e",lineHeight:1.5}}>
+                                    📦 <b>Cantidad ajustada por empaque de fábrica:</b><br/>
+                                    Tu pedido original: <b>{fmtN(c.unidades_originales)} und</b> → Cantidad enviada: <b style={{color:"#c47830"}}>{fmtN(c.unidades)} und</b> (+{Number(c.unidades) - Number(c.unidades_originales)}).<br/>
+                                    <span style={{fontSize:11,color:"#a16207"}}>La fábrica empaca {c.dim_und_caja} und por caja. Se completa la caja para evitar empaque parcial.</span>
+                                  </div>
                                 )}
                                 <div style={{background:"#040c18",borderRadius:12,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
                                   <div>

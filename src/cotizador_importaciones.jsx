@@ -984,6 +984,24 @@ export default function App({ supabase, usuario, onLogout }){
   };
 
   const handleMotivo=async(id,motivo)=>{ await persist(cotizaciones.map(c=>c.id===id?{...c,motivo_no_procesada:motivo}:c)); };
+
+  // Ajusta unidades para cuadrar con el empaque del proveedor (cajas completas).
+  // Guarda la cantidad original para mostrar al cliente que se incrementó por embalaje.
+  const handleAjustarCantidad = async (id, unidadesNuevas, unidadesOriginales) => {
+    const cot = cotizaciones.find(c => c.id === id);
+    if (!cot) return;
+    if (!confirm(`Ajustar cantidad de ${cot.nro || "cotización"} a ${unidadesNuevas} und?\n\nCantidad original (pedido cliente): ${unidadesOriginales} und.\nNueva cantidad ajustada al empaque: ${unidadesNuevas} und.\n\nSe le avisará al cliente que se aumentó por completar caja.`)) return;
+    await persist(cotizaciones.map(c => {
+      if (c.id !== id) return c;
+      return {
+        ...c,
+        unidades: unidadesNuevas,
+        unidades_originales: c.unidades_originales || unidadesOriginales,
+        fecha_ajuste_cantidad: new Date().toISOString().split("T")[0],
+      };
+    }));
+    showToast(`✓ ${cot.nro || "Cotización"} ajustada: ${unidadesOriginales} → ${unidadesNuevas} und`);
+  };
   const handleEdit=(c)=>{ setForm({...defaultForm,...c}); setEditId(c.id); setTab("calc"); };
   // DELETE explícito por ID (única forma autorizada de borrar). Confirma antes.
   const handleDelete=async id=>{
@@ -1698,7 +1716,13 @@ Número de seguimiento: ${c.nro}`;
                               <span className="opvc-cot-hdr-badge" style={{background:"#c47830",color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:700}}>✈️ Aéreo</span>
                             </div>
                             <div className="opvc-cot-grid" style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,background:"#fff"}}>
-                              <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Unidades</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmtN(cot.unidades)}</div></div>
+                              <div>
+                                <div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Unidades</div>
+                                <div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmtN(cot.unidades)}</div>
+                                {cot.unidades_originales && Number(cot.unidades_originales) !== Number(cot.unidades) && (
+                                  <div style={{fontSize:9,color:"#c47830",fontStyle:"italic",marginTop:2}}>📦 ajustada (pediste {cot.unidades_originales})</div>
+                                )}
+                              </div>
                               <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>$/und c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmt(pUnd)}</div></div>
                               <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Total c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:800,color:"#1aa358"}}>{fmt(totIva)}</div></div>
                               <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Llegada esti.</div><div className="opvc-cell-val" style={{fontSize:12,fontWeight:700,color:"#c47830",fontStyle:"italic"}}>≈ {calcLlegadaEst(cot)||"—"}</div></div>
@@ -1716,6 +1740,11 @@ Número de seguimiento: ${c.nro}`;
                                 <span>{fmtN(cot.unidades)} und × {fmt(pUnd)}</span>
                                 <span className="llegada">≈ Llegada esti. {calcLlegadaEst(cot)||"—"}</span>
                               </div>
+                              {cot.unidades_originales && Number(cot.unidades_originales) !== Number(cot.unidades) && (
+                                <div style={{marginTop:4,padding:"4px 7px",background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:5,fontSize:10,color:"#92400e",fontStyle:"italic"}}>
+                                  📦 Cantidad ajustada: {cot.unidades_originales} → <b>{cot.unidades}</b> und (completar caja)
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -3701,6 +3730,32 @@ Número de seguimiento: ${c.nro}`;
                             </div>
                             <button onClick={()=>handleGuardarSincronizar(c.id)} style={{background:"#1aa358",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",boxShadow:"0 1px 4px rgba(26,163,88,0.3)"}}>💾 Guardar y sincronizar</button>
                           </div>
+
+                          {/* Aviso ajuste cantidad por empaque (solo si hay diferencia con und_caja) */}
+                          {(() => {
+                            const u = Number(c.unidades) || 0;
+                            const undCaja = Number(c.dim_und_caja) || 0;
+                            const esCaja = c.dim_tipo === "caja" || (!c.dim_tipo && undCaja > 0);
+                            if (!esCaja || undCaja <= 0 || u <= 0) return null;
+                            const nCajas = Math.ceil(u / undCaja);
+                            const cantidadReal = nCajas * undCaja;
+                            if (cantidadReal === u) return null; // ya está ajustada
+                            const extras = cantidadReal - u;
+                            return (
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:14,padding:"12px 14px",background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,flexWrap:"wrap"}}>
+                                <div style={{fontSize:12,color:"#92400e",lineHeight:1.5,flex:1,minWidth:240}}>
+                                  📦 <b>Empaque no calza:</b> {u} und ÷ {undCaja} por caja = {nCajas} cajas (necesita {cantidadReal} und, sobran <b>{extras}</b>).<br/>
+                                  <span style={{fontSize:11,color:"#a16207"}}>Recomendado: ajustar a {cantidadReal} und para completar la caja. El cliente verá un aviso.</span>
+                                </div>
+                                <button onClick={()=>handleAjustarCantidad(c.id, cantidadReal, u)} style={{background:"#c47830",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",boxShadow:"0 1px 4px rgba(196,120,48,0.3)"}}>📐 Ajustar a {cantidadReal} und</button>
+                              </div>
+                            );
+                          })()}
+                          {c.unidades_originales && Number(c.unidades_originales) !== Number(c.unidades) && (
+                            <div style={{padding:"8px 12px",marginBottom:14,background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,fontSize:11,color:"#1e40af",lineHeight:1.5}}>
+                              ℹ️ <b>Cantidad ajustada al empaque:</b> {c.unidades_originales} und (original) → <b>{c.unidades} und</b> (ajustado el {c.fecha_ajuste_cantidad || "—"}). El cliente recibe aviso del incremento en la cotización.
+                            </div>
+                          )}
                           {/* Imágenes del producto — multi */}
                           <div style={{background:"#f8fafc",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0",marginBottom:16}}>
                             <div style={{fontSize:10,color:"#64748b",marginBottom:8,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>🖼️ Imágenes del producto {getImagenes(c.imagen_url).length>0&&<span style={{background:"#e2e8f0",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,color:"#475569",marginLeft:4}}>{getImagenes(c.imagen_url).length}</span>}</div>
