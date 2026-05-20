@@ -240,11 +240,46 @@ function calcCliente(d) {
 // ── Costo real ZAGA por cot (suma China RMB + Chile CLP + IVAs) ───────────
 // Devuelve el desglose completo del costo que ZAGA absorbe (sin margen) y compara
 // con el precio cobrado al cliente para mostrar ganancia real.
-function calcCostoRealZaga(d, op) {
+// cotsEnOp: array completo de cots de la OP, para calcular share y prorratear aduana
+function calcCostoRealZaga(d, op, cotsEnOp = []) {
   const u = Number(d.unidades) || 0;
   const TC_RMB_USD = 7.2;
   const tc = Number(op?.pago?.tc_efectivo) || Number(d?.pago?.tc_efectivo) || 950;
   const calc = calcCliente(d);
+
+  // ─── Share para prorrateo (igual lógica que calcConsolidado) ───────────
+  // En consolidado, la aduana fija se paga UNA VEZ y se reparte entre cots
+  // según modo Sunny (mayor entre peso/volumen).
+  let share = 1;
+  if (op && cotsEnOp && cotsEnOp.length > 1) {
+    const getCbm = (c) => {
+      const m3 = Number(c.dim_m3) || 0;
+      const uc = Number(c.unidades) || 0;
+      const undC = Number(c.dim_und_caja) || 0;
+      const esC = c.dim_tipo === "caja";
+      return esC && undC > 0 ? m3 * Math.ceil(uc / undC) : m3 * uc;
+    };
+    const getPesoCobr = (c) => {
+      const p = Number(c.peso_kg) || 0;
+      const uc = Number(c.unidades) || 0;
+      const undC = Number(c.dim_und_caja) || 0;
+      const esC = c.dim_tipo === "caja";
+      const pReal = esC && undC > 0 ? p * Math.ceil(uc / undC) : p * uc;
+      const cbm = getCbm(c);
+      return Math.max(pReal, cbm * 166.67);
+    };
+    const totalCbmOp = cotsEnOp.reduce((s, c) => s + getCbm(c), 0);
+    const totalPesoOp = cotsEnOp.reduce((s, c) => s + getPesoCobr(c), 0);
+    const cbmCot = getCbm(d);
+    const pesoCot = getPesoCobr(d);
+    const shareCbm = totalCbmOp > 0 ? cbmCot / totalCbmOp : 0;
+    const sharePeso = totalPesoOp > 0 ? pesoCot / totalPesoOp : 0;
+    const modo = d.aer_modo_cobro_sunny || "auto";
+    share = modo === "peso" ? sharePeso
+          : modo === "volumen" ? shareCbm
+          : Math.max(shareCbm, sharePeso);
+    if (share === 0) share = 1 / cotsEnOp.length; // fallback equitativo si no hay dims
+  }
 
   // ─── LADO CHINA ───────────────────────────────────────────────────────────
   // Fallback: si la cot no tiene precio_china_rmb (legacy), usar precio_china (CLP).
@@ -288,11 +323,13 @@ function calcCostoRealZaga(d, op) {
 
   // ─── LADO CHILE (en CLP, ya calculado por calcCliente) ────────────────────
   // cda = aduana fija + arancel real (ZAGA lo paga, neto)
-  // Para aéreo además están los IVAs (agente + aduana) que ZAGA paga aunque son recuperables
-  const cdaReal     = Number(calc.cda) || 0;
-  const ivaAgenteAer = calc.aer?.ivaAgente || 0;
-  const ivaAduanaAer = calc.aer?.ivaAduanaReal || 0;
-  const ivaChinaCLP  = Number(calc.ivaChina) || 0;
+  // En consolidado: ZAGA paga UNA aduana por despacho, NO una por cot.
+  // Prorrateamos por share (igual modo que calcConsolidado) cuando hay OP.
+  const cdaCompleto = Number(calc.cda) || 0;
+  const cdaReal     = cdaCompleto * share;
+  const ivaAgenteAer = (calc.aer?.ivaAgente || 0) * share;
+  const ivaAduanaAer = (calc.aer?.ivaAduanaReal || 0) * share;
+  const ivaChinaCLP  = Number(calc.ivaChina) || 0; // China IVA es por cot (no compartido)
   // Costo Chile neto que ZAGA absorbe (sin servicio FF que es ingreso, sin IVAs recuperables)
   const totalChileCLP = cdaReal;
   // IVA total recuperable (vía F29 cuando con_iva=true)
@@ -321,7 +358,7 @@ function calcCostoRealZaga(d, op) {
     detalleChina: { certOrigen, docOp, despacho, compraDocs, transporteCn, seguroRMB, seguroCalc, seguroMin, seguroAplicaMin: seguroRMB > seguroCalc },
     pesoTotal, tarifaRmbKg, comisionPct, seguroPct,
     // Chile
-    cdaReal, ivaAgenteAer, ivaAduanaAer, ivaChinaCLP, ivaRecuperableCLP, ivaPerdido, totalChileCLP,
+    cdaReal, cdaCompleto, share, ivaAgenteAer, ivaAduanaAer, ivaChinaCLP, ivaRecuperableCLP, ivaPerdido, totalChileCLP,
     // Total
     costoZAGANeto, costoZAGAReal,
     precioClienteIva, precioClienteNeto,
@@ -4251,7 +4288,8 @@ Número de seguimiento: ${c.nro}`;
                           {/* ── PANEL COSTO REAL ZAGA ── */}
                           {!isPropia && c.transporte === "aereo" && (() => {
                             const opVinc = c.operacion_id ? operaciones.find(o => o.id === c.operacion_id) : null;
-                            const cz = calcCostoRealZaga(c, opVinc);
+                            const cotsOpVinc = opVinc ? cotizaciones.filter(x => (opVinc.cotizaciones||[]).includes(x.id)) : [];
+                            const cz = calcCostoRealZaga(c, opVinc, cotsOpVinc);
                             if (cz.totalChinaRMB === 0 && cz.totalChileCLP === 0) return null;
                             return (
                               <div style={{marginTop:16,padding:16,background:"linear-gradient(135deg,#0f1e30 0%,#040c18 100%)",borderRadius:12,color:"#fff",border:"1px solid #c9a05544"}}>
@@ -4859,7 +4897,7 @@ Número de seguimiento: ${c.nro}`;
 
                               {/* ── PANEL COSTO REAL ZAGA — POR COT + TOTAL OP ── */}
                               {(() => {
-                                const rows = consolidados.map(({cot}) => ({ cot, cz: calcCostoRealZaga(cot, op) }));
+                                const rows = consolidados.map(({cot}) => ({ cot, cz: calcCostoRealZaga(cot, op, cots) }));
                                 if (rows.length === 0) return null;
                                 const totChinaCLP = rows.reduce((s,r) => s + r.cz.totalChinaCLP, 0);
                                 const totChileCLP = rows.reduce((s,r) => s + r.cz.totalChileCLP, 0);
