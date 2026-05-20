@@ -1081,7 +1081,7 @@ export default function App({ supabase, usuario, onLogout }){
           /* Cards de cotización ULTRA compactas en móvil: 2 líneas */
           .opvc-cot{margin-bottom:4px !important;border-width:1px !important;border-radius:6px !important}
           .opvc-cot-hdr{display:none !important}
-          .opvc-cot-grid{padding:0 !important;display:block !important;background:#fff !important}
+          .opvc-cot-grid{display:none !important}
           .opvc-cot-mob{display:block !important;padding:7px 10px !important;font-size:11px !important;line-height:1.4 !important}
           .opvc-cot-mob .row1{display:flex !important;justify-content:space-between !important;align-items:flex-start !important;gap:10px !important;margin-bottom:3px !important}
           .opvc-cot-mob .prod-wrap{flex:1 !important;min-width:0 !important}
