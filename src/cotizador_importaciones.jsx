@@ -914,6 +914,8 @@ export default function App({ supabase, usuario, onLogout }){
   };
 
   const handleEstado=async(id,estado)=>{
+    const cot = cotizaciones.find(c => c.id === id);
+    const estadoAnterior = cot?.estado;
     await persist(cotizaciones.map(c=>{
       if(c.id!==id) return c;
       let fll=c.fecha_llegada_est;
@@ -927,6 +929,34 @@ export default function App({ supabase, usuario, onLogout }){
       }
       return {...c,estado,fecha_llegada_est:fll,checklist:chk,fecha_pago1_cliente:fechaP1};
     }));
+    if (estadoAnterior !== estado) {
+      const lblNuevo = EST_LABEL[estado] || estado;
+      showToast(`✓ ${cot?.nro || "cotización"} → ${lblNuevo}`);
+    }
+  };
+
+  // Guarda y sincroniza explícitamente: re-persiste cot + recarga datos para todos
+  const handleGuardarSincronizar = async (id) => {
+    const cot = cotizaciones.find(c => c.id === id);
+    if (!cot) return;
+    try {
+      // Re-upsert explícito de la cot actual
+      await supabase.from("cotizaciones").upsert([{
+        id: cot.id,
+        nro: cot.nro || "",
+        cliente: cot.cliente || "",
+        gestor: cot.gestor || "francisco",
+        estado: cot.estado || "solicitud",
+        tipo: cot.tipo || "cliente",
+        datos: cot,
+        updated_at: new Date().toISOString(),
+      }], { onConflict: "id" });
+      // Recargar todo desde Supabase para que el admin vea lo más fresco
+      await cargar();
+      showToast(`✓ ${cot.nro || "Cotización"} guardada — sincronizado en todos los portales`);
+    } catch (e) {
+      showToast("Error al guardar: " + (e.message || ""), "err");
+    }
   };
 
   const handleCheck=async(id,key,val)=>{
@@ -3661,6 +3691,13 @@ Número de seguimiento: ${c.nro}`;
                       const isTerminal=isNoProcesada||c.estado==="no_prospero"||c.estado==="no_prospero";
                       return (
                         <div style={{borderTop:"1px solid #e2e8f0",padding:"20px 24px"}}>
+                          {/* Botón guardar y sincronizar — fuerza upsert + recarga para todos los portales */}
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:14,padding:"10px 12px",background:"#040c1808",border:"1px solid #c9a05533",borderRadius:8,flexWrap:"wrap"}}>
+                            <div style={{fontSize:11,color:"#475569",lineHeight:1.4}}>
+                              <b style={{color:"#0f172a"}}>💡 Tip:</b> los cambios se guardan automáticos, pero si quieres forzar sync en todos los portales (Sunny + cliente), usa este botón.
+                            </div>
+                            <button onClick={()=>handleGuardarSincronizar(c.id)} style={{background:"#1aa358",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",boxShadow:"0 1px 4px rgba(26,163,88,0.3)"}}>💾 Guardar y sincronizar</button>
+                          </div>
                           {/* Imágenes del producto — multi */}
                           <div style={{background:"#f8fafc",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0",marginBottom:16}}>
                             <div style={{fontSize:10,color:"#64748b",marginBottom:8,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>🖼️ Imágenes del producto {getImagenes(c.imagen_url).length>0&&<span style={{background:"#e2e8f0",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,color:"#475569",marginLeft:4}}>{getImagenes(c.imagen_url).length}</span>}</div>
