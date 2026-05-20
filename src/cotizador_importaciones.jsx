@@ -237,6 +237,89 @@ function calcCliente(d) {
   return { tChNeto,ivaChina,tCh,dCh,prCh,comR:comREff,p1Ch,p2Ch,totCh,cRUnd,cRUndNeto,pCUnd,tCl,dCl,prCl,comCl,serv,cda,cdaCl,ganCda,p1Cl,p2Cl,totCl,p1ClIva,p2ClIva,totClIva,totClIvaFinal,ajusteManual,ganImpAjustado,precioFinalAcordadoUnd,precioFinalAcordadoTotal,ivaCliente,ivaRecuperado,ivaNetoFavor,saldoF29,ganImpConIva,pfUnd,ganMar,difCom,ganServ,ganImp,gan1,gan2,uDev,uFull,ganFull,ganTot,markup,mgBrut,roi,mult,aer,isAereo };
 }
 
+// ── Costo real ZAGA por cot (suma China RMB + Chile CLP + IVAs) ───────────
+// Devuelve el desglose completo del costo que ZAGA absorbe (sin margen) y compara
+// con el precio cobrado al cliente para mostrar ganancia real.
+function calcCostoRealZaga(d, op) {
+  const u = Number(d.unidades) || 0;
+  const TC_RMB_USD = 7.2;
+  const tc = Number(op?.pago?.tc_efectivo) || Number(d?.pago?.tc_efectivo) || 950;
+  const calc = calcCliente(d);
+
+  // ─── LADO CHINA (en RMB) ──────────────────────────────────────────────────
+  const precioRmb = Number(d.precio_china_rmb) || 0;
+  const valorMercanciaRMB = precioRmb * u;
+
+  // Helpers fallback: si OP no tiene el campo (cot sola), usar el de la cot
+  const _take = (k) => Number(op?.[k] ?? d?.[k]) || 0;
+  const comisionPct = _take("comision_sunny_pct");
+  const seguroPct   = _take("seguro_pct"); // ej 0.002
+  const seguroMin   = _take("seguro_min_rmb");
+  const certOrigen  = _take("cost_cert_origen_rmb");
+  const docOp       = _take("cost_doc_operacion_rmb");
+  const despacho    = _take("cost_despacho_aduanero_rmb");
+  const compraDocs  = _take("cost_compra_docs_rmb");
+  const transporteCn= _take("cost_transporte_interno_cn_rmb");
+
+  // Peso total y flete RMB
+  const undCaja = Number(d.dim_und_caja) || 0;
+  const esCaja = d.dim_tipo === "caja";
+  const nCajas = esCaja && undCaja > 0 ? Math.ceil(u / undCaja) : 0;
+  const pesoUnit = Number(d.peso_kg) || 0;
+  const pesoTotal = esCaja && undCaja > 0 ? pesoUnit * nCajas : pesoUnit * u;
+  const tarifaRmbKg = Number(op?.flete_rmb_kg_consolidado ?? d.aer_tarifa_sunny_rmb_kg) || (Number(d.aer_tarifa_sunny_kg) || 0) * TC_RMB_USD;
+  const fleteRMB = pesoTotal * tarifaRmbKg;
+
+  const comisionRMB = valorMercanciaRMB * comisionPct / 100;
+  const seguroCalc = valorMercanciaRMB * seguroPct;
+  const seguroRMB = Math.max(seguroMin, seguroCalc);
+  const otrosGastosRMB = certOrigen + docOp + despacho + compraDocs + transporteCn + seguroRMB;
+  const totalChinaRMB = valorMercanciaRMB + comisionRMB + fleteRMB + otrosGastosRMB;
+  const totalChinaCLP = (totalChinaRMB / TC_RMB_USD) * tc;
+
+  // ─── LADO CHILE (en CLP, ya calculado por calcCliente) ────────────────────
+  // cda = aduana fija + arancel real (ZAGA lo paga, neto)
+  // Para aéreo además están los IVAs (agente + aduana) que ZAGA paga aunque son recuperables
+  const cdaReal     = Number(calc.cda) || 0;
+  const ivaAgenteAer = calc.aer?.ivaAgente || 0;
+  const ivaAduanaAer = calc.aer?.ivaAduanaReal || 0;
+  const ivaChinaCLP  = Number(calc.ivaChina) || 0;
+  // Costo Chile neto que ZAGA absorbe (sin servicio FF que es ingreso, sin IVAs recuperables)
+  const totalChileCLP = cdaReal;
+  // IVA total recuperable (vía F29 cuando con_iva=true)
+  const ivaRecuperableCLP = ivaAgenteAer + ivaAduanaAer + ivaChinaCLP;
+
+  // ─── TOTAL COSTO ZAGA ──────────────────────────────────────────────────────
+  // Costo neto operacional (lo que ZAGA realmente desembolsa de "su bolsillo")
+  const costoZAGANeto = totalChinaCLP + totalChileCLP;
+  // Si NO hay factura (sin IVA al cliente), los IVAs recuperables se pierden → costo sube
+  const conIva = !!d.con_iva || d.transporte === "aereo";
+  const ivaPerdido = conIva ? 0 : ivaRecuperableCLP;
+  const costoZAGAReal = costoZAGANeto + ivaPerdido;
+
+  // ─── PRECIO COBRADO AL CLIENTE ────────────────────────────────────────────
+  const precioClienteIva = Number(calc.totClIvaFinal) || Number(calc.totClIva) || 0;
+  const precioClienteNeto = precioClienteIva / 1.19;
+
+  // ─── GANANCIA REAL ────────────────────────────────────────────────────────
+  const ganRealNeto = precioClienteNeto - costoZAGAReal;
+  const margenRealPct = precioClienteNeto > 0 ? (ganRealNeto / precioClienteNeto) * 100 : 0;
+
+  return {
+    // China
+    valorMercanciaRMB, comisionRMB, fleteRMB, otrosGastosRMB, totalChinaRMB, totalChinaCLP,
+    detalleChina: { certOrigen, docOp, despacho, compraDocs, transporteCn, seguroRMB, seguroCalc, seguroMin, seguroAplicaMin: seguroRMB > seguroCalc },
+    pesoTotal, tarifaRmbKg, comisionPct, seguroPct,
+    // Chile
+    cdaReal, ivaAgenteAer, ivaAduanaAer, ivaChinaCLP, ivaRecuperableCLP, ivaPerdido, totalChileCLP,
+    // Total
+    costoZAGANeto, costoZAGAReal,
+    precioClienteIva, precioClienteNeto,
+    ganRealNeto, margenRealPct,
+    tc, TC_RMB_USD,
+  };
+}
+
 // ── Cálculo de consolidación aérea ──────────────────────────────────────────
 // Dada una cotización y la operación a la que pertenece (con todas sus cots),
 // devuelve standalone, consolidado y ahorro distribuido según regla:
@@ -4145,6 +4228,58 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                             </div>
                           )}
+
+                          {/* ── PANEL COSTO REAL ZAGA ── */}
+                          {!isPropia && c.transporte === "aereo" && (() => {
+                            const opVinc = c.operacion_id ? operaciones.find(o => o.id === c.operacion_id) : null;
+                            const cz = calcCostoRealZaga(c, opVinc);
+                            if (cz.totalChinaRMB === 0 && cz.totalChileCLP === 0) return null;
+                            return (
+                              <div style={{marginTop:16,padding:16,background:"linear-gradient(135deg,#0f1e30 0%,#040c18 100%)",borderRadius:12,color:"#fff",border:"1px solid #c9a05544"}}>
+                                <div style={{fontSize:11,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                                  <span>💼 Costo real ZAGA (paso a paso)</span>
+                                  {opVinc && <span style={{fontSize:10,background:"#c9a05522",color:"#c9a055",padding:"2px 8px",borderRadius:10}}>en {opVinc.nro}</span>}
+                                </div>
+                                {/* Lado China */}
+                                <div style={{background:"#040c18",borderRadius:8,padding:"10px 12px",marginBottom:8,border:"1px solid #1a2740"}}>
+                                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:6,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>🇨🇳 China (RMB → CLP via TC {cz.TC_RMB_USD})</div>
+                                  <div style={{display:"grid",gridTemplateColumns:"1fr auto",rowGap:3,columnGap:12,fontSize:12,color:"#cbd5e1"}}>
+                                    <span>Mercancía ({Number(c.unidades)||0} und × ¥{c.precio_china_rmb||0})</span><span style={{color:"#fff",fontWeight:600,textAlign:"right"}}>¥{fmtN(cz.valorMercanciaRMB)}</span>
+                                    <span>+ Comisión Sunny ({cz.comisionPct}%)</span><span style={{color:"#fff",fontWeight:600,textAlign:"right"}}>¥{fmtN(cz.comisionRMB)}</span>
+                                    <span>+ Flete ({fmtN(cz.pesoTotal,1)} kg × ¥{fmtN(cz.tarifaRmbKg,2)}/kg)</span><span style={{color:"#fff",fontWeight:600,textAlign:"right"}}>¥{fmtN(cz.fleteRMB)}</span>
+                                    <span>+ Otros gastos {cz.detalleChina.seguroAplicaMin && <em style={{color:"#c47830"}}>(seguro mín)</em>}</span><span style={{color:"#fff",fontWeight:600,textAlign:"right"}}>¥{fmtN(cz.otrosGastosRMB)}</span>
+                                    <span style={{borderTop:"1px solid #1a2740",paddingTop:4,marginTop:2,color:"#c9a055",fontWeight:700}}>= Total China</span><span style={{borderTop:"1px solid #1a2740",paddingTop:4,marginTop:2,color:"#c9a055",fontWeight:800,textAlign:"right"}}>¥{fmtN(cz.totalChinaRMB)} = {fmt(cz.totalChinaCLP)}</span>
+                                  </div>
+                                </div>
+                                {/* Lado Chile */}
+                                <div style={{background:"#040c18",borderRadius:8,padding:"10px 12px",marginBottom:8,border:"1px solid #1a2740"}}>
+                                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:6,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>🇨🇱 Chile (CLP)</div>
+                                  <div style={{display:"grid",gridTemplateColumns:"1fr auto",rowGap:3,columnGap:12,fontSize:12,color:"#cbd5e1"}}>
+                                    <span>Aduana fija + arancel real</span><span style={{color:"#fff",fontWeight:600,textAlign:"right"}}>{fmt(cz.cdaReal)}</span>
+                                    {cz.ivaAgenteAer > 0 && <><span>(info) IVA agente recuperable</span><span style={{color:"#94a3b8",textAlign:"right"}}>{fmt(cz.ivaAgenteAer)}</span></>}
+                                    {cz.ivaAduanaAer > 0 && <><span>(info) IVA aduana recuperable</span><span style={{color:"#94a3b8",textAlign:"right"}}>{fmt(cz.ivaAduanaAer)}</span></>}
+                                    <span style={{borderTop:"1px solid #1a2740",paddingTop:4,marginTop:2,color:"#c9a055",fontWeight:700}}>= Total Chile</span><span style={{borderTop:"1px solid #1a2740",paddingTop:4,marginTop:2,color:"#c9a055",fontWeight:800,textAlign:"right"}}>{fmt(cz.totalChileCLP)}</span>
+                                  </div>
+                                </div>
+                                {/* Total + Ganancia */}
+                                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                                  <div style={{background:"#1a2740",borderRadius:8,padding:"10px 12px",border:"1px solid #c9a05533"}}>
+                                    <div style={{fontSize:10,color:"#94a3b8",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Costo total ZAGA</div>
+                                    <div style={{fontSize:20,fontWeight:800,color:"#fff"}}>{fmt(cz.costoZAGAReal)}</div>
+                                    <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>= China {fmt(cz.totalChinaCLP)} + Chile {fmt(cz.totalChileCLP)}</div>
+                                  </div>
+                                  <div style={{background:cz.ganRealNeto >= 0 ? "#0d987022" : "#c0392b22",borderRadius:8,padding:"10px 12px",border:`1px solid ${cz.ganRealNeto >= 0 ? "#10b98166" : "#c0392b66"}`}}>
+                                    <div style={{fontSize:10,color:cz.ganRealNeto >= 0 ? "#10b981" : "#fca5a5",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Ganancia real (neto)</div>
+                                    <div style={{fontSize:20,fontWeight:800,color:cz.ganRealNeto >= 0 ? "#22c55e" : "#fca5a5"}}>{fmt(cz.ganRealNeto)}</div>
+                                    <div style={{fontSize:10,color:"#cbd5e1",marginTop:2}}>Margen {fmtP(cz.margenRealPct)} · cliente paga {fmt(cz.precioClienteIva)} c/IVA</div>
+                                  </div>
+                                </div>
+                                <div style={{fontSize:10,color:"#64748b",marginTop:8,fontStyle:"italic",textAlign:"center"}}>
+                                  TC USD→CLP: {cz.tc} · Precio cliente neto: {fmt(cz.precioClienteNeto)} {cz.ivaPerdido > 0 && <span style={{color:"#fca5a5"}}>· ⚠️ IVA perdido sin factura: {fmt(cz.ivaPerdido)}</span>}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })()||null}</CardErrorBoundary>}
@@ -4699,6 +4834,66 @@ Número de seguimiento: ${c.nro}`;
                                   </div>
                                 </div>
                               )}
+
+                              {/* ── PANEL COSTO REAL ZAGA — POR COT + TOTAL OP ── */}
+                              {(() => {
+                                const rows = consolidados.map(({cot}) => ({ cot, cz: calcCostoRealZaga(cot, op) }));
+                                if (rows.length === 0) return null;
+                                const totChinaCLP = rows.reduce((s,r) => s + r.cz.totalChinaCLP, 0);
+                                const totChileCLP = rows.reduce((s,r) => s + r.cz.totalChileCLP, 0);
+                                const totCosto    = rows.reduce((s,r) => s + r.cz.costoZAGAReal, 0);
+                                const totPrecio   = rows.reduce((s,r) => s + r.cz.precioClienteIva, 0);
+                                const totGanancia = rows.reduce((s,r) => s + r.cz.ganRealNeto, 0);
+                                const totPrecioNeto = totPrecio / 1.19;
+                                const margenOp = totPrecioNeto > 0 ? (totGanancia/totPrecioNeto)*100 : 0;
+                                return (
+                                  <div style={{marginTop:14,padding:14,background:"linear-gradient(135deg,#0f1e30 0%,#040c18 100%)",borderRadius:10,color:"#fff",border:"1px solid #c9a05544"}}>
+                                    <div style={{fontSize:11,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10}}>
+                                      💼 Costo real ZAGA — OP {op.nro}
+                                    </div>
+                                    <div style={{overflowX:"auto"}}>
+                                      <table style={{width:"100%",fontSize:11,borderCollapse:"collapse",minWidth:600}}>
+                                        <thead>
+                                          <tr style={{background:"#040c18",color:"#94a3b8"}}>
+                                            <th style={{padding:"6px 8px",textAlign:"left",fontWeight:700}}>Cot</th>
+                                            <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700}}>China CLP</th>
+                                            <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700}}>Chile CLP</th>
+                                            <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700,color:"#c9a055"}}>Costo ZAGA</th>
+                                            <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700}}>Cliente c/IVA</th>
+                                            <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700,color:"#10b981"}}>Ganancia</th>
+                                            <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700}}>Margen</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {rows.map(({cot, cz}) => (
+                                            <tr key={cot.id} style={{borderTop:"1px solid #1a2740"}}>
+                                              <td style={{padding:"6px 8px",color:"#fff",fontWeight:700}}>{cot.nro}</td>
+                                              <td style={{padding:"6px 8px",textAlign:"right",color:"#cbd5e1"}}>{fmt(cz.totalChinaCLP)}</td>
+                                              <td style={{padding:"6px 8px",textAlign:"right",color:"#cbd5e1"}}>{fmt(cz.totalChileCLP)}</td>
+                                              <td style={{padding:"6px 8px",textAlign:"right",color:"#c9a055",fontWeight:700}}>{fmt(cz.costoZAGAReal)}</td>
+                                              <td style={{padding:"6px 8px",textAlign:"right",color:"#fff"}}>{fmt(cz.precioClienteIva)}</td>
+                                              <td style={{padding:"6px 8px",textAlign:"right",color:cz.ganRealNeto>=0?"#22c55e":"#fca5a5",fontWeight:700}}>{fmt(cz.ganRealNeto)}</td>
+                                              <td style={{padding:"6px 8px",textAlign:"right",color:cz.margenRealPct>=0?"#22c55e":"#fca5a5"}}>{fmtP(cz.margenRealPct)}</td>
+                                            </tr>
+                                          ))}
+                                          <tr style={{borderTop:"2px solid #c9a055",background:"#1a2740"}}>
+                                            <td style={{padding:"8px",fontSize:11,fontWeight:800,color:"#c9a055"}}>TOTAL OP</td>
+                                            <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#fff"}}>{fmt(totChinaCLP)}</td>
+                                            <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#fff"}}>{fmt(totChileCLP)}</td>
+                                            <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#c9a055",fontSize:12}}>{fmt(totCosto)}</td>
+                                            <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#fff",fontSize:12}}>{fmt(totPrecio)}</td>
+                                            <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:totGanancia>=0?"#22c55e":"#fca5a5",fontSize:12}}>{fmt(totGanancia)}</td>
+                                            <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:margenOp>=0?"#22c55e":"#fca5a5"}}>{fmtP(margenOp)}</td>
+                                          </tr>
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                    <div style={{fontSize:10,color:"#64748b",marginTop:8,fontStyle:"italic"}}>
+                                      💡 Costo ZAGA = China (mercancía + comisión Sunny + flete + 5 extras) + Chile (aduana fija + arancel). Ganancia = Cliente neto − Costo ZAGA. Para detalle por cot, expande la cot en Tracker.
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                               <div className="op-bottom-actions" style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
                                 <button onClick={async()=>{
                                   if(!confirm(`📢 Marcar OP ${op.nro} para que Sunny recotize?\n\nSunny verá la operación en su portal y deberá actualizar la tarifa de flete consolidada (USD/kg o USD/CBM según modo).`))return;
