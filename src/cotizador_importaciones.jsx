@@ -2333,185 +2333,153 @@ Número de seguimiento: ${c.nro}`;
       })()}
 
       {/* MODAL VISTA CLIENTE */}
-      {vistaData&&vistaData.tipo!=="propia"&&(
+      {vistaData&&vistaData.tipo!=="propia"&&(()=>{
+        // Vista cliente individual — limpia, estilo OP cliente
+        const cot = vistaData;
+        const u = Number(cot.unidades) || 0;
+        const precioAcordadoUnd = Number(cot.precio_final_acordado_und) || 0;
+        const totClIvaCalc = Number(cot.calc?.totClIva) || (Number(cot.calc?.totCl)*1.19) || 0;
+        const precioFinalUnd = precioAcordadoUnd > 0 ? precioAcordadoUnd : (u > 0 ? totClIvaCalc / u : 0);
+        const totalIva = precioFinalUnd * u;
+        const isAereo = cot.transporte === "aereo";
+        const calcLlegadaInd = () => {
+          if (cot.fecha_llegada_real) return cot.fecha_llegada_real;
+          const dias = isAereo ? 25 : 90;
+          let base;
+          if ((cot.checklist?.pago1_cliente || ["pagada","en_camino","en_bodega","completada"].includes(cot.estado)) && cot.fecha_pago1_cliente) {
+            base = cot.fecha_pago1_cliente;
+          } else {
+            base = cot.fecha_solicitud || cot.fecha_respuesta_china;
+          }
+          if (!base) return cot.fecha_llegada_est || null;
+          const d = new Date(base);
+          d.setDate(d.getDate() + dias);
+          return d.toISOString().split("T")[0];
+        };
+        const fechaLlegada = calcLlegadaInd();
+        const diasLlegada = fechaLlegada ? Math.ceil((new Date(fechaLlegada) - new Date()) / (1000*60*60*24)) : null;
+        const tienePago100 = !!cot.pago_100 || isAereo;
+        const p1 = tienePago100 ? totalIva : totalIva * 0.5;
+        const p2 = tienePago100 ? 0 : totalIva * 0.5;
+        return (
         <div style={{position:"fixed",inset:0,background:"#000b",zIndex:900,overflowY:"auto",padding:"12px 8px"}} onClick={e=>e.target===e.currentTarget&&setVistaId(null)}>
-          <div style={{maxWidth:520,margin:"0 auto"}}>
+          <div style={{maxWidth:820,margin:"0 auto"}}>
             <div style={{display:"flex",gap:8,marginBottom:8,justifyContent:"flex-end"}}>
               <button onClick={()=>abrirPrint("tracker")} style={{background:"#c9a055",color:"#05100e",border:"none",borderRadius:9,padding:"8px 16px",fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ Imprimir / Guardar PDF</button>
               <button onClick={()=>setVistaId(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:9,padding:"8px 14px",fontSize:13,cursor:"pointer"}}>✕ Cerrar</button>
             </div>
-            <div ref={vistaRef} style={{background:"#fff",borderRadius:14,overflow:"hidden",color:"#222",fontFamily:"'Segoe UI',Arial,sans-serif"}}>
-              {/* Header compacto */}
-              <div style={{background:"#ffffff",padding:"12px 18px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"2px solid #f0f0f0"}}>
-                <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:32,width:"auto",objectFit:"contain"}}/>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{vistaData.nro}</div>
-                  <div style={{fontSize:10,color:"#94a3b8",letterSpacing:.5,textTransform:"uppercase"}}>Cotización de Importación</div>
-                  <div style={{fontSize:11,color:"#64748b"}}>{todayStr()}</div>
+            <div ref={vistaRef} className="opvc-wrap" style={{background:"#fff",borderRadius:14,overflow:"hidden",color:"#222",fontFamily:"'Segoe UI',Arial,sans-serif"}}>
+              {/* Header limpio */}
+              <div className="opvc-header" style={{background:"#f1f5f9",padding:"24px 32px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:28,width:"auto",objectFit:"contain"}}/>
+                  <div>
+                    <div className="opvc-header-sub" style={{fontSize:11,color:"#64748b"}}>{isAereo?"Cotización Aérea":"Cotización Marítima"}</div>
+                    <div style={{fontSize:14,color:"#c9a055",fontWeight:700}}>{cot.nro}</div>
+                  </div>
+                </div>
+                <div className="opvc-header-r" style={{textAlign:"right"}}>
+                  <div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{cot.cliente}</div>
+                  <div className="opvc-header-date" style={{fontSize:11,color:"#64748b"}}>{todayStr()}</div>
                 </div>
               </div>
-              <div style={{padding:"14px 18px"}}>
-                {/* Info cliente — 2 cols compactas */}
-                <div style={{display:"flex",gap:12,marginBottom:12,paddingBottom:12,borderBottom:"1px solid #f0f0f0",alignItems:"flex-start"}}>
-                  {getImagenes(vistaData.imagen_url)[0]&&<img src={proxyImg(getImagenes(vistaData.imagen_url)[0])} alt={vistaData.producto} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:80,height:80,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",flexShrink:0}}/>}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 14px",flex:1}}>
-                    {[["Cliente",vistaData.cliente],["Producto",vistaData.producto],["Unidades",fmtN(vistaData.unidades)],["Fecha",todayStr()]].map(([l,v])=>(
-                      <div key={l}><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:2}}>{l}</div><div style={{fontSize:13,fontWeight:700,lineHeight:1.3}}>{v}</div></div>
-                    ))}
-                  </div>
+
+              {/* Banner KPIs */}
+              <div className="opvc-banner" style={{padding:"18px 32px",background:"#040c18",color:"#fff",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
+                <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Unidades</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#fff"}}>{fmtN(u)}</div></div>
+                <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Precio / und</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#c9a055"}}>{fmt(precioFinalUnd)}</div></div>
+                <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Total c/IVA</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(totalIva)}</div></div>
+                <div className="opvc-kpi-hide-mob">
+                  <div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Transporte</div>
+                  <div className="opvc-kpi-val" style={{fontSize:14,fontWeight:700,color:"#c47830"}}>{isAereo?"✈️ Aéreo":"🚢 Marítimo"}</div>
+                  {diasLlegada!==null && <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{diasLlegada>0?`≈ ${diasLlegada} días`:diasLlegada===0?"≈ Hoy":"Atrasado"}</div>}
                 </div>
-                {/* Precio */}
-                <div style={{background:"#f8f9ff",border:"1px solid #1a1a2e22",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div>
-                    <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:2}}>Precio por unidad (base)</div>
-                    <div style={{fontSize:22,fontWeight:800,color:"#0f172a"}}>{fmt(vistaData.calc?.pCUnd)}</div>
-                    <div style={{fontSize:10,color:"#64748b"}}>{vistaData.con_iva?"+ IVA":"Sin IVA"}</div>
-                  </div>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:2}}>Precio final / unidad (todo incluido)</div>
-                    {vistaData.con_iva ? (
-                      <>
-                        <div style={{fontSize:22,fontWeight:800,color:"#0f7040"}}>{fmt((vistaData.calc?.pfUnd||0)*1.19)}<span style={{fontSize:11,color:"#64748b",fontWeight:400,marginLeft:3}}>c/IVA</span></div>
-                        <div style={{fontSize:13,fontWeight:600,color:"#64748b"}}>{fmt(vistaData.calc?.pfUnd)}<span style={{fontSize:10,color:"#94a3b8",fontWeight:400,marginLeft:3}}>neto</span></div>
-                      </>
-                    ) : (
-                      <div style={{fontSize:22,fontWeight:800,color:"#0f7040"}}>{fmt(vistaData.calc?.pfUnd)}<span style={{fontSize:11,color:"#64748b",fontWeight:400,marginLeft:3}}>neto</span></div>
-                    )}
-                    <div style={{fontSize:10,color:"#64748b"}}>Incluye comisiones y servicio</div>
-                  </div>
-                </div>
-                {/* Estructura de Pago */}
-                <div style={{marginBottom:10}}>
-                  <div style={{fontSize:12,fontWeight:700,marginBottom:8,color:"#0f172a"}}>Estructura de Pago</div>
-                  {/* ── COTIZACIÓN AÉREA: tabla de 3 líneas (Mercadería · Costos aduaneros · Servicio ZAGA) ── */}
-                  {vistaData.transporte==="aereo" ? (
-                    <div style={{background:"#fff7ed",border:"2px solid #fed7aa",borderRadius:10,padding:"12px 14px"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                        <span style={{fontWeight:700,fontSize:13,color:"#c47830"}}>✈️ Cotización aérea — Pago 100% al confirmar</span>
-                        <span style={{fontSize:10,color:"#92400e",fontStyle:"italic"}}>CIP Santiago + gestión aduanera</span>
-                      </div>
-                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                        <thead>
-                          <tr style={{background:"#fef3c7"}}>
-                            <th style={{textAlign:"left",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Concepto</th>
-                            <th style={{textAlign:"right",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Cant</th>
-                            <th style={{textAlign:"right",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>P. Unit</th>
-                            <th style={{textAlign:"right",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Neto</th>
-                            <th style={{textAlign:"right",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>IVA 19%</th>
-                            <th style={{textAlign:"right",padding:"6px 8px",fontSize:10,color:"#92400e",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(()=>{
-                            const tCl=vistaData.calc?.tCl||0, serv=vistaData.calc?.serv||0, cdaCl=vistaData.calc?.cdaCl||0;
-                            const aer=vistaData.calc?.aer||{};
-                            // Mercadería
-                            const mNeto=tCl, mIva=tCl*0.19, mTot=mNeto+mIva;
-                            // Gestión aduanera: neto = aduFijo + arancel (solo netos), IVA = 19% sobre neto
-                            const aNeto=cdaCl;
-                            const aIva=aNeto*0.19;
-                            const aTot=aNeto+aIva;
-                            // Servicio ZAGA
-                            const sNeto=serv, sIva=serv*0.19, sTot=sNeto+sIva;
-                            const subtotal=mNeto+aNeto+sNeto;
-                            const totIva=mIva+aIva+sIva;
-                            const totGen=mTot+aTot+sTot;
-                            return (<>
-                              <tr style={{borderBottom:"1px solid #fed7aa"}}>
-                                <td style={{padding:"6px 8px",color:"#0f172a"}}>{vistaData.producto||"Mercadería"}</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f172a"}}>{fmtN(vistaData.unidades||0)}</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f172a"}}>{fmt(vistaData.calc?.pCUnd||0)}</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f172a",fontWeight:600}}>{fmt(mNeto)}</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#92400e"}}>{fmt(mIva)}</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f7040",fontWeight:700}}>{fmt(mTot)}</td>
-                              </tr>
-                              <tr style={{borderBottom:"1px solid #fed7aa"}}>
-                                <td style={{padding:"6px 8px",color:"#0f172a"}}>Gestión aduanera y despacho</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#94a3b8"}}>—</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#94a3b8"}}>—</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f172a",fontWeight:600}}>{fmt(aNeto)}</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#92400e"}}>{fmt(aIva)}</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f7040",fontWeight:700}}>{fmt(aTot)}</td>
-                              </tr>
-                              <tr style={{borderBottom:"1px solid #fed7aa"}}>
-                                <td style={{padding:"6px 8px",color:"#0f172a"}}>Servicio ZAGA ({vistaData.pct_servicio||6}%)</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#94a3b8"}}>—</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#94a3b8"}}>—</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f172a",fontWeight:600}}>{fmt(sNeto)}</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#92400e"}}>{fmt(sIva)}</td>
-                                <td style={{textAlign:"right",padding:"6px 8px",color:"#0f7040",fontWeight:700}}>{fmt(sTot)}</td>
-                              </tr>
-                              <tr style={{background:"#fef3c7"}}>
-                                <td colSpan={3} style={{padding:"8px",fontWeight:800,color:"#92400e",textTransform:"uppercase",fontSize:10,letterSpacing:.8}}>Total</td>
-                                <td style={{textAlign:"right",padding:"8px",fontWeight:800,color:"#0f172a"}}>{fmt(subtotal)}</td>
-                                <td style={{textAlign:"right",padding:"8px",fontWeight:800,color:"#92400e"}}>{fmt(totIva)}</td>
-                                <td style={{textAlign:"right",padding:"8px",fontWeight:900,color:"#0f7040",fontSize:13}}>{fmt(totGen)}</td>
-                              </tr>
-                            </>);
-                          })()}
-                        </tbody>
-                      </table>
-                      <div style={{fontSize:10,color:"#92400e",marginTop:10,lineHeight:1.6}}>
-                        <strong>Condiciones:</strong> Pago 100% anticipado.
+              </div>
+
+              <div className="opvc-body" style={{padding:"20px 32px"}}>
+                <div className="opvc-section-ttl opvc-detalle-section-ttl" style={{fontSize:12,fontWeight:700,color:"#333",marginBottom:12}}>Detalle del producto</div>
+                <div className="opvc-cot" style={{borderRadius:10,border:"2px solid #1a1a2e22",marginBottom:10,overflow:"hidden"}}>
+                  <div className="opvc-cot-hdr" style={{background:"#f8fafc",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #e2e8f0"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      {getImagenes(cot.imagen_url)[0]&&<img src={proxyImg(getImagenes(cot.imagen_url)[0])} alt={cot.producto} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:48,height:48,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                      <div>
+                        <div className="opvc-cot-hdr-prod" style={{fontWeight:700,fontSize:13,color:"#222"}}>{cot.producto}</div>
+                        <div className="opvc-cot-hdr-nro" style={{fontSize:11,color:"#64748b"}}>{cot.nro}</div>
                       </div>
                     </div>
-                  ) : (vistaData.pago_100||Number(vistaData.pct_deposito)>=100) ? (
-                    <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:"10px 14px"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontWeight:700,fontSize:13,color:"#0f7040"}}>💰 Pago Único — Al confirmar la orden</span><span style={{fontWeight:800,fontSize:17,color:"#0f7040"}}>{vistaData.con_iva?fmt((vistaData.calc?.totCl||0)*1.19):fmt(vistaData.calc?.totCl)}</span></div>
-                      <div style={{fontSize:11,color:"#666"}}>
-                        {[["Total importación",fmt(vistaData.calc?.tCl)],[`Servicio de importación (${vistaData.pct_servicio}%)`,fmt(vistaData.calc?.serv)],...((Number(vistaData.cda_cl)||Number(vistaData.cda))>0?[[vistaData.cda_descripcion||"Certificado",fmt(vistaData.calc?.cdaCl||Number(vistaData.cda_cl)||Number(vistaData.cda)||0)]]:[] ),...(vistaData.con_iva?[["IVA (19%)",fmt((vistaData.calc?.totCl||0)*0.19)]]:[] )].map(([l,v])=>(
-                          <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid #dcfce7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
-                        ))}
+                    <span className="opvc-cot-hdr-badge" style={{background:"#c47830",color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:700}}>{isAereo?"✈️ Aéreo":"🚢 Marítimo"}</span>
+                  </div>
+                  <div className="opvc-cot-grid" style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,background:"#fff"}}>
+                    <div>
+                      <div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Unidades</div>
+                      <div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmtN(u)}</div>
+                      {cot.unidades_originales && Number(cot.unidades_originales) !== Number(cot.unidades) && (
+                        <div style={{fontSize:9,color:"#c47830",fontStyle:"italic",marginTop:2}}>📦 ajustada (pediste {cot.unidades_originales})</div>
+                      )}
+                    </div>
+                    <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>$/und c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmt(precioFinalUnd)}</div></div>
+                    <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Total c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:800,color:"#1aa358"}}>{fmt(totalIva)}</div></div>
+                    <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Llegada esti.</div><div className="opvc-cell-val" style={{fontSize:12,fontWeight:700,color:"#c47830",fontStyle:"italic"}}>≈ {fechaLlegada||"—"}</div></div>
+                  </div>
+                  {/* Versión móvil compacta */}
+                  <div className="opvc-cot-mob" style={{display:"none"}}>
+                    <div className="row1">
+                      <div className="prod-wrap">
+                        <span className="nro-chip">{cot.nro}</span>
+                        <span className="prod">{cot.producto}</span>
                       </div>
+                      <span className="tot">{fmt(totalIva)}</span>
+                    </div>
+                    <div className="row2">
+                      <span>{fmtN(u)} und × {fmt(precioFinalUnd)}</span>
+                      <span className="llegada">≈ Llegada esti. {fechaLlegada||"—"}</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Plan de pagos (estilo OP cliente) */}
+                <div className="opvc-pay" style={{background:"#040c18",borderRadius:12,padding:"18px 22px",color:"#fff",marginTop:14}}>
+                  <div className="opvc-pay-ttl" style={{fontSize:10,color:"#c9a055",textTransform:"uppercase",letterSpacing:1.5,fontWeight:700,marginBottom:12}}>💰 Plan de pagos</div>
+                  {tienePago100 ? (
+                    <div className="opvc-pay-box" style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
+                      <div><div className="opvc-pay-box-lbl" style={{fontSize:12,color:"#94a3b8"}}>💰 Pago único (100%)</div><div className="opvc-pay-box-sub" style={{fontSize:10,color:"#64748b",marginTop:2}}>Al confirmar</div></div>
+                      <div className="opvc-pay-box-val" style={{fontSize:20,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
                     </div>
                   ) : (
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                      <div style={{background:"#f0fdf4",border:"2px solid #22c55e44",borderRadius:10,padding:"10px 12px"}}>
-                        <div style={{fontWeight:700,fontSize:12,color:"#0f7040",marginBottom:4}}>1er Pago</div>
-                        <div style={{fontWeight:800,fontSize:18,color:"#0f7040",marginBottom:6}}>{vistaData.con_iva?fmt((vistaData.calc?.p1Cl||0)*1.19):fmt(vistaData.calc?.p1Cl)}</div>
-                        <div style={{fontSize:10,color:"#0f7040",marginBottom:6}}>Al confirmar la orden</div>
-                        <div style={{fontSize:10,color:"#666"}}>
-                          {[[`Depósito ${vistaData.pct_deposito}%`,fmt(vistaData.calc?.dCl)],[`Comisión ${(Number(vistaData.pct_com_prestamo)||6.5).toFixed(1)}%`,fmt(vistaData.calc?.comCl)],...((Number(vistaData.cda_cl)||Number(vistaData.cda))>0?[[vistaData.cda_descripcion||"Certificado",fmt(vistaData.calc?.cdaCl||Number(vistaData.cda_cl)||Number(vistaData.cda)||0)]]:[] ),...(vistaData.con_iva?[["IVA 19%",fmt((vistaData.calc?.p1Cl||0)*0.19)]]:[] )].map(([l,v])=>(
-                            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"2px 0",borderBottom:"1px solid #dcfce7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
-                          ))}
-                        </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
+                        <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>1er pago (50%)</div>
+                        <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Al confirmar</div>
+                        <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
                       </div>
-                      <div style={{background:"#fffbeb",border:"2px solid #f5c84244",borderRadius:10,padding:"10px 12px"}}>
-                        <div style={{fontWeight:700,fontSize:12,color:"#92400e",marginBottom:4}}>2do Pago</div>
-                        <div style={{fontWeight:800,fontSize:18,color:"#92400e",marginBottom:6}}>{vistaData.con_iva?fmt((vistaData.calc?.p2Cl||0)*1.19):fmt(vistaData.calc?.p2Cl)}</div>
-                        <div style={{fontSize:10,color:"#92400e",marginBottom:6}}>Al recibir en Chile</div>
-                        <div style={{fontSize:10,color:"#666"}}>
-                          {[[`Saldo ${100-Number(vistaData.pct_deposito)}%`,fmt(vistaData.calc?.prCl)],[`Servicio ${vistaData.pct_servicio}%`,fmt(vistaData.calc?.serv)],...(vistaData.con_iva?[["IVA 19%",fmt((vistaData.calc?.p2Cl||0)*0.19)]]:[] )].map(([l,v])=>(
-                            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"2px 0",borderBottom:"1px solid #fef3c7"}}><span>{l}</span><span style={{fontWeight:600}}>{v}</span></div>
-                          ))}
-                        </div>
+                      <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
+                        <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>2do pago (50%)</div>
+                        <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Antes del despacho</div>
+                        <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#fbbf24"}}>{fmt(p2)}</div>
                       </div>
                     </div>
                   )}
-                </div>
-                {/* Total */}
-                <div style={{background:"#f1f5f9",borderRadius:10,padding:"10px 14px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{color:"#64748b",fontSize:12}}>TOTAL IMPORTACIÓN</span>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{color:"#0f172a",fontSize:20,fontWeight:800}}>{vistaData.con_iva?fmt((vistaData.calc?.totCl||0)*1.19):fmt(vistaData.calc?.totCl)}</div>
-                    <div style={{color:"#64748b",fontSize:10}}>{fmtN(vistaData.unidades)} und · {vistaData.con_iva?fmt((vistaData.calc?.pfUnd||0)*1.19):fmt(vistaData.calc?.pfUnd)}/und{vistaData.con_iva?" c/IVA":""}</div>
+                  <div className="opvc-pay-total" style={{marginTop:14,paddingTop:12,borderTop:"1px solid #1a2740",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:12,color:"#94a3b8"}}>TOTAL CON IVA</span>
+                    <span className="opvc-pay-total-val" style={{fontSize:22,fontWeight:800,color:"#c9a055"}}>{fmt(totalIva)}</span>
                   </div>
                 </div>
-                {/* Consideraciones compactas */}
-                <div style={{background:"#f9f9f9",borderRadius:8,padding:"8px 12px",fontSize:11,color:"#666"}}>
-                  <div style={{fontWeight:700,color:"#333",marginBottom:5}}>Consideraciones</div>
-                  <div style={{marginBottom:3}}>• Llegada estimada: <strong>{vistaData.transporte==="aereo"?"30 días":"90 días"}</strong> desde confirmación y pago.</div>
-                  {!vistaData.pago_100&&Number(vistaData.pct_deposito)<100&&<div style={{marginBottom:3}}>• El {100-Number(vistaData.pct_deposito)}% del valor queda financiado hasta la recepción.</div>}
-                  {(vistaData.pago_100||Number(vistaData.pct_deposito)>=100)&&<div style={{marginBottom:3}}>• Pago 100% al confirmar la orden (sin financiamiento).</div>}
-                  <div style={{marginBottom:3}}>• Fulfillment disponible desde <strong>$1.200 + IVA</strong> según necesidad.</div>
-                  {vistaData.notas&&<div style={{marginBottom:3}}>• {vistaData.notas}</div>}
-                  <div>• Valores <strong>{vistaData.con_iva?"con IVA incluido":"sin IVA"}</strong>.</div>
+
+                {/* Mensaje cierre */}
+                <div className="opvc-msg" style={{marginTop:16,padding:"14px 18px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0",fontSize:12,color:"#475569",lineHeight:1.5}}>
+                  <b style={{color:"#040c18"}}>Vigencia:</b> 7 días · <b style={{color:"#040c18"}}>Modalidad:</b> {isAereo?"Aérea":"Marítima"}{fechaLlegada && <> · <b style={{color:"#040c18"}}>Llegada esti.:</b> {fechaLlegada}</>}<br/>
+                  <b style={{color:"#040c18"}}>Datos de pago:</b> coordinar con ZAGA al confirmar. <em>* Las fechas son estimadas y pueden variar según producción y aduana.</em>
+                </div>
+
+                <div className="opvc-footer" style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>
+                  ZAGA SpA · RUT 77874968-8 · Santiago, Chile · {todayStr()}
                 </div>
               </div>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
+
 
       <div style={{maxWidth:1200,margin:"0 auto",padding:"20px 16px",overflowX:"hidden"}}>
 
