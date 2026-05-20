@@ -626,6 +626,7 @@ function calcPropia(d) {
 
 // ── Format ────────────────────────────────────────────────────────
 const fmt  = n=>!n&&n!==0?"$0":Number(n).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0});
+const fmtRMB = n=>!n&&n!==0?"¥0":"¥"+Number(n).toLocaleString("es-CL",{maximumFractionDigits:0});
 const fmtN = n=>Number(n).toLocaleString("es-CL",{maximumFractionDigits:0});
 // Parsea imagen_url que puede contener múltiples URLs separadas por "|||"
 const getImagenes = (url) => url ? url.split('|||').filter(Boolean) : [];
