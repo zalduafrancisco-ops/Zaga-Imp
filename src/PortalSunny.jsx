@@ -7,6 +7,14 @@ import LOGO_WHITE from "./logo-white.png"
 // Diseño aprobado en PORTAL_SUNNY_DESIGN.md (commit e7eaeb2).
 
 const TC_RMB_USD = 7.2 // TC fijo (igual que PortalChina dashboard)
+// Proxy de imágenes para dominios con hotlink protection (Alibaba, Taobao, 1688, etc.)
+const proxyImg = (url) => {
+  if (!url || typeof url !== "string") return url
+  if (/alicdn\.com|alibaba\.com|taobao\.com|tmall\.com|aliyuncs\.com|1688\.com/i.test(url)) {
+    return `https://wsrv.nl/?url=${encodeURIComponent(url)}`
+  }
+  return url
+}
 
 // ─── Estados que ve Sunny por tab ───────────────────────────────────────────
 const ESTADOS_PEND_COT     = ["solicitud"]
@@ -688,7 +696,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               {c.notas && <div style={{ gridColumn:"1 / -1", color:"#92400e", background:"#fffbeb", borderRadius:6, padding:"5px 8px", marginTop:4 }}><b>📌 备注 Nota admin:</b> {c.notas}</div>}
               {c.imagen_url && (() => {
                 const img = c.imagen_url.split("|||")[0]
-                return img ? <div style={{ gridColumn:"1 / -1", marginTop:4 }}><img src={img} alt="" referrerPolicy="no-referrer" style={{ maxWidth:140, borderRadius:6, border:"1px solid #e2e8f0" }} onError={e=>e.target.style.display="none"}/></div> : null
+                return img ? <div style={{ gridColumn:"1 / -1", marginTop:4 }}><img src={proxyImg(img)} alt="" referrerPolicy="no-referrer" style={{ maxWidth:140, borderRadius:6, border:"1px solid #e2e8f0" }} onError={e=>e.target.style.display="none"}/></div> : null
               })()}
             </div>
           </div>
@@ -705,7 +713,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
                   <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
                     {imagenes.map((url, idx) => (
                       <div key={idx} style={{ position:"relative", width:64, height:64 }}>
-                        <img src={url} alt="" referrerPolicy="no-referrer" style={{ width:64, height:64, objectFit:"cover", borderRadius:5, border:"1px solid #e2e8f0", display:"block" }} onError={e=>{ e.target.parentNode.style.opacity=".3" }}/>
+                        <img src={proxyImg(url)} alt="" referrerPolicy="no-referrer" style={{ width:64, height:64, objectFit:"cover", borderRadius:5, border:"1px solid #e2e8f0", display:"block" }} onError={e=>{ e.target.parentNode.style.opacity=".3" }}/>
                         <button type="button" onClick={()=>setImagenes(imagenes.filter((_,i)=>i!==idx))} title="删除 / Eliminar" style={{ position:"absolute", top:-5, right:-5, width:18, height:18, background:"#c0392b", color:"#fff", border:"none", borderRadius:"50%", cursor:"pointer", fontSize:13, lineHeight:"18px", textAlign:"center", padding:0, fontWeight:900 }}>×</button>
                       </div>
                     ))}
@@ -714,7 +722,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
                 {/* Input agregar nueva URL */}
                 <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                   {nuevaImgUrl && /^https?:\/\//i.test(nuevaImgUrl) && (
-                    <img src={nuevaImgUrl} alt="" referrerPolicy="no-referrer" style={{ width:32, height:32, objectFit:"cover", borderRadius:4, border:"1px solid #e2e8f0", flexShrink:0 }} onError={e=>{ e.target.style.display="none" }}/>
+                    <img src={proxyImg(nuevaImgUrl)} alt="" referrerPolicy="no-referrer" style={{ width:32, height:32, objectFit:"cover", borderRadius:4, border:"1px solid #e2e8f0", flexShrink:0 }} onError={e=>{ e.target.style.display="none" }}/>
                   )}
                   <input
                     value={nuevaImgUrl}
@@ -1117,7 +1125,7 @@ function CotReadOnly({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
                 return (
                   <div style={{ display:"flex", flexWrap:"wrap", gap:4, flexShrink:0, maxWidth:170 }}>
                     {imgs.slice(0,4).map((url, idx) => (
-                      <img key={idx} src={url} alt="" referrerPolicy="no-referrer" style={{ width:imgs.length===1?80:50, height:imgs.length===1?80:50, borderRadius:5, objectFit:"cover", border:"1px solid #e2e8f0" }} onError={e=>e.target.style.display="none"}/>
+                      <img key={idx} src={proxyImg(url)} alt="" referrerPolicy="no-referrer" style={{ width:imgs.length===1?80:50, height:imgs.length===1?80:50, borderRadius:5, objectFit:"cover", border:"1px solid #e2e8f0" }} onError={e=>e.target.style.display="none"}/>
                     ))}
                     {imgs.length > 4 && <div style={{ width:50, height:50, borderRadius:5, background:"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center", color:"#64748b", fontSize:11, fontWeight:700 }}>+{imgs.length-4}</div>}
                   </div>

@@ -574,6 +574,15 @@ const fmt  = n=>!n&&n!==0?"$0":Number(n).toLocaleString("es-CL",{style:"currency
 const fmtN = n=>Number(n).toLocaleString("es-CL",{maximumFractionDigits:0});
 // Parsea imagen_url que puede contener múltiples URLs separadas por "|||"
 const getImagenes = (url) => url ? url.split('|||').filter(Boolean) : [];
+// Proxy de imágenes para dominios con hotlink protection (Alibaba, Taobao, 1688, etc.)
+// wsrv.nl es un proxy gratuito que reemite la imagen sin headers problemáticos.
+const proxyImg = (url) => {
+  if (!url || typeof url !== "string") return url;
+  if (/alicdn\.com|alibaba\.com|taobao\.com|tmall\.com|aliyuncs\.com|1688\.com/i.test(url)) {
+    return `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
 const fmtP = n=>isNaN(n)||n===null?"-":`${Number(n).toFixed(1)}%`;
 const todayStr=()=>new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
 const monthKey=d=>{ try{ const dt=new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`; }catch{ return ""; }};
@@ -1863,7 +1872,7 @@ Número de seguimiento: ${c.nro}`;
                       </div>
                     )
                   })()}
-                  {getImagenes(p.imagen_url)[0]&&<img src={getImagenes(p.imagen_url)[0]} alt={p.producto} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:"100%",maxHeight:220,objectFit:"contain",borderRadius:10,border:"1px solid #e2e8f0",background:"#f8fafc",marginBottom:4}}/>}
+                  {getImagenes(p.imagen_url)[0]&&<img src={proxyImg(getImagenes(p.imagen_url)[0])} alt={p.producto} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:"100%",maxHeight:220,objectFit:"contain",borderRadius:10,border:"1px solid #e2e8f0",background:"#f8fafc",marginBottom:4}}/>}
                   {p.link_alibaba&&<a href={p.link_alibaba} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,background:"#eff6ff",color:"#2d78c8",border:"1px solid #3b82f633",borderRadius:8,padding:"8px 14px",fontSize:12,textDecoration:"none"}}>🔗 Ver referencia en Alibaba</a>}
                   {p.motivo_no_procesada&&<div style={{background:"#fff1f2",borderRadius:8,padding:12,border:"1px solid #ef444433"}}><div style={{fontSize:10,color:"#c0392b",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Motivo no procesada</div><div style={{fontSize:12,color:"#dc2626"}}>{p.motivo_no_procesada}</div></div>}
                   {(p.negociacion_rondas||[]).length>0&&(
@@ -1914,7 +1923,7 @@ Número de seguimiento: ${c.nro}`;
               <div style={{padding:"14px 18px"}}>
                 {/* Info cliente — 2 cols compactas */}
                 <div style={{display:"flex",gap:12,marginBottom:12,paddingBottom:12,borderBottom:"1px solid #f0f0f0",alignItems:"flex-start"}}>
-                  {getImagenes(vistaData.imagen_url)[0]&&<img src={getImagenes(vistaData.imagen_url)[0]} alt={vistaData.producto} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:80,height:80,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                  {getImagenes(vistaData.imagen_url)[0]&&<img src={proxyImg(getImagenes(vistaData.imagen_url)[0])} alt={vistaData.producto} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:80,height:80,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",flexShrink:0}}/>}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 14px",flex:1}}>
                     {[["Cliente",vistaData.cliente],["Producto",vistaData.producto],["Unidades",fmtN(vistaData.unidades)],["Fecha",todayStr()]].map(([l,v])=>(
                       <div key={l}><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:2}}>{l}</div><div style={{fontSize:13,fontWeight:700,lineHeight:1.3}}>{v}</div></div>
@@ -2175,7 +2184,7 @@ Número de seguimiento: ${c.nro}`;
                     <label style={{display:"block",fontSize:10,color:"#777",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Imagen del producto (URL)</label>
                     <div style={{display:"flex",gap:8,alignItems:"center"}}>
                       <input value={form.imagen_url||""} onChange={e=>setForm(p=>({...p,imagen_url:e.target.value}))} placeholder="Clic derecho en la imagen → Copiar dirección de imagen" style={{flex:1,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:8,color:"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
-                      {getImagenes(form.imagen_url)[0]&&<img src={getImagenes(form.imagen_url)[0]} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:44,height:44,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                      {getImagenes(form.imagen_url)[0]&&<img src={proxyImg(getImagenes(form.imagen_url)[0])} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:44,height:44,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0",flexShrink:0}}/>}
                     </div>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
@@ -3266,7 +3275,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{padding:20,borderLeft:`4px solid ${isPropia?"#3d7fc4":sc}`}}>
                       <div className="cot-card-row" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                         <div style={{flex:1}}>
-                          {getImagenes(c.imagen_url)[0]&&<img src={getImagenes(c.imagen_url)[0]} alt={c.producto} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:90,height:90,objectFit:"cover",borderRadius:10,border:"1px solid #e2e8f0",float:"right",marginLeft:12,marginBottom:6}}/>}
+                          {getImagenes(c.imagen_url)[0]&&<img src={proxyImg(getImagenes(c.imagen_url)[0])} alt={c.producto} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:90,height:90,objectFit:"cover",borderRadius:10,border:"1px solid #e2e8f0",float:"right",marginLeft:12,marginBottom:6}}/>}
                           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
                             {isPropia?<span style={{background:"#3d7fc422",color:"#3d7fc4",border:"1px solid #8b5cf644",borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>🏠 PROPIA</span>:<span style={{fontWeight:700,fontSize:15}}>{c.cliente}</span>}
                             {!isPropia&&c.categoria_cliente==="premium"&&<span style={{background:"#c9a05522",color:"#c9a055",border:"1px solid #f5c84244",borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:700}}>⭐ Premium</span>}
@@ -3604,7 +3613,7 @@ Número de seguimiento: ${c.nro}`;
                               <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:10}}>
                                 {getImagenes(c.imagen_url).map((url,idx)=>(
                                   <div key={idx} style={{position:"relative",width:72,height:72}}>
-                                    <img src={url} referrerPolicy="no-referrer" onError={e=>{e.target.parentNode.style.opacity='.3'}} style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",display:"block"}}/>
+                                    <img src={proxyImg(url)} referrerPolicy="no-referrer" onError={e=>{e.target.parentNode.style.opacity='.3'}} style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0",display:"block"}}/>
                                     <button onClick={async()=>{
                                       const imgs=getImagenes(c.imagen_url).filter((_,i)=>i!==idx);
                                       await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,imagen_url:imgs.join('|||')}:x));
@@ -3615,7 +3624,7 @@ Número de seguimiento: ${c.nro}`;
                             )}
                             {/* Input agregar nueva */}
                             <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                              {newImgInput[c.id]&&<img src={newImgInput[c.id]} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:36,height:36,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0",flexShrink:0}}/>}
+                              {newImgInput[c.id]&&<img src={proxyImg(newImgInput[c.id])} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:36,height:36,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0",flexShrink:0}}/>}
                               <input
                                 value={newImgInput[c.id]||""}
                                 onChange={e=>setNewImgInput(p=>({...p,[c.id]:e.target.value}))}
