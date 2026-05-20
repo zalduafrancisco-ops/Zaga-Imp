@@ -373,8 +373,9 @@ function OpGroupCard({ op, cots, supabase, onSaved, children }) {
         <div style={{ fontSize: 22, color: "#854d0e" }}>{expanded ? "▾" : "▸"}</div>
       </div>
 
-      {/* Chat del grupo (expandible al click del header) */}
+      {/* Chat + cotizaciones (expandible al click del header) */}
       {expanded && (
+        <>
         <div style={{ padding: "12px 16px", background: "#fff", borderBottom: "1px solid #fde68a" }}>
           <div style={{ fontSize: 11, color: "#854d0e", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
             💬 小组消息 / Chat del grupo (visible para todas las cots)
@@ -424,15 +425,16 @@ function OpGroupCard({ op, cots, supabase, onSaved, children }) {
             {saving ? "发送中..." : "📤 发送给小组 / Enviar al grupo"}
           </button>
         </div>
-      )}
 
-      {/* Cards de las cotizaciones del grupo */}
-      <div style={{ padding: "10px 12px 12px", background: "#fffbeb" }}>
-        <div style={{ fontSize: 10, color: "#854d0e", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-          📦 报价 / Cotizaciones del grupo ({cots.length})
+        {/* Cards de las cotizaciones del grupo (solo visibles al expandir) */}
+        <div style={{ padding: "10px 12px 12px", background: "#fffbeb" }}>
+          <div style={{ fontSize: 10, color: "#854d0e", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+            📦 报价 / Cotizaciones del grupo ({cots.length})
+          </div>
+          {children}
         </div>
-        {children}
-      </div>
+        </>
+      )}
     </div>
   )
 }
