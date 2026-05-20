@@ -574,7 +574,9 @@ export default function App({ supabase, usuario, onLogout }){
   const [toast,setToast]                 = useState(null);
   const [vistaId,setVistaId]             = useState(null);
   const [previewId,setPreviewId]         = useState(null);
-  const [printModal,setPrintModal]       = useState(null); // "tracker" | "cliente"
+  const [printModal,setPrintModal]       = useState(null); // "tracker" | "cliente" | "op_cliente"
+  const [vistaOpId,setVistaOpId]         = useState(null);
+  const [vistaOpCliente,setVistaOpCliente] = useState(null);
   const [dashFilter,setDashFilter]       = useState("todas");
   const [dashTipo,setDashTipo]           = useState("clientes");
   const [dashClienteFiltro,setDashClienteFiltro] = useState("todos");
@@ -914,7 +916,7 @@ export default function App({ supabase, usuario, onLogout }){
 
   // Export via print dialog (no CDN needed)
   const abrirPrint=(tipo)=>{ setPrintModal(tipo); };
-  const cerrarPrint=()=>{ setPrintModal(null); };
+  const cerrarPrint=()=>{ setPrintModal(null); setVistaOpId(null); setVistaOpCliente(null); };
 
   const _vistaRaw=vistaId?cotizaciones.find(c=>c.id===vistaId):null;
   // Recalcular calc al renderizar la vista — evita que cotizaciones guardadas con cálculos viejos
@@ -1380,6 +1382,138 @@ Número de seguimiento: ${c.nro}`;
                 </div>
               </div>
             )}
+
+            {/* ── VISTA CLIENTE — OP CONSOLIDADA (cotización formal por cliente) ── */}
+            {printModal==="op_cliente"&&vistaOpId&&vistaOpCliente&&(()=>{
+              const op = operaciones.find(o=>o.id===vistaOpId);
+              if (!op) return null;
+              const cotsOp = cotizaciones.filter(c => (op.cotizaciones||[]).includes(c.id));
+              const cotsCliente = cotsOp.filter(c => c.cliente === vistaOpCliente && !["no_prospero"].includes(c.estado));
+              if (cotsCliente.length === 0) return null;
+              const aplicado = op.consolidado_aplicado_cliente === true;
+              const consolidados = cotsCliente.map(c => ({ cot:c, calc: calcConsolidado(c, op, cotsOp) }));
+              const totConsolidadoIva = consolidados.reduce((s,x)=>s+(x.calc?.consolidado?.totClIva||0), 0);
+              const totStandaloneIva = consolidados.reduce((s,x)=>s+(x.calc?.standalone?.totClIva||0), 0);
+              const ahorroIva = totStandaloneIva - totConsolidadoIva;
+              const totUnd = cotsCliente.reduce((s,c)=>s+(Number(c.unidades)||0), 0);
+              // Pagos: 50/50 a menos que la cot tenga pago_100
+              const tienePago100 = cotsCliente.every(c => c.pago_100);
+              const p1 = tienePago100 ? totConsolidadoIva : totConsolidadoIva / 2;
+              const p2 = tienePago100 ? 0 : totConsolidadoIva / 2;
+              // Fecha estimada de llegada (máxima de las cots)
+              const fechasLlegada = cotsCliente.map(c=>c.fecha_llegada_est).filter(Boolean);
+              const fechaLlegadaMax = fechasLlegada.length > 0 ? fechasLlegada.sort().slice(-1)[0] : null;
+              const diasLlegada = fechaLlegadaMax ? Math.ceil((new Date(fechaLlegadaMax)-new Date())/(1000*60*60*24)) : null;
+              return (
+                <div ref={vistaClienteRef}>
+                  <div style={{background:"#f1f5f9",padding:"24px 32px",display:"flex",justifyContent:"space-between",alignItems:"center",borderRadius:"12px 12px 0 0"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:28,width:"auto",objectFit:"contain"}}/>
+                      <div>
+                        <div style={{fontSize:11,color:"#64748b"}}>Cotización Consolidada Aérea</div>
+                        <div style={{fontSize:14,color:"#c9a055",fontWeight:700}}>{op.nro}</div>
+                      </div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{vistaOpCliente}</div>
+                      <div style={{fontSize:11,color:"#64748b"}}>{todayStr()}</div>
+                    </div>
+                  </div>
+                  <div style={{border:"2px solid #1a1a2e22",borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden",background:"#fff"}}>
+                    {/* Banner con resumen + ahorro si aplica */}
+                    <div style={{padding:"18px 32px",background:"#040c18",color:"#fff",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
+                      <div><div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Productos</div><div style={{fontSize:18,fontWeight:800,color:"#c9a055"}}>{cotsCliente.length}</div></div>
+                      <div><div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Unidades</div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{fmtN(totUnd)}</div></div>
+                      <div><div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Total c/IVA</div><div style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(totConsolidadoIva)}</div></div>
+                      <div>
+                        <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Transporte</div>
+                        <div style={{fontSize:14,fontWeight:700,color:"#c47830"}}>✈️ Aéreo</div>
+                        {diasLlegada!==null && <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{diasLlegada>0?`${diasLlegada} días`:diasLlegada===0?"Hoy":"Atrasado"}</div>}
+                      </div>
+                    </div>
+
+                    {ahorroIva > 0 && (
+                      <div style={{padding:"12px 32px",background:"#f0fdf4",borderBottom:"1px solid #bbf7d0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div style={{fontSize:12,color:"#15803d",fontWeight:700}}>💎 Ahorro por consolidar c/IVA</div>
+                        <div style={{fontSize:16,color:"#15803d",fontWeight:800}}>{fmt(ahorroIva)}</div>
+                      </div>
+                    )}
+
+                    {!aplicado && (
+                      <div style={{padding:"10px 32px",background:"#fff7ed",borderBottom:"1px solid #fed7aa",fontSize:11,color:"#92400e",fontStyle:"italic"}}>
+                        ⚠️ Esta cotización aún NO ha sido aplicada al cliente (admin debe presionar "✅ Aplicar consolidado al cliente" antes de enviar este PDF).
+                      </div>
+                    )}
+
+                    {/* Detalle productos */}
+                    <div style={{padding:"20px 32px"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#333",marginBottom:12}}>Detalle de productos</div>
+                      {consolidados.map(({cot,calc})=>{
+                        const totIva = calc?.consolidado?.totClIva || 0;
+                        const pUnd = totIva / (Number(cot.unidades)||1);
+                        return (
+                          <div key={cot.id} style={{borderRadius:10,border:"2px solid #1a1a2e22",marginBottom:10,overflow:"hidden"}}>
+                            <div style={{background:"#f8fafc",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #e2e8f0"}}>
+                              <div>
+                                <span style={{fontWeight:700,fontSize:13,color:"#222"}}>{cot.producto}</span>
+                                <span style={{fontSize:11,color:"#64748b",marginLeft:8}}>{cot.nro}</span>
+                              </div>
+                              <span style={{background:"#c47830",color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:700}}>✈️ Aéreo consolidado</span>
+                            </div>
+                            <div style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,background:"#fff"}}>
+                              <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Unidades</div><div style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmtN(cot.unidades)}</div></div>
+                              <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Precio/und c/IVA</div><div style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmt(pUnd)}</div></div>
+                              <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Total c/IVA</div><div style={{fontSize:13,fontWeight:800,color:"#1aa358"}}>{fmt(totIva)}</div></div>
+                              <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Llegada est.</div><div style={{fontSize:12,fontWeight:700,color:"#c47830"}}>{cot.fecha_llegada_est||"—"}</div></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Bloque pagos */}
+                      <div style={{background:"#040c18",borderRadius:12,padding:"18px 22px",color:"#fff",marginTop:14}}>
+                        <div style={{fontSize:10,color:"#c9a055",textTransform:"uppercase",letterSpacing:1.5,fontWeight:700,marginBottom:12}}>💰 Plan de pagos</div>
+                        {tienePago100 ? (
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
+                            <div><div style={{fontSize:12,color:"#94a3b8"}}>💰 Pago único (100%)</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Al confirmar cotización</div></div>
+                            <div style={{fontSize:20,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
+                          </div>
+                        ) : (
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                            <div style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
+                              <div style={{fontSize:11,color:"#94a3b8"}}>1er pago (50%)</div>
+                              <div style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Al confirmar cotización</div>
+                              <div style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
+                            </div>
+                            <div style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
+                              <div style={{fontSize:11,color:"#94a3b8"}}>2do pago (50%)</div>
+                              <div style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Antes del despacho</div>
+                              <div style={{fontSize:18,fontWeight:800,color:"#fbbf24"}}>{fmt(p2)}</div>
+                            </div>
+                          </div>
+                        )}
+                        <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #1a2740",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <span style={{fontSize:12,color:"#94a3b8"}}>TOTAL CON IVA</span>
+                          <span style={{fontSize:22,fontWeight:800,color:"#c9a055"}}>{fmt(totConsolidadoIva)}</span>
+                        </div>
+                      </div>
+
+                      {/* Mensaje cierre + datos */}
+                      <div style={{marginTop:16,padding:"14px 18px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0",fontSize:12,color:"#475569",lineHeight:1.6}}>
+                        <b style={{color:"#040c18"}}>Vigencia:</b> 7 días desde la fecha de emisión.<br/>
+                        <b style={{color:"#040c18"}}>Modalidad:</b> Importación aérea consolidada — ZAGA gestiona producción en China, flete aéreo, aduana en Chile y entrega en bodega.<br/>
+                        {fechaLlegadaMax && <><b style={{color:"#040c18"}}>Llegada estimada a bodega Chile:</b> {fechaLlegadaMax}<br/></>}
+                        <b style={{color:"#040c18"}}>Datos de pago:</b> coordinar con el equipo ZAGA para recibir la información bancaria al confirmar.
+                      </div>
+
+                      <div style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>
+                        ZAGA SpA · RUT 77874968-8 · Santiago, Chile · Generado el {todayStr()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -4571,6 +4705,31 @@ Número de seguimiento: ${c.nro}`;
                                     </button>
                                   );
                                 })()}
+                              </div>
+
+                              {/* Vista cliente formal por cada cliente de la OP */}
+                              <div style={{marginTop:14,padding:"12px 14px",background:"#eef6ff",border:"1px solid #bfdbfe",borderRadius:8}}>
+                                <div style={{fontSize:11,color:"#2d78c8",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>
+                                  📄 Vista cliente formal — enviar cotización consolidada
+                                </div>
+                                <div style={{fontSize:10,color:"#475569",marginBottom:8,fontStyle:"italic"}}>
+                                  {clienteUnico ? "Un único cliente en esta operación." : `${clientesOp.length} clientes — elige cuál ver / imprimir / enviar.`}
+                                </div>
+                                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                                  {clientesOp.map(cl => {
+                                    const cotsCl = cots.filter(c => c.cliente === cl && !["no_prospero"].includes(c.estado));
+                                    if (cotsCl.length === 0) return null;
+                                    return (
+                                      <button key={cl} onClick={()=>{
+                                        setVistaOpId(op.id);
+                                        setVistaOpCliente(cl);
+                                        setPrintModal("op_cliente");
+                                      }} style={{background:"#fff",color:"#2d78c8",border:"1px solid #2d78c8",borderRadius:7,padding:"7px 12px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                                        👁 {cl} <span style={{opacity:.6,fontWeight:400}}>({cotsCl.length} cots)</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             </>
                           )}
