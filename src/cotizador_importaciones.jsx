@@ -268,17 +268,25 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
       const cbm = getCbm(c);
       return Math.max(pReal, cbm * 166.67);
     };
-    const totalCbmOp = cotsEnOp.reduce((s, c) => s + getCbm(c), 0);
-    const totalPesoOp = cotsEnOp.reduce((s, c) => s + getPesoCobr(c), 0);
-    const cbmCot = getCbm(d);
-    const pesoCot = getPesoCobr(d);
-    const shareCbm = totalCbmOp > 0 ? cbmCot / totalCbmOp : 0;
-    const sharePeso = totalPesoOp > 0 ? pesoCot / totalPesoOp : 0;
-    const modo = d.aer_modo_cobro_sunny || "auto";
-    share = modo === "peso" ? sharePeso
-          : modo === "volumen" ? shareCbm
-          : Math.max(shareCbm, sharePeso);
-    if (share === 0) share = 1 / cotsEnOp.length; // fallback equitativo si no hay dims
+    // Si CUALQUIER cot no tiene datos suficientes (peso o cbm), prorrateamos
+    // equitativamente (1/N) para TODAS. Esto evita que la cot con datos absorba
+    // toda la aduana mientras las otras quedan en 0.
+    const todasTienenDatos = cotsEnOp.every(c => getPesoCobr(c) > 0);
+    if (!todasTienenDatos) {
+      share = 1 / cotsEnOp.length;
+    } else {
+      const totalCbmOp = cotsEnOp.reduce((s, c) => s + getCbm(c), 0);
+      const totalPesoOp = cotsEnOp.reduce((s, c) => s + getPesoCobr(c), 0);
+      const cbmCot = getCbm(d);
+      const pesoCot = getPesoCobr(d);
+      const shareCbm = totalCbmOp > 0 ? cbmCot / totalCbmOp : 0;
+      const sharePeso = totalPesoOp > 0 ? pesoCot / totalPesoOp : 0;
+      const modo = d.aer_modo_cobro_sunny || "auto";
+      share = modo === "peso" ? sharePeso
+            : modo === "volumen" ? shareCbm
+            : Math.max(shareCbm, sharePeso);
+      if (share === 0) share = 1 / cotsEnOp.length;
+    }
   }
 
   // ─── LADO CHINA ───────────────────────────────────────────────────────────
@@ -4952,6 +4960,14 @@ Número de seguimiento: ${c.nro}`;
                                     <div style={{fontSize:10,color:"#64748b",marginTop:8,fontStyle:"italic"}}>
                                       💡 Costo ZAGA = China (mercancía + comisión Sunny + flete + 5 extras) + Chile (aduana fija + arancel). Ganancia = Cliente neto − Costo ZAGA. Para detalle por cot, expande la cot en Tracker.
                                       {rows.some(r => !r.cz.tieneDataRmb) && <><br/>⚠️ Cots con ícono naranja: legacy CLP sin desglose Sunny (mercancía sí, pero sin flete RMB ni 5 extras). Para obtener cifras precisas, pídele a Sunny que llene la cot en su portal.</>}
+                                      {(() => {
+                                        const hayShareEquitativo = rows.some(r => Math.abs(r.cz.share - (1/rows.length)) < 0.0001);
+                                        const todasShareEquitativo = rows.every(r => Math.abs(r.cz.share - (1/rows.length)) < 0.0001);
+                                        if (rows.length > 1 && todasShareEquitativo) {
+                                          return <><br/>📐 Aduana CL prorrateada <b>equitativamente (1/{rows.length})</b> porque hay cots sin peso/CBM. Cuando Sunny llene todas, se recalcula por peso/volumen real.</>;
+                                        }
+                                        return null;
+                                      })()}
                                     </div>
                                   </div>
                                 );
