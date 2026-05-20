@@ -243,8 +243,9 @@ function calcCliente(d) {
 // cotsEnOp: array completo de cots de la OP, para calcular share y prorratear aduana
 function calcCostoRealZaga(d, op, cotsEnOp = []) {
   const u = Number(d.unidades) || 0;
-  const TC_RMB_USD = 7.2;
-  const tc = Number(op?.pago?.tc_efectivo) || Number(d?.pago?.tc_efectivo) || 950;
+  // TC variable por OP (Francisco puede ajustar para cada operación)
+  const TC_RMB_USD = Number(op?.tc_rmb_usd ?? d?.tc_rmb_usd) || 7.2;
+  const tc = Number(op?.tc_usd_clp ?? op?.pago?.tc_efectivo ?? d?.tc_usd_clp ?? d?.pago?.tc_efectivo) || 950;
   const calc = calcCliente(d);
 
   // ─── Share para prorrateo (igual lógica que calcConsolidado) ───────────
@@ -1886,10 +1887,11 @@ Número de seguimiento: ${c.nro}`;
         const c = cotizaciones.find(x => x.id === vistaValidarId);
         if (!c) return null;
         const u = Number(c.unidades) || 0;
-        const TC_RMB_USD = 7.2;
-        const tc = Number(c?.pago?.tc_efectivo) || 950;
         const opVinc = c.operacion_id ? operaciones.find(o => o.id === c.operacion_id) : null;
         const cotsOpVinc = opVinc ? cotizaciones.filter(x => (opVinc.cotizaciones||[]).includes(x.id)) : [];
+        // TCs editables (en validarForm o fallback al OP/cot/default)
+        const TC_RMB_USD = Number(validarForm.tc_rmb_usd ?? opVinc?.tc_rmb_usd ?? c.tc_rmb_usd) || 7.2;
+        const tc = Number(validarForm.tc_usd_clp ?? opVinc?.tc_usd_clp ?? opVinc?.pago?.tc_efectivo ?? c.tc_usd_clp ?? c?.pago?.tc_efectivo) || 950;
 
         // ─── Lado China (desde Sunny) ──────────────────────────────────────
         const precioRmb = Number(c.precio_china_rmb) || 0;
@@ -1965,6 +1967,13 @@ Número de seguimiento: ${c.nro}`;
 
         const cerrar = () => { setVistaValidarId(null); setValidarForm({}); };
         const guardar = async () => {
+          // Persistir TC en la OP (si existe) o en la cot (si va sola)
+          if (opVinc) {
+            const newOp = {...opVinc, tc_rmb_usd: TC_RMB_USD, tc_usd_clp: tc};
+            delete newOp.id; delete newOp._id; delete newOp._created; delete newOp._updated;
+            await supabase.from("operaciones").update({datos: newOp, updated_at: new Date().toISOString()}).eq("id", opVinc.id);
+            setOperaciones(prev => prev.map(o => o.id === opVinc.id ? {...newOp, id: opVinc.id} : o));
+          }
           await persist(cotizaciones.map(x => {
             if (x.id !== c.id) return x;
             return {
@@ -1979,9 +1988,11 @@ Número de seguimiento: ${c.nro}`;
               agencia,
               margen_obj_pct: margenPct,
               precio_final_acordado_und: precioAcordado > 0 ? precioAcordado : precioSugUndIva,
+              tc_rmb_usd: TC_RMB_USD,
+              tc_usd_clp: tc,
             };
           }));
-          showToast(`✓ ${c.nro || "cot"} validada · Precio acordado: ${fmt(precioFinalUnd)}/und. Estado NO cambió.`);
+          showToast(`✓ ${c.nro || "cot"} validada · Precio acordado: ${fmt(precioFinalUnd)}/und · TC RMB ${TC_RMB_USD} / USD ${tc}. Estado NO cambió.`);
           cerrar();
         };
 
@@ -2019,6 +2030,21 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{borderTop:"2px solid #c47830",marginTop:10,paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:800}}>
                     <span style={{color:"#854d0e"}}>Total China:</span>
                     <span style={{color:"#c47830"}}>{fmtRMB(totalChinaRMB)} ≈ {fmt(totalChinaCLP)}</span>
+                  </div>
+                </div>
+
+                {/* TIPO DE CAMBIO — editable por OP */}
+                <div style={{gridColumn:"1 / -1",background:"#fefce8",border:"1px solid #fde047",borderRadius:10,padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                  <div style={{fontSize:11,color:"#a16207",fontWeight:700}}>💱 Tipo de cambio para esta {opVinc?"OP":"cotización"}</div>
+                  <div style={{display:"flex",gap:14,alignItems:"center"}}>
+                    <label style={{fontSize:11,color:"#475569",display:"flex",alignItems:"center",gap:5}}>
+                      RMB → USD:
+                      <input type="number" step="0.01" value={validarForm.tc_rmb_usd||7.2} onChange={e=>setValidarForm(p=>({...p,tc_rmb_usd:e.target.value}))} style={{width:80,padding:"4px 7px",border:"1px solid #facc15",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fff"}}/>
+                    </label>
+                    <label style={{fontSize:11,color:"#475569",display:"flex",alignItems:"center",gap:5}}>
+                      USD → CLP:
+                      <input type="number" step="1" value={validarForm.tc_usd_clp||950} onChange={e=>setValidarForm(p=>({...p,tc_usd_clp:e.target.value}))} style={{width:80,padding:"4px 7px",border:"1px solid #facc15",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fff"}}/>
+                    </label>
                   </div>
                 </div>
 
@@ -3979,6 +4005,7 @@ Número de seguimiento: ${c.nro}`;
                         {c.estado==="solicitud"&&<button onClick={()=>setResumenChina(c)} style={{background:"#6a9fd422",color:"#334155",border:"1px solid #ddd6fe",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📋 Resumen China</button>}
                         <button onClick={()=>setOpenId(isOpen?null:c.id)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>{isOpen?"▲ Cerrar":"▼ Gestionar"}</button>
                         {c.transporte==="aereo"&&!isPropia&&<button onClick={()=>{
+                          const opVincBtn = c.operacion_id ? operaciones.find(o => o.id === c.operacion_id) : null;
                           setValidarForm({
                             aer_honorarios: c.aer_honorarios ?? 150000,
                             aer_edi: c.aer_edi ?? 15000,
@@ -3990,6 +4017,8 @@ Número de seguimiento: ${c.nro}`;
                             agencia: Number(c.agencia) || 0,
                             margen_obj_pct: Number(c.margen_obj_pct) || 25,
                             precio_acordado_und: Number(c.precio_final_acordado_und) || 0,
+                            tc_rmb_usd: Number(opVincBtn?.tc_rmb_usd ?? c.tc_rmb_usd) || 7.2,
+                            tc_usd_clp: Number(opVincBtn?.tc_usd_clp ?? opVincBtn?.pago?.tc_efectivo ?? c.tc_usd_clp ?? c?.pago?.tc_efectivo) || 950,
                           });
                           setVistaValidarId(c.id);
                         }} style={{background:"#c4783022",color:"#c47830",border:"1px solid #c4783055",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700}}>🛬 Validar</button>}
