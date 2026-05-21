@@ -2062,6 +2062,12 @@ Número de seguimiento: ${c.nro}`;
                     <span>+ Transporte CN:</span><b style={{color:"#0f172a",textAlign:"right"}}>{fmtRMB(transporteCn)}</b>
                     <span>+ Seguro:</span><b style={{color:"#0f172a",textAlign:"right"}}>{fmtRMB(seguroRMB)}</b>
                   </div>
+                  <div style={{marginTop:8,padding:"6px 9px",background:"#fefce8",border:"1px dashed #fde047",borderRadius:6,fontSize:10.5,color:"#78350f",lineHeight:1.5}}>
+                    <b>Regla seguro:</b> 150 RMB únicos por consolidado si total mercancía ≤ ¥75.000 · si supera, 0,2% sobre el total.
+                    {valorMercanciaRMB > 75000
+                      ? <span style={{color:"#c47830",fontWeight:600}}> ▸ Aplica 0,2%</span>
+                      : <span style={{color:"#16a34a",fontWeight:600}}> ▸ Aplica mínimo</span>}
+                  </div>
                   <div style={{borderTop:"2px solid #c47830",marginTop:10,paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:800}}>
                     <span style={{color:"#854d0e"}}>Total China:</span>
                     <span style={{color:"#c47830"}}>{fmtRMB(totalChinaRMB)} ≈ {fmt(totalChinaCLP)}</span>

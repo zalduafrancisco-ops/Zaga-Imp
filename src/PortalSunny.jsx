@@ -974,6 +974,9 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
                 <input type="number" step="1" value={form.seguro_min_rmb} onChange={e=>setForm(p=>({...p, seguro_min_rmb:e.target.value}))} placeholder="150" style={inp}/>
               </Field>
             </div>
+            <div style={{ background:"#fefce8", border:"1px dashed #fde047", borderRadius:7, padding:"7px 11px", fontSize:10.5, color:"#78350f", lineHeight:1.55, marginBottom:6 }}>
+              <b>📋 保险规则 / Regla seguro:</b> 150 RMB únicos por consolidado si total ≤ 75.000 RMB · si supera, 0,2% del valor de mercancías. En consolidados se cobra <u>una sola vez</u> sobre el total de la OP.
+            </div>
             <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:7, padding:"7px 11px", fontSize:11, color:"#475569" }}>
               ▸ 保险金额 / Seguro RMB: <b style={{ color:"#0f172a" }}>{fmtRMB(seguroRMBcot)}</b>
               {seguroRMBcot > seguroCalculado && <span style={{ color:"#c47830", marginLeft:6, fontStyle:"italic" }}>({form.seguro_pct}% = ¥{fmtN(seguroCalculado,0)} → mínimo ¥{fmtN(seguroMinRMB,0)} aplicado)</span>}
@@ -1564,6 +1567,14 @@ function OpRecotizarCard({ op, cots, supabase, onSaved, onEditCot }) {
             <Field label="保险最低 / Seguro mínimo RMB">
               <input type="number" step="1" value={seguroMinRmb} onChange={e=>setSeguroMinRmb(e.target.value)} placeholder="150" style={inp}/>
             </Field>
+          </div>
+          <div style={{ background:"#fefce8", border:"1px dashed #fde047", borderRadius:7, padding:"7px 11px", fontSize:10.5, color:"#78350f", lineHeight:1.55, marginBottom:6 }}>
+            <b>📋 保险规则 / Regla seguro:</b> 150 RMB únicos por consolidado si total ≤ 75.000 RMB · si supera, se cobra 0,2% del valor de mercancías
+            <br/><span style={{ color: valorMercanciaRMB > 75000 ? "#c47830" : "#16a34a", fontWeight:600 }}>
+              {valorMercanciaRMB > 75000
+                ? `▸ Total ¥${fmtN(valorMercanciaRMB,0)} > ¥75.000 → aplica 0,2% = ${fmtRMB(seguroRMB)}`
+                : `▸ Total ¥${fmtN(valorMercanciaRMB,0)} ≤ ¥75.000 → aplica mínimo ${fmtRMB(seguroRMB)}`}
+            </span>
           </div>
           <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:7, padding:"8px 11px", fontSize:11, color:"#475569", lineHeight:1.7 }}>
             ▸ 原产地证 Cert. origen: <b>{fmtRMB(certOrigenTotal)}</b> ({nCots} × ¥{certOrigen})<br/>
