@@ -4004,23 +4004,41 @@ Número de seguimiento: ${c.nro}`;
                         <button onClick={()=>setPreviewId(c.id)} style={{background:"#f8fafc",color:"#475569",border:"1px solid #e2e8f0",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>👁 Ver</button>
                         {c.estado==="solicitud"&&<button onClick={()=>setResumenChina(c)} style={{background:"#6a9fd422",color:"#334155",border:"1px solid #ddd6fe",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📋 Resumen China</button>}
                         <button onClick={()=>setOpenId(isOpen?null:c.id)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>{isOpen?"▲ Cerrar":"▼ Gestionar"}</button>
-                        {c.transporte==="aereo"&&!isPropia&&<button onClick={()=>{
-                          const opVincBtn = c.operacion_id ? operaciones.find(o => o.id === c.operacion_id) : null;
+                        {c.transporte==="aereo"&&!isPropia&&<button onClick={async()=>{
+                          // Re-fetch fresco de Supabase para que el modal use datos actualizados
+                          // (evita ver datos stale si Sunny acaba de editar y el realtime no llegó)
+                          let cFresh = c;
+                          let opFresh = c.operacion_id ? operaciones.find(o => o.id === c.operacion_id) : null;
+                          try {
+                            const { data: cotData } = await supabase.from("cotizaciones").select("id,datos").eq("id", c.id).single();
+                            if (cotData) {
+                              cFresh = {...cotData.datos, id: cotData.id};
+                              // También actualizar state local
+                              setCotizaciones(prev => prev.map(x => x.id === c.id ? cFresh : x));
+                            }
+                            if (c.operacion_id) {
+                              const { data: opData } = await supabase.from("operaciones").select("id,datos").eq("id", c.operacion_id).single();
+                              if (opData) {
+                                opFresh = {...opData.datos, id: opData.id};
+                                setOperaciones(prev => prev.map(o => o.id === c.operacion_id ? opFresh : o));
+                              }
+                            }
+                          } catch(e) { console.warn("No se pudo refrescar cot/op antes de validar:", e); }
                           setValidarForm({
-                            aer_honorarios: c.aer_honorarios ?? 150000,
-                            aer_edi: c.aer_edi ?? 15000,
-                            aer_despacho: c.aer_despacho ?? 50000,
-                            aer_aeropuerto: c.aer_aeropuerto ?? 68000,
-                            aer_aforo: c.aer_aforo ?? 48000,
-                            incluir_aforo: c.incluir_aforo !== false,
-                            transp_interno_cl: Number(c.transp_interno_cl) || 0,
-                            agencia: Number(c.agencia) || 0,
-                            margen_obj_pct: Number(c.margen_obj_pct) || 25,
-                            precio_acordado_und: Number(c.precio_final_acordado_und) || 0,
-                            tc_rmb_usd: Number(opVincBtn?.tc_rmb_usd ?? c.tc_rmb_usd) || 6.5,
-                            tc_usd_clp: Number(opVincBtn?.tc_usd_clp ?? opVincBtn?.pago?.tc_efectivo ?? c.tc_usd_clp ?? c?.pago?.tc_efectivo) || 950,
+                            aer_honorarios: cFresh.aer_honorarios ?? 150000,
+                            aer_edi: cFresh.aer_edi ?? 15000,
+                            aer_despacho: cFresh.aer_despacho ?? 50000,
+                            aer_aeropuerto: cFresh.aer_aeropuerto ?? 68000,
+                            aer_aforo: cFresh.aer_aforo ?? 48000,
+                            incluir_aforo: cFresh.incluir_aforo !== false,
+                            transp_interno_cl: Number(cFresh.transp_interno_cl) || 0,
+                            agencia: Number(cFresh.agencia) || 0,
+                            margen_obj_pct: Number(cFresh.margen_obj_pct) || 25,
+                            precio_acordado_und: Number(cFresh.precio_final_acordado_und) || 0,
+                            tc_rmb_usd: Number(opFresh?.tc_rmb_usd ?? cFresh.tc_rmb_usd) || 6.5,
+                            tc_usd_clp: Number(opFresh?.tc_usd_clp ?? opFresh?.pago?.tc_efectivo ?? cFresh.tc_usd_clp ?? cFresh?.pago?.tc_efectivo) || 950,
                           });
-                          setVistaValidarId(c.id);
+                          setVistaValidarId(cFresh.id);
                         }} style={{background:"#c4783022",color:"#c47830",border:"1px solid #c4783055",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700}}>🛬 Validar</button>}
                         {!isPropia&&<button onClick={()=>setVistaId(c.id)} style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📄 Vista cliente</button>}
                         <button onClick={()=>handleEdit(c)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>✏️ Editar</button>
