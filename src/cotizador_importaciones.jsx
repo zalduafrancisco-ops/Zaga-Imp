@@ -301,14 +301,22 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
 
   // Helpers fallback: si OP no tiene el campo (cot sola), usar el de la cot
   const _take = (k) => Number(op?.[k] ?? d?.[k]) || 0;
+  // Para costos fijos en RMB: 0 en OP significa "no seteado", caer al cot.
+  // (Sunny puede editar a nivel cot DESPUES de recotizar la OP — el cot gana
+  // si la OP no tiene el campo o lo tiene en 0.)
+  const _takeMax = (k) => {
+    const opVal  = Number(op?.[k])  || 0;
+    const cotVal = Number(d?.[k])   || 0;
+    return Math.max(opVal, cotVal);
+  };
   const comisionPct = _take("comision_sunny_pct");
   const seguroPct   = _take("seguro_pct"); // ej 0.002
   const seguroMin   = _take("seguro_min_rmb");
-  const certOrigen  = _take("cost_cert_origen_rmb");
-  const docOp       = _take("cost_doc_operacion_rmb");
-  const despacho    = _take("cost_despacho_aduanero_rmb");
-  const compraDocs  = _take("cost_compra_docs_rmb");
-  const transporteCn= _take("cost_transporte_interno_cn_rmb");
+  const certOrigen  = _takeMax("cost_cert_origen_rmb");
+  const docOp       = _takeMax("cost_doc_operacion_rmb");
+  const despacho    = _takeMax("cost_despacho_aduanero_rmb");
+  const compraDocs  = _takeMax("cost_compra_docs_rmb");
+  const transporteCn= _takeMax("cost_transporte_interno_cn_rmb");
 
   // Peso total y flete RMB (solo aplica si Sunny ya llenó la cot)
   const undCaja = Number(d.dim_und_caja) || 0;
@@ -512,14 +520,17 @@ function calcConsolidado(cot, op, cotsEnOp) {
   const valorMercanciaOpRMB  = cotsEnOp.reduce((s,c) => s + (Number(c.precio_china_rmb) || 0) * (Number(c.unidades) || 0), 0);
 
   // Fallback: si OP no tiene el campo (Sunny todavía no recotizó), usar el de la cot individual
+  // Para costos fijos en RMB: 0 en OP = "no seteado" → tomar el mayor entre OP y cot.
+  // (Sunny puede editar a nivel cot DESPUES de recotizar la OP; el cot gana si OP=0.)
+  const _max = (a, b) => Math.max(Number(a) || 0, Number(b) || 0);
   const comisionPct = Number(op.comision_sunny_pct ?? cot.comision_sunny_pct) || 0;
   const seguroPct   = Number(op.seguro_pct ?? cot.seguro_pct) || 0; // ej 0.002 = 0.2%
   const seguroMin   = Number(op.seguro_min_rmb ?? cot.seguro_min_rmb) || 0; // mínimo RMB (default 150 cuando Sunny lo setea)
-  const certOrigen      = Number(op.cost_cert_origen_rmb ?? cot.cost_cert_origen_rmb) || 0;
-  const docOperacion    = Number(op.cost_doc_operacion_rmb ?? cot.cost_doc_operacion_rmb) || 0;
-  const despachoAd      = Number(op.cost_despacho_aduanero_rmb ?? cot.cost_despacho_aduanero_rmb) || 0;
-  const compraDocs      = Number(op.cost_compra_docs_rmb ?? cot.cost_compra_docs_rmb) || 0;
-  const transporteCnRmb = Number(op.cost_transporte_interno_cn_rmb ?? cot.cost_transporte_interno_cn_rmb) || 0;
+  const certOrigen      = _max(op.cost_cert_origen_rmb,        cot.cost_cert_origen_rmb);
+  const docOperacion    = _max(op.cost_doc_operacion_rmb,      cot.cost_doc_operacion_rmb);
+  const despachoAd      = _max(op.cost_despacho_aduanero_rmb,  cot.cost_despacho_aduanero_rmb);
+  const compraDocs      = _max(op.cost_compra_docs_rmb,        cot.cost_compra_docs_rmb);
+  const transporteCnRmb = _max(op.cost_transporte_interno_cn_rmb, cot.cost_transporte_interno_cn_rmb);
 
   // Seguro a nivel OP con mínimo, prorrateado por valor de la cot
   const seguroOpTotalRMB    = Math.max(seguroMin, valorMercanciaOpRMB * seguroPct);
@@ -1924,14 +1935,16 @@ Número de seguimiento: ${c.nro}`;
         const tarifaRmbKg = Number(opVinc?.flete_rmb_kg_consolidado ?? c.aer_tarifa_sunny_rmb_kg) || 0;
         const fleteRMB = pesoTotal * tarifaRmbKg;
         const _t = (k) => Number(opVinc?.[k] ?? c[k]) || 0;
+        // Para costos fijos en RMB: 0 en OP = "no seteado" → tomar el mayor.
+        const _tMax = (k) => Math.max(Number(opVinc?.[k]) || 0, Number(c?.[k]) || 0);
         const comisionPct = _t("comision_sunny_pct");
         const seguroPct = _t("seguro_pct");
         const seguroMin = _t("seguro_min_rmb");
-        const certOrigen = _t("cost_cert_origen_rmb");
-        const docOp = _t("cost_doc_operacion_rmb");
-        const despacho = _t("cost_despacho_aduanero_rmb");
-        const compraDocs = _t("cost_compra_docs_rmb");
-        const transporteCn = _t("cost_transporte_interno_cn_rmb");
+        const certOrigen = _tMax("cost_cert_origen_rmb");
+        const docOp = _tMax("cost_doc_operacion_rmb");
+        const despacho = _tMax("cost_despacho_aduanero_rmb");
+        const compraDocs = _tMax("cost_compra_docs_rmb");
+        const transporteCn = _tMax("cost_transporte_interno_cn_rmb");
         const comisionRMB = valorMercanciaRMB * comisionPct / 100;
         const seguroRMB = Math.max(seguroMin, valorMercanciaRMB * seguroPct);
         const otrosRMB = certOrigen + docOp + despacho + compraDocs + transporteCn + seguroRMB;
