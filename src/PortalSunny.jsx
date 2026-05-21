@@ -127,18 +127,30 @@ export default function PortalSunny({ supabase, onLogout }) {
   // ─── Grupos por tab ───────────────────────────────────────────────────────
   // Pend. cotizar incluye:
   //   1. cots con estado 'solicitud' (admin pide cotización)
-  //   2. cots en 'solicitud' o 'cotizada' que pertenecen a OP en borrador
-  //      (asi Sunny ve todas las cots de la OP juntas y puede editar/recargar info)
-  const opsBorrador = new Set(
-    (Array.isArray(ops) ? ops : [])
-      .filter(o => o && (!o.estado || o.estado === "borrador"))
-      .map(o => o && o._id)
-      .filter(Boolean)
-  )
+  //   2. cots en 'solicitud' o 'cotizada' vinculadas a OP en borrador
+  //      (mira tanto c.operacion_id como op.cotizaciones para robustez)
+  const opsBorradorMap = new Map()
+  ;(Array.isArray(ops) ? ops : []).forEach(o => {
+    if (!o || !o._id) return
+    if (!o.estado || o.estado === "borrador") {
+      const cotIds = new Set(Array.isArray(o.cotizaciones) ? o.cotizaciones : [])
+      opsBorradorMap.set(o._id, cotIds)
+    }
+  })
+  const cotEnOpBorrador = (c) => {
+    if (!c) return false
+    // 1) Via operacion_id en la cot
+    if (c.operacion_id && opsBorradorMap.has(c.operacion_id)) return true
+    // 2) Via array op.cotizaciones (fallback si operacion_id no se pobló)
+    for (const [, cotIds] of opsBorradorMap) {
+      if (cotIds.has(c._id) || cotIds.has(c.id)) return true
+    }
+    return false
+  }
   const pendCot = cots.filter(c => {
     if (!c) return false
     if (ESTADOS_PEND_COT.includes(c.estado)) return true
-    if (c.operacion_id && opsBorrador.has(c.operacion_id) && (c.estado === "solicitud" || c.estado === "cotizada")) return true
+    if ((c.estado === "solicitud" || c.estado === "cotizada") && cotEnOpBorrador(c)) return true
     return false
   })
   const pendCliente = cots.filter(c => ESTADOS_PEND_CLIENTE.includes(c.estado))
