@@ -613,6 +613,38 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
     setForm(p => ({ ...p, [field]: v }))
   }
 
+  // ─── Ajustar cantidad al empaque (cuando la caja cerrada da otra cifra) ──
+  async function handleAjustarCantidad(unidadesNuevas) {
+    const unidadesOriginales = c.unidades_originales || unidades
+    const confirmMsg = `调整数量 / Ajustar ${c.nro || "cotización"} a ${unidadesNuevas} und?\n\n客户要求 / Cliente pidió: ${unidadesOriginales} und\n包装调整 / Ajustado al empaque: ${unidadesNuevas} und\n\n✅ 确认后将通知客户 / Se le avisa al cliente del incremento.`
+    if (!confirm(confirmMsg)) return
+    setSaving(true)
+    setMsg(null)
+    try {
+      const { data: fresca, error: errLoad } = await supabase
+        .from("cotizaciones").select("datos").eq("id", c._id).single()
+      if (errLoad || !fresca) throw new Error("No se pudo leer la cotización")
+      const datosMerged = {
+        ...fresca.datos,
+        unidades: unidadesNuevas,
+        unidades_originales: fresca.datos.unidades_originales || unidadesOriginales,
+        fecha_ajuste_cantidad: new Date().toISOString().split("T")[0],
+      }
+      const { error: errSave } = await supabase
+        .from("cotizaciones")
+        .update({ datos: datosMerged, updated_at: new Date().toISOString() })
+        .eq("id", c._id).select("id")
+      if (errSave) throw errSave
+      setMsg({ tipo:"ok", txt:`✅ 已调整 / Ajustada a ${unidadesNuevas} und` })
+      setTimeout(() => onSaved && onSaved(), 1200)
+    } catch (e) {
+      console.error(e)
+      setMsg({ tipo:"err", txt:"⚠️ Error: " + (e.message || "no se pudo ajustar") })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // ─── Guardar (borrador o envío final) ────────────────────────────────────
   async function persistirRespuestaSunny(enviarAdmin) {
     setSaving(true)
@@ -897,8 +929,33 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
                 📦 <b>实际数量 / Cantidad real con embalaje: {nCajas * undCaja} und</b> ({nCajas} cajas × {undCaja} und).
                 <br/>客户要求 / Cliente pidió: <b>{unidades} und</b>.
                 {(nCajas * undCaja) > unidades
-                  ? <> 差额 / Diferencia: <b>+{(nCajas * undCaja) - unidades} und</b> extra por completar caja. ⚠️ Confirmar con admin si cobra cantidad real o pedida.</>
+                  ? <> 差额 / Diferencia: <b>+{(nCajas * undCaja) - unidades} und</b> extra por completar caja.</>
                   : <> ⚠️ El embalaje no cubre la cantidad pedida.</>}
+                {(nCajas * undCaja) > unidades && (
+                  <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                    <button
+                      onClick={() => handleAjustarCantidad(nCajas * undCaja)}
+                      disabled={saving}
+                      style={{
+                        background: saving ? "#fed7aa" : "#c47830",
+                        color: "#fff", border: "none", borderRadius: 7,
+                        padding: "7px 14px", fontSize: 11, fontWeight: 700,
+                        cursor: saving ? "not-allowed" : "pointer",
+                        fontFamily: "inherit",
+                        boxShadow: "0 1px 3px rgba(196,120,48,0.3)",
+                      }}>
+                      📐 调整到 / Ajustar a {nCajas * undCaja} und
+                    </button>
+                    <span style={{ fontSize: 10, color: "#92400e", fontStyle: "italic" }}>
+                      自动通知客户 / Se avisa al cliente automáticamente
+                    </span>
+                  </div>
+                )}
+                {c.unidades_originales && Number(c.unidades_originales) !== Number(c.unidades) && (
+                  <div style={{ marginTop:6, padding:"4px 8px", background:"#dbeafe", border:"1px solid #93c5fd", borderRadius:6, fontSize:10, color:"#1e40af", fontStyle:"italic" }}>
+                    ℹ️ 已调整 / Ya ajustada: {c.unidades_originales} → {c.unidades} und ({c.fecha_ajuste_cantidad || "—"})
+                  </div>
+                )}
               </div>
             )}
           </Section>
