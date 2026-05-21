@@ -5498,6 +5498,191 @@ Número de seguimiento: ${c.nro}`;
                                 </div>
                               )}
 
+                              {/* ── PANEL COMPARATIVO RMB CON SUNNY (réplica Excel Sunny) ── */}
+                              {(() => {
+                                const cotsActivas = cots.filter(c => !["no_prospero"].includes(c.estado));
+                                if (cotsActivas.length === 0) return null;
+                                const TC_RMB_USD = Number(op.tc_rmb_usd) || 7.03;
+                                const tc = Number(op.tc_usd_clp ?? op.pago?.tc_efectivo) || 950;
+                                const comPct = Number(op.comision_sunny_pct ?? op.costos_china?.comision_pct) || 0;
+                                const segPct_raw = Number(op.seguro_pct ?? op.costos_china?.seguro_pct) || 0;
+                                const segPct = segPct_raw > 1 ? segPct_raw/100 : segPct_raw;
+                                const segMin = Number(op.seguro_min_rmb) || 0;
+                                const certOri = Number(op.cost_cert_origen_rmb) || 0;
+                                const docOpV = Number(op.cost_doc_operacion_rmb) || 0;
+                                const despV = Number(op.cost_despacho_aduanero_rmb) || 0;
+                                const compraDV = Number(op.cost_compra_docs_rmb) || 0;
+                                const transpV = Number(op.cost_transporte_interno_cn_rmb) || 0;
+                                const fleteRmbKg = Number(op.flete_rmb_kg_consolidado ?? op.costos_china?.flete_rmb_kg) || 0;
+                                const cc = op.costos_china || {};
+                                const otrosUSDLeg = Number(cc.otros_usd) || 0;
+                                const formFUSDLeg = (Number(cc.form_f_usd_por_producto)||0) * cotsActivas.length;
+                                const logisticaLeg = Number(cc.logistica_rmb) || 0;
+
+                                // Por cot: peso real, cbm, peso volumétrico, peso cobrable, mercancía
+                                const detallesCot = cotsActivas.map(c => {
+                                  const u = Number(c.unidades) || 0;
+                                  const undCaja = Number(c.dim_und_caja) || 0;
+                                  const esCaja = c.dim_tipo === "caja";
+                                  const nCajas = esCaja && undCaja > 0 ? Math.ceil(u/undCaja) : 0;
+                                  const pesoReal = esCaja && undCaja > 0 ? (Number(c.peso_kg)||0)*nCajas : (Number(c.peso_kg)||0)*u;
+                                  const cbm = esCaja && undCaja > 0 ? (Number(c.dim_m3)||0)*nCajas : (Number(c.dim_m3)||0)*u;
+                                  const pesoVol = cbm * 167; // 1 m³ = 167 kg vol (estándar aéreo)
+                                  const pesoCobr = Math.max(pesoReal, pesoVol);
+                                  const mercanciaRMB = (Number(c.precio_china_rmb)||0) * u;
+                                  const fleteRMB = pesoCobr * fleteRmbKg;
+                                  return { c, u, pesoReal, pesoVol, pesoCobr, cbm, mercanciaRMB, fleteRMB };
+                                });
+                                const mercOp = detallesCot.reduce((s,d) => s + d.mercanciaRMB, 0);
+                                const comisionOp = mercOp * comPct / 100;
+                                const pesoCobrTotal = detallesCot.reduce((s,d) => s + d.pesoCobr, 0);
+                                const fleteOp = detallesCot.reduce((s,d) => s + d.fleteRMB, 0);
+                                const certOpRMB = certOri * cotsActivas.length;
+                                const seguroOp = Math.max(segMin, mercOp * segPct);
+                                const otrosOpRMB = docOpV + despV + compraDV + transpV + logisticaLeg + seguroOp;
+                                const totalRMB = mercOp + comisionOp + fleteOp + certOpRMB + otrosOpRMB;
+                                const totalUSDExtra = otrosUSDLeg + formFUSDLeg;
+                                const totalUSD = totalRMB / TC_RMB_USD + totalUSDExtra;
+                                const totalCLP = totalUSD * tc;
+                                const totalUnd = detallesCot.reduce((s,d) => s + d.u, 0);
+                                const costoUndCLP = totalUnd > 0 ? totalCLP / totalUnd : 0;
+                                const costoUndRMB = totalUnd > 0 ? totalRMB / totalUnd : 0;
+
+                                const rowRMB = (lbl, val, hint) => (
+                                  <tr style={{borderBottom:"1px solid #fde68a"}}>
+                                    <td style={{padding:"6px 10px",fontSize:11,color:"#78350f"}}>{lbl}{hint && <div style={{fontSize:9,color:"#a16207",fontStyle:"italic"}}>{hint}</div>}</td>
+                                    <td style={{padding:"6px 10px",fontSize:12,textAlign:"right",fontWeight:600,color:"#0f172a"}}>¥{fmtN(val,2)}</td>
+                                  </tr>
+                                );
+
+                                return (
+                                  <div style={{marginTop:14,padding:14,background:"#fefce8",border:"1px solid #fde047",borderRadius:10}}>
+                                    <div style={{fontSize:11,color:"#854d0e",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                                      <span>💴 Comparativo RMB — OP {op.nro} (formato Excel Sunny)</span>
+                                      <span style={{fontSize:10,background:"#fff",color:"#854d0e",padding:"2px 8px",borderRadius:10,fontWeight:600,letterSpacing:0.5,border:"1px solid #fde047"}}>💱 RMB {TC_RMB_USD} · USD {tc}</span>
+                                    </div>
+                                    <div style={{fontSize:10,color:"#a16207",marginBottom:10,fontStyle:"italic"}}>
+                                      Usa esta tabla para comparar con el Excel que envía Sunny. Si los totales coinciden, los costos están bien capturados.
+                                    </div>
+                                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+                                      {/* Columna izquierda: desglose */}
+                                      <div>
+                                        <table style={{width:"100%",borderCollapse:"collapse",background:"#fff",borderRadius:8,overflow:"hidden",border:"1px solid #fde047"}}>
+                                          <tbody>
+                                            {rowRMB("📦 Mercancía total", mercOp, `${cotsActivas.length} cots · ${fmtN(totalUnd)} und`)}
+                                            {rowRMB(`💼 Comisión Sunny (${comPct}%)`, comisionOp, "Sobre mercancía total")}
+                                            {rowRMB("✈️ Flete aéreo", fleteOp, `${fmtN(pesoCobrTotal,1)} kg cobrable × ¥${fmtN(fleteRmbKg,2)}/kg`)}
+                                            {rowRMB(`📜 Cert. origen (×${cotsActivas.length})`, certOpRMB, `¥${certOri}/cot`)}
+                                            {docOpV>0   && rowRMB("📄 Doc. operación CN", docOpV, "Fijo OP")}
+                                            {despV>0    && rowRMB("🛃 Despacho aduanero CN", despV, "Fijo OP")}
+                                            {compraDV>0 && rowRMB("📑 Compra docs", compraDV, "Fijo OP")}
+                                            {transpV>0  && rowRMB("🚚 Transporte interno CN", transpV, "Fijo OP")}
+                                            {logisticaLeg>0 && rowRMB("🛣️ Logística Yiwu→SH (legacy)", logisticaLeg, "OP-001 legacy")}
+                                            {rowRMB(`🛡️ Seguro (${(segPct*100).toFixed(2)}% sobre merc., mín ¥${segMin})`, seguroOp, mercOp*segPct < segMin ? "Aplica mínimo" : "Aplica %")}
+                                          </tbody>
+                                        </table>
+                                        {totalUSDExtra > 0 && (
+                                          <div style={{marginTop:8,padding:"8px 11px",background:"#fff",borderRadius:7,border:"1px solid #fde047",fontSize:11,color:"#78350f"}}>
+                                            <b>+ Extras USD (legacy):</b><br/>
+                                            {otrosUSDLeg > 0 && <>· Otros USD: <b style={{color:"#0f172a"}}>${fmtN(otrosUSDLeg,2)}</b><br/></>}
+                                            {formFUSDLeg > 0 && <>· Form F: <b style={{color:"#0f172a"}}>${fmtN(formFUSDLeg,2)}</b> ({cotsActivas.length} cots × ${cc.form_f_usd_por_producto}/cot)<br/></>}
+                                            <span style={{fontStyle:"italic",fontSize:10,color:"#a16207"}}>Estos NO se convierten a RMB (Sunny los cobra en USD)</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      {/* Columna derecha: totales en 3 monedas */}
+                                      <div>
+                                        <div style={{background:"#fff",borderRadius:8,border:"1px solid #fde047",padding:"12px 14px"}}>
+                                          <div style={{fontSize:10,color:"#a16207",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Total OP en 3 monedas</div>
+                                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8,paddingBottom:8,borderBottom:"1px dashed #fde047"}}>
+                                            <span style={{fontSize:12,color:"#78350f"}}>RMB</span>
+                                            <span style={{fontSize:18,fontWeight:800,color:"#0f172a"}}>¥{fmtN(totalRMB,2)}</span>
+                                          </div>
+                                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8,paddingBottom:8,borderBottom:"1px dashed #fde047"}}>
+                                            <span style={{fontSize:12,color:"#78350f"}}>USD <span style={{fontSize:9,color:"#a16207"}}>(÷ TC {TC_RMB_USD})</span></span>
+                                            <span style={{fontSize:18,fontWeight:800,color:"#0f172a"}}>${fmtN(totalUSD,2)}</span>
+                                          </div>
+                                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                                            <span style={{fontSize:12,color:"#78350f"}}>CLP <span style={{fontSize:9,color:"#a16207"}}>(× TC {tc})</span></span>
+                                            <span style={{fontSize:20,fontWeight:800,color:"#c47830"}}>{fmt(totalCLP)}</span>
+                                          </div>
+                                        </div>
+                                        <div style={{marginTop:8,background:"#fff",borderRadius:8,border:"1px solid #fde047",padding:"10px 14px"}}>
+                                          <div style={{fontSize:10,color:"#a16207",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Costo por unidad (promedio OP)</div>
+                                          <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:3}}>
+                                            <span style={{color:"#78350f"}}>RMB / und</span>
+                                            <span style={{fontWeight:700,color:"#0f172a"}}>¥{fmtN(costoUndRMB,2)}</span>
+                                          </div>
+                                          <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}>
+                                            <span style={{color:"#78350f"}}>CLP / und</span>
+                                            <span style={{fontWeight:700,color:"#c47830"}}>{fmt(costoUndCLP)}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    {/* Tabla por cot con costo unitario */}
+                                    <div style={{marginTop:12,background:"#fff",borderRadius:8,border:"1px solid #fde047",overflow:"hidden"}}>
+                                      <div style={{padding:"8px 12px",fontSize:10,fontWeight:700,color:"#854d0e",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #fde047"}}>Costo por cot (mercancía + flete + share extras)</div>
+                                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                                        <thead>
+                                          <tr style={{background:"#fef3c7",color:"#78350f"}}>
+                                            <th style={{padding:"5px 8px",textAlign:"left"}}>Cot</th>
+                                            <th style={{padding:"5px 8px",textAlign:"right"}}>Und</th>
+                                            <th style={{padding:"5px 8px",textAlign:"right"}}>Peso real</th>
+                                            <th style={{padding:"5px 8px",textAlign:"right"}}>Peso cobr.</th>
+                                            <th style={{padding:"5px 8px",textAlign:"right"}}>Mercancía ¥</th>
+                                            <th style={{padding:"5px 8px",textAlign:"right"}}>Flete ¥</th>
+                                            <th style={{padding:"5px 8px",textAlign:"right"}}>Total ¥</th>
+                                            <th style={{padding:"5px 8px",textAlign:"right"}}>¥/und</th>
+                                            <th style={{padding:"5px 8px",textAlign:"right"}}>CLP/und</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {detallesCot.map((d) => {
+                                            // share por valor (consistente con calcCostoRealZaga)
+                                            const shareVal = mercOp > 0 ? d.mercanciaRMB / mercOp : 1/detallesCot.length;
+                                            const extrasShare = (otrosOpRMB + certOri) * shareVal + (certOri ? 0 : 0); // cert origen es per cot (no per share)
+                                            // Mejor: cert origen ES per cot, no por share
+                                            const certCotRMB = certOri;
+                                            const otrosShareCotRMB = otrosOpRMB * shareVal;
+                                            const comisionCotRMB = d.mercanciaRMB * comPct / 100;
+                                            const otrosUSDShareCot = totalUSDExtra * shareVal;
+                                            const totalCotRMB = d.mercanciaRMB + comisionCotRMB + d.fleteRMB + certCotRMB + otrosShareCotRMB;
+                                            const totalCotUSD = totalCotRMB / TC_RMB_USD + otrosUSDShareCot;
+                                            const totalCotCLP = totalCotUSD * tc;
+                                            const undRMB = d.u > 0 ? totalCotRMB / d.u : 0;
+                                            const undCLP = d.u > 0 ? totalCotCLP / d.u : 0;
+                                            return (
+                                              <tr key={d.c.id} style={{borderTop:"1px solid #fef3c7"}}>
+                                                <td style={{padding:"5px 8px",fontWeight:700,color:"#0f172a"}}>{d.c.nro}</td>
+                                                <td style={{padding:"5px 8px",textAlign:"right",color:"#475569"}}>{fmtN(d.u)}</td>
+                                                <td style={{padding:"5px 8px",textAlign:"right",color:"#475569"}}>{fmtN(d.pesoReal,1)}kg</td>
+                                                <td style={{padding:"5px 8px",textAlign:"right",color:"#475569"}}>{fmtN(d.pesoCobr,1)}kg</td>
+                                                <td style={{padding:"5px 8px",textAlign:"right",color:"#475569"}}>¥{fmtN(d.mercanciaRMB,0)}</td>
+                                                <td style={{padding:"5px 8px",textAlign:"right",color:"#475569"}}>¥{fmtN(d.fleteRMB,0)}</td>
+                                                <td style={{padding:"5px 8px",textAlign:"right",fontWeight:700,color:"#0f172a"}}>¥{fmtN(totalCotRMB,0)}</td>
+                                                <td style={{padding:"5px 8px",textAlign:"right",fontWeight:700,color:"#854d0e"}}>¥{fmtN(undRMB,2)}</td>
+                                                <td style={{padding:"5px 8px",textAlign:"right",fontWeight:700,color:"#c47830"}}>{fmt(undCLP)}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                          <tr style={{borderTop:"2px solid #fde047",background:"#fef3c7"}}>
+                                            <td style={{padding:"7px 8px",fontWeight:800,color:"#854d0e"}}>TOTAL</td>
+                                            <td style={{padding:"7px 8px",textAlign:"right",fontWeight:800,color:"#854d0e"}}>{fmtN(totalUnd)}</td>
+                                            <td colSpan={2} style={{padding:"7px 8px",textAlign:"right",fontSize:10,color:"#a16207",fontStyle:"italic"}}>(promedio OP →)</td>
+                                            <td style={{padding:"7px 8px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>¥{fmtN(mercOp,0)}</td>
+                                            <td style={{padding:"7px 8px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>¥{fmtN(fleteOp,0)}</td>
+                                            <td style={{padding:"7px 8px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>¥{fmtN(totalRMB,0)}</td>
+                                            <td style={{padding:"7px 8px",textAlign:"right",fontWeight:800,color:"#854d0e"}}>¥{fmtN(costoUndRMB,2)}</td>
+                                            <td style={{padding:"7px 8px",textAlign:"right",fontWeight:800,color:"#c47830"}}>{fmt(costoUndCLP)}</td>
+                                          </tr>
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+
                               {/* ── PANEL COSTO REAL ZAGA — POR COT + TOTAL OP ── */}
                               {(() => {
                                 const rows = consolidados.map(({cot}) => ({ cot, cz: calcCostoRealZaga(cot, op, cots) }));
