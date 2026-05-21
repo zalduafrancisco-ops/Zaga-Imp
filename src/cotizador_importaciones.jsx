@@ -5033,8 +5033,36 @@ Número de seguimiento: ${c.nro}`;
                       const clientePrincipal=clientesArr.length===1?clientesArr[0]:(clientesArr.length>1?clientesArr.join(" + "):"");
                       const payload={...opForm,cliente:clientePrincipal,clientes:clientesArr};
                       if(opEditId){
+                        // Detectar cots removidas/agregadas vs versión previa para sincronizar operacion_id
+                        const opPrev = operaciones.find(o => o.id === opEditId);
+                        const cotIdsPrev = new Set(opPrev?.cotizaciones || []);
+                        const cotIdsNuevo = new Set(opForm.cotizaciones || []);
+                        const removidas = [...cotIdsPrev].filter(id => !cotIdsNuevo.has(id));
+                        const agregadas = [...cotIdsNuevo].filter(id => !cotIdsPrev.has(id));
                         await supabase.from("operaciones").update({datos:payload,updated_at:new Date().toISOString()}).eq("id",opEditId);
                         setOperaciones(prev=>prev.map(o=>o.id===opEditId?{...payload,id:opEditId}:o));
+                        // Limpiar operacion_id de las removidas
+                        for (const cotId of removidas) {
+                          const cot = cotizaciones.find(c => c.id === cotId);
+                          if (cot) {
+                            const {operacion_id, ...rest} = cot;
+                            await supabase.from("cotizaciones").update({datos: rest}).eq("id", cotId);
+                          }
+                        }
+                        // Setear operacion_id en las agregadas
+                        for (const cotId of agregadas) {
+                          const cot = cotizaciones.find(c => c.id === cotId);
+                          if (cot) {
+                            await supabase.from("cotizaciones").update({datos: {...cot, operacion_id: opEditId}}).eq("id", cotId);
+                          }
+                        }
+                        if (removidas.length > 0 || agregadas.length > 0) {
+                          setCotizaciones(prev => prev.map(c => {
+                            if (removidas.includes(c.id)) { const {operacion_id, ...rest} = c; return rest; }
+                            if (agregadas.includes(c.id)) return {...c, operacion_id: opEditId};
+                            return c;
+                          }));
+                        }
                       } else {
                         const {data,error}=await supabase.from("operaciones").insert({datos:payload}).select("id").single();
                         if(error)throw error;

@@ -139,9 +139,9 @@ export default function PortalSunny({ supabase, onLogout }) {
   })
   const cotEnOpBorrador = (c) => {
     if (!c) return false
-    // 1) Via operacion_id en la cot
-    if (c.operacion_id && opsBorradorMap.has(c.operacion_id)) return true
-    // 2) Via array op.cotizaciones (fallback si operacion_id no se pobló)
+    // FUENTE DE VERDAD: op.cotizaciones (array). Si admin saca cot de una OP,
+    // la quita del array. Confiar solo en c.operacion_id daría falsos positivos
+    // si el admin no limpió el campo (queda como dato obsoleto).
     for (const [, cotIds] of opsBorradorMap) {
       if (cotIds.has(c._id) || cotIds.has(c.id)) return true
     }
