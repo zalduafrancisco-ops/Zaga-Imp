@@ -221,7 +221,21 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     var canal = supabase.channel('zaga_cliente_rt')
       .on('postgres_changes',{event:'*',schema:'public',table:'cotizaciones'},function(){ cargar() })
       .subscribe()
-    return function(){ supabase.removeChannel(canal) }
+    var ultimoRefreshFoco = Date.now()
+    var onVisibilidad = function(){
+      if (document.visibilityState === 'visible') {
+        var ahora = Date.now()
+        if (ahora - ultimoRefreshFoco > 5000) {
+          ultimoRefreshFoco = ahora
+          cargar()
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilidad)
+    return function(){
+      supabase.removeChannel(canal)
+      document.removeEventListener('visibilitychange', onVisibilidad)
+    }
   },[])
 
   var cargar = async function(){

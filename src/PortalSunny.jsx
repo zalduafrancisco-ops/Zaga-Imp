@@ -97,7 +97,21 @@ export default function PortalSunny({ supabase, onLogout }) {
         loadData()
       })
       .subscribe()
-    return () => supabase.removeChannel(channel)
+    let ultimoRefreshFoco = Date.now()
+    const onVisibilidad = () => {
+      if (document.visibilityState === "visible") {
+        const ahora = Date.now()
+        if (ahora - ultimoRefreshFoco > 5000) {
+          ultimoRefreshFoco = ahora
+          loadData()
+        }
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilidad)
+    return () => {
+      supabase.removeChannel(channel)
+      document.removeEventListener("visibilitychange", onVisibilidad)
+    }
   }, [])
 
   async function loadData() {

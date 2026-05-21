@@ -842,7 +842,27 @@ export default function App({ supabase, usuario, onLogout }){
         }
       })
       .subscribe();
-    return ()=>{ supabase.removeChannel(channel); };
+    // ── AUTO-REFRESH al volver a la tab (visibilitychange) ──
+    // Cuando el admin vuelve a la pestaña después de estar en otra ventana/tab
+    // (WhatsApp, otra app, etc.), refresca datos automáticamente. Evita ver
+    // valores stale si el realtime websocket no propagó.
+    let ultimoRefreshFoco = Date.now();
+    const onVisibilidad = () => {
+      if (document.visibilityState === "visible") {
+        const ahora = Date.now();
+        // Solo refrescar si pasaron >5 segundos desde el último refresh por foco
+        // (evita refrescos en cascada por cambios rápidos entre tabs)
+        if (ahora - ultimoRefreshFoco > 5000) {
+          ultimoRefreshFoco = ahora;
+          cargar();
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilidad);
+    return ()=>{
+      supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVisibilidad);
+    };
   },[]);
 
   const exportarDatos=()=>{
