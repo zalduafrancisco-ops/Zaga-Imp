@@ -264,17 +264,28 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
     return esC && undC > 0 ? p * Math.ceil(uc / undC) : p * uc;
   };
 
-  // ─── Share por CBM (preferido; suma=1) ─────────────────────────────────
-  // CBM es más confiable que peso (admin a veces mete peso/und vs total).
-  // No usamos Math.max(shareCbm, sharePeso) porque ese sum > 1 sobre-prorratea.
+  // ─── Share por VALOR de mercancía (preferido; suma=1) ──────────────────
+  // Las cots con productos más caros absorben más costos fijos (aduana, doc op,
+  // despacho CN, etc.). Esto da márgenes más parejos entre cots: una cot
+  // chica pero valiosa no se "lleva gratis" la aduana.
+  // Fallback: CBM si no hay valor mercancía. Luego peso. Luego 1/N.
+  const getValorMercRMB = (c) => {
+    const rmb = Number(c.precio_china_rmb) || 0;
+    const uc  = Number(c.unidades) || 0;
+    return rmb * uc;
+  };
   let share = 1;
-  let totalCbmOp = 0, totalPesoOp = 0;
+  let totalCbmOp = 0, totalPesoOp = 0, totalValorOp = 0;
   if (op && cotsEnOp && cotsEnOp.length > 1) {
+    totalValorOp = cotsEnOp.reduce((s, c) => s + getValorMercRMB(c), 0);
     totalCbmOp = cotsEnOp.reduce((s, c) => s + getCbm(c), 0);
     totalPesoOp = cotsEnOp.reduce((s, c) => s + getPesoReal(c), 0);
+    const valorCot = getValorMercRMB(d);
     const cbmCot = getCbm(d);
     const pesoCot = getPesoReal(d);
-    if (totalCbmOp > 0) {
+    if (totalValorOp > 0 && valorCot > 0) {
+      share = valorCot / totalValorOp;
+    } else if (totalCbmOp > 0) {
       share = cbmCot / totalCbmOp;
     } else if (totalPesoOp > 0) {
       share = pesoCot / totalPesoOp;
