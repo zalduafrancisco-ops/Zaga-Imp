@@ -4727,7 +4727,8 @@ Número de seguimiento: ${c.nro}`;
                               <div style={{marginTop:16,padding:16,background:"linear-gradient(135deg,#0f1e30 0%,#040c18 100%)",borderRadius:12,color:"#fff",border:"1px solid #c9a05544"}}>
                                 <div style={{fontSize:11,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"baseline",flexWrap:"wrap",gap:6}}>
                                   <span>💼 Costo real ZAGA (paso a paso)</span>
-                                  <div style={{display:"flex",gap:6}}>
+                                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                                    <span style={{fontSize:10,background:"#facc1522",color:"#facc15",padding:"2px 8px",borderRadius:10,fontWeight:600,fontFamily:"inherit"}} title="Tipo de cambio en uso (editable en 🛬 Validar)">💱 RMB {cz.TC_RMB_USD} · USD {cz.tc}</span>
                                     {!cz.tieneDataRmb && <span title="Cot legacy CLP sin desglose Sunny" style={{fontSize:10,background:"#fbbf2422",color:"#fbbf24",padding:"2px 8px",borderRadius:10,fontWeight:700}}>⚠️ Legacy CLP</span>}
                                     {opVinc && <span style={{fontSize:10,background:"#c9a05522",color:"#c9a055",padding:"2px 8px",borderRadius:10}}>en {opVinc.nro}</span>}
                                   </div>
@@ -5368,8 +5369,9 @@ Número de seguimiento: ${c.nro}`;
                                 const margenOp = totPrecioNeto > 0 ? (totGanancia/totPrecioNeto)*100 : 0;
                                 return (
                                   <div style={{marginTop:14,padding:14,background:"linear-gradient(135deg,#0f1e30 0%,#040c18 100%)",borderRadius:10,color:"#fff",border:"1px solid #c9a05544"}}>
-                                    <div style={{fontSize:11,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10}}>
-                                      💼 Costo real ZAGA — OP {op.nro}
+                                    <div style={{fontSize:11,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                                      <span>💼 Costo real ZAGA — OP {op.nro}</span>
+                                      {rows[0]?.cz && <span style={{fontSize:10,background:"#facc1522",color:"#facc15",padding:"2px 8px",borderRadius:10,fontWeight:600,letterSpacing:0.5}} title="TC en uso para esta OP (editable en 🛬 Validar)">💱 RMB {rows[0].cz.TC_RMB_USD} · USD {rows[0].cz.tc}</span>}
                                     </div>
                                     <div style={{overflowX:"auto"}}>
                                       <table style={{width:"100%",fontSize:11,borderCollapse:"collapse",minWidth:600}}>
