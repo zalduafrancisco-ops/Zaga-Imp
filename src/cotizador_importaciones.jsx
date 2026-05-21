@@ -327,16 +327,56 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
   const tarifaRmbKg = Number(op?.flete_rmb_kg_consolidado ?? d.aer_tarifa_sunny_rmb_kg) || (Number(d.aer_tarifa_sunny_kg) || 0) * TC_RMB_USD;
   const fleteRMB = pesoTotal * tarifaRmbKg;
 
-  const comisionRMB = valorMercanciaRMB * comisionPct / 100;
-  const seguroCalc = valorMercanciaRMB * seguroPct;
-  const seguroRMB = tieneDataRmb ? Math.max(seguroMin, seguroCalc) : 0; // sin mínimo si no hay data RMB
-  const otrosGastosRMB = certOrigen + docOp + despacho + compraDocs + transporteCn + seguroRMB;
-  const totalChinaRMB = valorMercanciaRMB + comisionRMB + fleteRMB + otrosGastosRMB;
+  let comisionRMB = valorMercanciaRMB * comisionPct / 100;
+  let seguroCalc = valorMercanciaRMB * seguroPct;
+  let seguroRMB = tieneDataRmb ? Math.max(seguroMin, seguroCalc) : 0; // sin mínimo si no hay data RMB
+  let otrosGastosRMB = certOrigen + docOp + despacho + compraDocs + transporteCn + seguroRMB;
+  let totalChinaRMB = valorMercanciaRMB + comisionRMB + fleteRMB + otrosGastosRMB;
+  let _valorMercanciaRMB = valorMercanciaRMB;
+  let _fleteRMB = fleteRMB;
 
-  // Total China CLP: si hay data RMB → convierte. Si NO hay data RMB → usa precio legacy CLP (mercancía sin extras Sunny)
-  const totalChinaCLP = tieneDataRmb
-    ? (totalChinaRMB / TC_RMB_USD) * tc
-    : valorMercanciaCLPLegacy;
+  // ── Total China CLP ──────────────────────────────────────────────────────
+  // Caso 1: cot tiene precio_china_rmb → convierte RMB → CLP (path nuevo)
+  // Caso 2: cot legacy + OP tiene `costos_china` legacy (ej. OP-001) → usa
+  //   el bloque de la OP (productos, comisión, flete, logística, seguro,
+  //   otros_usd, form_f_usd_por_producto × n_cots) y prorrateo por share
+  //   (peso/CBM auto, igual que aduana). Ignora precio_china legacy del cot
+  //   porque tiene costos viejos embebidos que no calzan con la realidad.
+  // Caso 3: cot solo (sin OP) → usa precio_china legacy CLP como antes.
+  let totalChinaCLP;
+  let _usoOpLegacy = false;
+  if (tieneDataRmb) {
+    totalChinaCLP = (totalChinaRMB / TC_RMB_USD) * tc;
+  } else if (op?.costos_china && (Number(op.costos_china.productos_rmb) || 0) > 0) {
+    const cc = op.costos_china;
+    const productosRMB    = Number(cc.productos_rmb) || 0;
+    const comisionRMBop   = productosRMB * (Number(cc.comision_pct) || 0) / 100;
+    const fleteRMBop      = (Number(cc.peso_kg) || 0) * (Number(cc.flete_rmb_kg) || 0);
+    const logisticaRMBop  = Number(cc.logistica_rmb) || 0;
+    const seguroRMBop     = productosRMB * (Number(cc.seguro_pct) || 0) / 100;
+    const otrosUSDop      = Number(cc.otros_usd) || 0;
+    const nCots           = cotsEnOp && cotsEnOp.length ? cotsEnOp.length : 1;
+    const formFUSDop      = (Number(cc.form_f_usd_por_producto) || 0) * nCots;
+
+    const totalOpRMB = productosRMB + comisionRMBop + fleteRMBop + logisticaRMBop + seguroRMBop;
+    const totalOpUSD = totalOpRMB / TC_RMB_USD + otrosUSDop + formFUSDop;
+    const totalOpCLP = totalOpUSD * tc;
+    totalChinaCLP = totalOpCLP * share;
+
+    // Rellenar el desglose por cot proporcional al share, para que el panel
+    // "Costo real ZAGA" muestre los componentes de forma coherente.
+    _valorMercanciaRMB = productosRMB * share;
+    comisionRMB        = comisionRMBop * share;
+    _fleteRMB          = fleteRMBop * share;
+    seguroCalc         = seguroRMBop * share;
+    seguroRMB          = seguroCalc;
+    // Otros gastos = logística + otros_usd + formF (todos prorrateados, en RMB equivalente)
+    otrosGastosRMB = (logisticaRMBop + (otrosUSDop + formFUSDop) * TC_RMB_USD) * share;
+    totalChinaRMB  = _valorMercanciaRMB + comisionRMB + _fleteRMB + otrosGastosRMB;
+    _usoOpLegacy = true;
+  } else {
+    totalChinaCLP = valorMercanciaCLPLegacy;
+  }
 
   // ─── LADO CHILE (en CLP, ya calculado por calcCliente) ────────────────────
   // cda = aduana fija + arancel real (ZAGA lo paga, neto)
@@ -370,8 +410,8 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
 
   return {
     // China
-    valorMercanciaRMB, comisionRMB, fleteRMB, otrosGastosRMB, totalChinaRMB, totalChinaCLP,
-    valorMercanciaCLPLegacy, tieneDataRmb,
+    valorMercanciaRMB: _valorMercanciaRMB, comisionRMB, fleteRMB: _fleteRMB, otrosGastosRMB, totalChinaRMB, totalChinaCLP,
+    valorMercanciaCLPLegacy, tieneDataRmb, usoOpLegacy: _usoOpLegacy,
     detalleChina: { certOrigen, docOp, despacho, compraDocs, transporteCn, seguroRMB, seguroCalc, seguroMin, seguroAplicaMin: seguroRMB > seguroCalc },
     pesoTotal, tarifaRmbKg, comisionPct, seguroPct,
     // Chile
