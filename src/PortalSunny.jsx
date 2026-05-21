@@ -267,7 +267,14 @@ export default function PortalSunny({ supabase, onLogout }) {
           loading ? <Empty zh="加载中" es="Cargando..." emoji="⏳" /> :
           opsPendientes.length === 0 ? <Empty zh="暂无重新报价请求" es="No hay operaciones esperando recotización" emoji="🔄" /> :
           opsPendientes.map(op => (
-            <OpRecotizarCard key={op._id} op={op} cots={cots} supabase={supabase} onSaved={loadData} />
+            <OpRecotizarCard key={op._id} op={op} cots={cots} supabase={supabase} onSaved={loadData} onEditCot={(cotId)=>{
+              // En vez de modal, llevar a Pend cotizar donde la cot está editable inline
+              setTab("pend_cot")
+              setTimeout(()=>{
+                const el = document.getElementById("cot-" + cotId)
+                if (el) el.scrollIntoView({behavior:"smooth", block:"center"})
+              }, 200)
+            }} />
           ))
         ) : loading ? (
           <Empty zh="加载中" es="Cargando..." emoji="⏳" />
@@ -651,7 +658,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
   }
 
   return (
-    <div style={{
+    <div id={"cot-" + c._id} style={{
       background:"#fff", borderRadius:12, marginBottom:14,
       border: isExpanded ? "2px solid #c47830" : "1px solid #e2e8f0",
       overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,0.04)",
@@ -1327,7 +1334,7 @@ function Dashboard({ cots, pendCot, confirmadas, camino, completadas }) {
 }
 
 // ─── Card de operación a recotizar (tab nuevo) ──────────────────────────────
-function OpRecotizarCard({ op, cots, supabase, onSaved }) {
+function OpRecotizarCard({ op, cots, supabase, onSaved, onEditCot }) {
   const cotsEnOp = cots.filter(c => (op.cotizaciones || []).includes(c._id))
   const nCots = cotsEnOp.length
 
@@ -1448,15 +1455,20 @@ function OpRecotizarCard({ op, cots, supabase, onSaved }) {
             const p = Number(c.precio_china_rmb) || 0
             const u = Number(c.unidades) || 0
             const subtotal = p * u
+            const sinDatos = p === 0
             return (
-              <div key={c._id} style={{ display:"flex", justifyContent:"space-between", padding:"7px 0", borderBottom:"1px solid #f1f5f9", fontSize:12 }}>
-                <div>
+              <div key={c._id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 0", borderBottom:"1px solid #f1f5f9", fontSize:12, gap:8 }}>
+                <div style={{ flex:1, minWidth:0 }}>
                   <b style={{ color:"#0f172a" }}>{c.nro || "?"}</b> · {c.producto || "—"}
                   <span style={{ color:"#94a3b8", marginLeft:6 }}>· 👤 {c.cliente || "—"}</span>
+                  {sinDatos && <span style={{ marginLeft:6, fontSize:10, color:"#dc2626", background:"#fef2f2", border:"1px solid #fecaca", padding:"1px 6px", borderRadius:8, fontWeight:700 }}>⚠️ Sin datos</span>}
                 </div>
-                <div style={{ color:"#64748b", fontSize:11, textAlign:"right" }}>
+                <div style={{ color:"#64748b", fontSize:11, textAlign:"right", whiteSpace:"nowrap" }}>
                   {u} und × ¥{p} = <b style={{ color:"#0f172a" }}>{fmtRMB(subtotal)}</b>
                 </div>
+                {onEditCot && (
+                  <button onClick={()=>onEditCot(c._id)} title="编辑 / Ir a editar esta cotización" style={{ background:"#fff", color:"#c47830", border:"1px solid #fed7aa", borderRadius:6, padding:"4px 9px", fontSize:11, cursor:"pointer", fontWeight:700, fontFamily:"inherit", whiteSpace:"nowrap" }}>✏️ 编辑</button>
+                )}
               </div>
             )
           })}
