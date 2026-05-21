@@ -5539,7 +5539,10 @@ Número de seguimiento: ${c.nro}`;
                                 const fleteOp = detallesCot.reduce((s,d) => s + d.fleteRMB, 0);
                                 const certOpRMB = certOri * cotsActivas.length;
                                 const seguroOp = Math.max(segMin, mercOp * segPct);
-                                const otrosOpRMB = docOpV + despV + compraDV + transpV + logisticaLeg + seguroOp;
+                                // Logística legacy es duplicada del transporte_interno_cn nuevo: solo sumar
+                                // si NO hay transporte_interno_cn (compatibilidad OP-001 vieja).
+                                const logisticaEfectiva = transpV > 0 ? 0 : logisticaLeg;
+                                const otrosOpRMB = docOpV + despV + compraDV + transpV + logisticaEfectiva + seguroOp;
                                 const totalRMB = mercOp + comisionOp + fleteOp + certOpRMB + otrosOpRMB;
                                 const totalUSDExtra = otrosUSDLeg + formFUSDLeg;
                                 const totalUSD = totalRMB / TC_RMB_USD + totalUSDExtra;
@@ -5577,7 +5580,7 @@ Número de seguimiento: ${c.nro}`;
                                             {despV>0    && rowRMB("🛃 Despacho aduanero CN", despV, "Fijo OP")}
                                             {compraDV>0 && rowRMB("📑 Compra docs", compraDV, "Fijo OP")}
                                             {transpV>0  && rowRMB("🚚 Transporte interno CN", transpV, "Fijo OP")}
-                                            {logisticaLeg>0 && rowRMB("🛣️ Logística Yiwu→SH (legacy)", logisticaLeg, "OP-001 legacy")}
+                                            {logisticaLeg>0 && transpV===0 && rowRMB("🛣️ Logística Yiwu→SH (legacy)", logisticaLeg, "Solo OP legacy sin transporte_interno_cn nuevo")}
                                             {rowRMB(`🛡️ Seguro (${(segPct*100).toFixed(2)}% sobre merc., mín ¥${segMin})`, seguroOp, mercOp*segPct < segMin ? "Aplica mínimo" : "Aplica %")}
                                           </tbody>
                                         </table>
