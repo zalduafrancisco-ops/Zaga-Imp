@@ -1753,8 +1753,9 @@ Número de seguimiento: ${c.nro}`;
               const totStandaloneIva = consolidados.reduce((s,x)=>s+(x.calc?.standalone?.totClIva||0), 0);
               const ahorroIva = totStandaloneIva - totConsolidadoIva;
               const totUnd = cotsCliente.reduce((s,c)=>s+(Number(c.unidades)||0), 0);
-              // Pagos: 50/50 a menos que la cot tenga pago_100
-              const tienePago100 = cotsCliente.every(c => c.pago_100);
+              // Pagos: aéreo SIEMPRE pago único (regla negocio).
+              // Marítimo: 50/50 a menos que la cot tenga pago_100 explícito.
+              const tienePago100 = cotsCliente.every(c => c.transporte === "aereo" || c.pago_100);
               const p1 = tienePago100 ? totConsolidadoIva : totConsolidadoIva / 2;
               const p2 = tienePago100 ? 0 : totConsolidadoIva / 2;
               // Llegada estimada aérea = base + 25 días
