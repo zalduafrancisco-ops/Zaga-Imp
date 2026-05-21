@@ -6,7 +6,7 @@ import LOGO_WHITE from "./logo-white.png"
 // Captura editable en Tab 1: precio FOB, dimensiones, peso, modo cobro, Form F, días producción.
 // Diseño aprobado en PORTAL_SUNNY_DESIGN.md (commit e7eaeb2).
 
-const TC_RMB_USD = 6.5 // TC conservador (protege contra apreciación del yuan)
+const TC_RMB_USD = 7.03 // TC con margen ~1.7% sobre WU real (CLP/RMB ≈ 135.14 vs WU 132.93)
 // Proxy de imágenes para dominios con hotlink protection (Alibaba, Taobao, 1688, etc.)
 const proxyImg = (url) => {
   if (!url || typeof url !== "string") return url
@@ -861,7 +861,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               <Field label="FOB 价格 / Precio FOB (RMB / und)">
                 <input type="number" step="0.01" value={form.precio_china_rmb} onChange={e=>setForm(p=>({...p, precio_china_rmb:e.target.value}))} placeholder="0.00" style={inp}/>
               </Field>
-              <Field label="自动 / Calculado USD (TC 6.5)">
+              <Field label="自动 / Calculado USD (TC 7.03)">
                 <div style={{ ...inp, background:"#f1f5f9", color:"#475569", fontWeight:700 }}>
                   {precioUSD > 0 ? fmtUSD(precioUSD) : "—"}
                 </div>
@@ -989,7 +989,7 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               </Field>
             </div>
             <div style={{ fontSize:10, color:"#94a3b8", marginTop:-4, marginBottom:8, fontStyle:"italic" }}>
-              💡 填写 RMB/kg 后，USD 自动计算（汇率 6.5）/ Si llenas RMB/kg, el USD se calcula automático (TC 6.5). USD legacy: {fmtUSD(Number(form.aer_tarifa_sunny_kg)||0)}
+              💡 填写 RMB/kg 后，USD 自动计算（汇率 7.03）/ Si llenas RMB/kg, el USD se calcula automático (TC 7.03). USD legacy: {fmtUSD(Number(form.aer_tarifa_sunny_kg)||0)}
             </div>
             {fleteEstimado > 0 && (
               <div style={{ marginTop:4, background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:7, padding:"7px 11px", fontSize:11, color:"#92400e" }}>
