@@ -248,135 +248,168 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
   const tc = Number(op?.tc_usd_clp ?? op?.pago?.tc_efectivo ?? d?.tc_usd_clp ?? d?.pago?.tc_efectivo) || 950;
   const calc = calcCliente(d);
 
-  // ─── Share para prorrateo (igual lógica que calcConsolidado) ───────────
-  // En consolidado, la aduana fija se paga UNA VEZ y se reparte entre cots
-  // según modo Sunny (mayor entre peso/volumen).
+  // ─── Helpers de medida por cot ─────────────────────────────────────────
+  const getCbm = (c) => {
+    const m3 = Number(c.dim_m3) || 0;
+    const uc = Number(c.unidades) || 0;
+    const undC = Number(c.dim_und_caja) || 0;
+    const esC = c.dim_tipo === "caja";
+    return esC && undC > 0 ? m3 * Math.ceil(uc / undC) : m3 * uc;
+  };
+  const getPesoReal = (c) => {
+    const p = Number(c.peso_kg) || 0;
+    const uc = Number(c.unidades) || 0;
+    const undC = Number(c.dim_und_caja) || 0;
+    const esC = c.dim_tipo === "caja";
+    return esC && undC > 0 ? p * Math.ceil(uc / undC) : p * uc;
+  };
+
+  // ─── Share por CBM (preferido; suma=1) ─────────────────────────────────
+  // CBM es más confiable que peso (admin a veces mete peso/und vs total).
+  // No usamos Math.max(shareCbm, sharePeso) porque ese sum > 1 sobre-prorratea.
   let share = 1;
+  let totalCbmOp = 0, totalPesoOp = 0;
   if (op && cotsEnOp && cotsEnOp.length > 1) {
-    const getCbm = (c) => {
-      const m3 = Number(c.dim_m3) || 0;
-      const uc = Number(c.unidades) || 0;
-      const undC = Number(c.dim_und_caja) || 0;
-      const esC = c.dim_tipo === "caja";
-      return esC && undC > 0 ? m3 * Math.ceil(uc / undC) : m3 * uc;
-    };
-    const getPesoCobr = (c) => {
-      const p = Number(c.peso_kg) || 0;
-      const uc = Number(c.unidades) || 0;
-      const undC = Number(c.dim_und_caja) || 0;
-      const esC = c.dim_tipo === "caja";
-      const pReal = esC && undC > 0 ? p * Math.ceil(uc / undC) : p * uc;
-      const cbm = getCbm(c);
-      return Math.max(pReal, cbm * 166.67);
-    };
-    // Si CUALQUIER cot no tiene datos suficientes (peso o cbm), prorrateamos
-    // equitativamente (1/N) para TODAS. Esto evita que la cot con datos absorba
-    // toda la aduana mientras las otras quedan en 0.
-    const todasTienenDatos = cotsEnOp.every(c => getPesoCobr(c) > 0);
-    if (!todasTienenDatos) {
-      share = 1 / cotsEnOp.length;
+    totalCbmOp = cotsEnOp.reduce((s, c) => s + getCbm(c), 0);
+    totalPesoOp = cotsEnOp.reduce((s, c) => s + getPesoReal(c), 0);
+    const cbmCot = getCbm(d);
+    const pesoCot = getPesoReal(d);
+    if (totalCbmOp > 0) {
+      share = cbmCot / totalCbmOp;
+    } else if (totalPesoOp > 0) {
+      share = pesoCot / totalPesoOp;
     } else {
-      const totalCbmOp = cotsEnOp.reduce((s, c) => s + getCbm(c), 0);
-      const totalPesoOp = cotsEnOp.reduce((s, c) => s + getPesoCobr(c), 0);
-      const cbmCot = getCbm(d);
-      const pesoCot = getPesoCobr(d);
-      const shareCbm = totalCbmOp > 0 ? cbmCot / totalCbmOp : 0;
-      const sharePeso = totalPesoOp > 0 ? pesoCot / totalPesoOp : 0;
-      const modo = d.aer_modo_cobro_sunny || "auto";
-      share = modo === "peso" ? sharePeso
-            : modo === "volumen" ? shareCbm
-            : Math.max(shareCbm, sharePeso);
-      if (share === 0) share = 1 / cotsEnOp.length;
+      share = 1 / cotsEnOp.length;
     }
+    if (share === 0) share = 1 / cotsEnOp.length;
   }
 
-  // ─── LADO CHINA ───────────────────────────────────────────────────────────
-  // Fallback: si la cot no tiene precio_china_rmb (legacy), usar precio_china (CLP).
-  // Para legacy CLP, los extras RMB de Sunny no aplican (no fueron capturados).
+  // ─── Datos básicos del cot ─────────────────────────────────────────────
   const precioRmb = Number(d.precio_china_rmb) || 0;
   const precioCLPLegacy = Number(d.precio_china) || 0;
   const tieneDataRmb = precioRmb > 0;
-  const valorMercanciaRMB = precioRmb * u;
   const valorMercanciaCLPLegacy = precioCLPLegacy * u;
 
-  // Helpers fallback: si OP no tiene el campo (cot sola), usar el de la cot
   const _take = (k) => Number(op?.[k] ?? d?.[k]) || 0;
-  // Para costos fijos en RMB: 0 en OP significa "no seteado", caer al cot.
-  // (Sunny puede editar a nivel cot DESPUES de recotizar la OP — el cot gana
-  // si la OP no tiene el campo o lo tiene en 0.)
   const _takeMax = (k) => {
     const opVal  = Number(op?.[k])  || 0;
     const cotVal = Number(d?.[k])   || 0;
     return Math.max(opVal, cotVal);
   };
-  const comisionPct = _take("comision_sunny_pct");
-  const seguroPct   = _take("seguro_pct"); // ej 0.002
-  const seguroMin   = _take("seguro_min_rmb");
-  const certOrigen  = _takeMax("cost_cert_origen_rmb");
-  const docOp       = _takeMax("cost_doc_operacion_rmb");
-  const despacho    = _takeMax("cost_despacho_aduanero_rmb");
-  const compraDocs  = _takeMax("cost_compra_docs_rmb");
-  const transporteCn= _takeMax("cost_transporte_interno_cn_rmb");
 
-  // Peso total y flete RMB (solo aplica si Sunny ya llenó la cot)
-  const undCaja = Number(d.dim_und_caja) || 0;
-  const esCaja = d.dim_tipo === "caja";
-  const nCajas = esCaja && undCaja > 0 ? Math.ceil(u / undCaja) : 0;
-  const pesoUnit = Number(d.peso_kg) || 0;
-  const pesoTotal = esCaja && undCaja > 0 ? pesoUnit * nCajas : pesoUnit * u;
-  const tarifaRmbKg = Number(op?.flete_rmb_kg_consolidado ?? d.aer_tarifa_sunny_rmb_kg) || (Number(d.aer_tarifa_sunny_kg) || 0) * TC_RMB_USD;
-  const fleteRMB = pesoTotal * tarifaRmbKg;
+  // ─── Lado China — calcular TODO a nivel OP, luego prorratear ──────────
+  //
+  // Reglas:
+  //   - mercancía: DIRECTO por cot (precio_china_rmb × und). Cada producto
+  //     tiene su propio FOB Exw, no se prorratea.
+  //   - comisión Sunny: % sobre mercancía → directo por cot también.
+  //   - flete: pesoCobrable_cot × tarifa. Directo por cot, sum=flete_total.
+  //   - cert origen: PER COT/PRODUCTO (1 cert por SKU). No se prorratea.
+  //   - doc op, despacho aduanero CN, compra docs, transporte interno CN:
+  //     FIJO POR OP. Se prorratea por share CBM.
+  //   - seguro: max(min, mercancía_op × pct). Calculado a nivel OP, prorrateado.
+  //   - logística Yiwu (legacy), otros_usd (legacy), formF: fijos por OP,
+  //     prorrateado.
+  const cc = op?.costos_china || {};
+  const useLegacyCC = (Number(cc.productos_rmb) || 0) > 0;
 
-  let comisionRMB = valorMercanciaRMB * comisionPct / 100;
-  let seguroCalc = valorMercanciaRMB * seguroPct;
-  let seguroRMB = tieneDataRmb ? Math.max(seguroMin, seguroCalc) : 0; // sin mínimo si no hay data RMB
-  let otrosGastosRMB = certOrigen + docOp + despacho + compraDocs + transporteCn + seguroRMB;
-  let totalChinaRMB = valorMercanciaRMB + comisionRMB + fleteRMB + otrosGastosRMB;
-  let _valorMercanciaRMB = valorMercanciaRMB;
-  let _fleteRMB = fleteRMB;
-
-  // ── Total China CLP ──────────────────────────────────────────────────────
-  // Caso 1: cot tiene precio_china_rmb → convierte RMB → CLP (path nuevo)
-  // Caso 2: cot legacy + OP tiene `costos_china` legacy (ej. OP-001) → usa
-  //   el bloque de la OP (productos, comisión, flete, logística, seguro,
-  //   otros_usd, form_f_usd_por_producto × n_cots) y prorrateo por share
-  //   (peso/CBM auto, igual que aduana). Ignora precio_china legacy del cot
-  //   porque tiene costos viejos embebidos que no calzan con la realidad.
-  // Caso 3: cot solo (sin OP) → usa precio_china legacy CLP como antes.
-  let totalChinaCLP;
-  let _usoOpLegacy = false;
+  // -- Mercancía y comisión del cot (DIRECTO)
+  let mercanciaCotRMB;
   if (tieneDataRmb) {
-    totalChinaCLP = (totalChinaRMB / TC_RMB_USD) * tc;
-  } else if (op?.costos_china && (Number(op.costos_china.productos_rmb) || 0) > 0) {
-    const cc = op.costos_china;
-    const productosRMB    = Number(cc.productos_rmb) || 0;
-    const comisionRMBop   = productosRMB * (Number(cc.comision_pct) || 0) / 100;
-    const fleteRMBop      = (Number(cc.peso_kg) || 0) * (Number(cc.flete_rmb_kg) || 0);
-    const logisticaRMBop  = Number(cc.logistica_rmb) || 0;
-    const seguroRMBop     = productosRMB * (Number(cc.seguro_pct) || 0) / 100;
-    const otrosUSDop      = Number(cc.otros_usd) || 0;
-    const nCots           = cotsEnOp && cotsEnOp.length ? cotsEnOp.length : 1;
-    const formFUSDop      = (Number(cc.form_f_usd_por_producto) || 0) * nCots;
+    mercanciaCotRMB = precioRmb * u;
+  } else if (useLegacyCC && cotsEnOp.length > 0) {
+    // Proxy: distribuye productos_rmb por share del precio legacy CLP.
+    // Mientras Sunny no llene precio_china_rmb por cot, usamos legacy como proxy.
+    const sumLegacy = cotsEnOp.reduce((s,c) => s + (Number(c.precio_china)||0)*(Number(c.unidades)||0), 0);
+    const shareMerc = sumLegacy > 0 ? (precioCLPLegacy * u) / sumLegacy : (1 / cotsEnOp.length);
+    mercanciaCotRMB = (Number(cc.productos_rmb) || 0) * shareMerc;
+  } else {
+    mercanciaCotRMB = 0;
+  }
 
-    const totalOpRMB = productosRMB + comisionRMBop + fleteRMBop + logisticaRMBop + seguroRMBop;
-    const totalOpUSD = totalOpRMB / TC_RMB_USD + otrosUSDop + formFUSDop;
-    const totalOpCLP = totalOpUSD * tc;
-    totalChinaCLP = totalOpCLP * share;
+  // Comisión Sunny (% sobre mercancía cot, directo)
+  let comisionPctEff = _take("comision_sunny_pct");
+  if (!comisionPctEff && useLegacyCC) comisionPctEff = Number(cc.comision_pct) || 0;
+  const comisionRMB = mercanciaCotRMB * comisionPctEff / 100;
 
-    // Rellenar el desglose por cot proporcional al share, para que el panel
-    // "Costo real ZAGA" muestre los componentes de forma coherente.
-    _valorMercanciaRMB = productosRMB * share;
-    comisionRMB        = comisionRMBop * share;
-    _fleteRMB          = fleteRMBop * share;
-    seguroCalc         = seguroRMBop * share;
-    seguroRMB          = seguroCalc;
-    // Otros gastos = logística + otros_usd + formF (todos prorrateados, en RMB equivalente)
-    otrosGastosRMB = (logisticaRMBop + (otrosUSDop + formFUSDop) * TC_RMB_USD) * share;
-    totalChinaRMB  = _valorMercanciaRMB + comisionRMB + _fleteRMB + otrosGastosRMB;
-    _usoOpLegacy = true;
+  // Flete: peso real cot × tarifa RMB/kg
+  const pesoTotalCot = getPesoReal(d);
+  let tarifaRmbKg = Number(op?.flete_rmb_kg_consolidado ?? d.aer_tarifa_sunny_rmb_kg) || 0;
+  if (!tarifaRmbKg && useLegacyCC) tarifaRmbKg = Number(cc.flete_rmb_kg) || 0;
+  if (!tarifaRmbKg) tarifaRmbKg = (Number(d.aer_tarifa_sunny_kg) || 0) * TC_RMB_USD;
+  const fleteRMB = pesoTotalCot * tarifaRmbKg;
+
+  // Cert origen: per cot/producto (no se prorratea)
+  let certOrigen = _takeMax("cost_cert_origen_rmb");
+  // (Legacy OP-001 no tiene este campo separado — solo en top-level del nuevo modelo)
+
+  // Fijos POR OP — prorratear por share CBM
+  let docOp_op       = _takeMax("cost_doc_operacion_rmb");
+  let despacho_op    = _takeMax("cost_despacho_aduanero_rmb");
+  let compraDocs_op  = _takeMax("cost_compra_docs_rmb");
+  let transporteCn_op= _takeMax("cost_transporte_interno_cn_rmb");
+  let logistica_op   = 0;
+  let otrosUSD_op    = 0;
+  let formFUSD_op    = 0;
+  if (useLegacyCC) {
+    logistica_op = Number(cc.logistica_rmb) || 0;
+    otrosUSD_op  = Number(cc.otros_usd) || 0;
+    const nCots  = cotsEnOp.length || 1;
+    formFUSD_op  = (Number(cc.form_f_usd_por_producto) || 0) * nCots;
+  }
+
+  // Seguro a nivel OP, prorrateado
+  const seguroPct = _take("seguro_pct") || (useLegacyCC ? Number(cc.seguro_pct)/100 : 0);
+  // Nota: cc.seguro_pct viene como 0.2 (% directo); cost_*_rmb del nuevo modelo viene como 0.002 (decimal).
+  // Si seguroPct quedó > 1, asumimos que viene como % directo y dividimos.
+  const seguroPctNorm = seguroPct > 1 ? seguroPct / 100 : seguroPct;
+  const seguroMin = _take("seguro_min_rmb");
+  const mercanciaOpRMB = useLegacyCC
+    ? (Number(cc.productos_rmb) || 0)
+    : cotsEnOp.reduce((s,c) => s + (Number(c.precio_china_rmb)||0)*(Number(c.unidades)||0), 0);
+  const seguroOpCalc = mercanciaOpRMB * seguroPctNorm;
+  const seguroOpRMB = tieneDataRmb || useLegacyCC
+    ? Math.max(seguroMin, seguroOpCalc)
+    : 0;
+
+  // Compartidos del OP (en RMB) prorrateados para esta cot:
+  const compartidosCotRMB =
+      docOp_op       * share
+    + despacho_op    * share
+    + compraDocs_op  * share
+    + transporteCn_op* share
+    + logistica_op   * share
+    + seguroOpRMB    * share;
+  // Compartidos USD (legacy) prorrateados:
+  const compartidosCotUSD = (otrosUSD_op + formFUSD_op) * share;
+
+  // Total RMB y CLP del cot
+  const valorMercanciaRMB = mercanciaCotRMB; // alias para retornar
+  const seguroRMB         = seguroOpRMB * share;
+  const otrosGastosRMB    = certOrigen + compartidosCotRMB;
+  const totalChinaRMB     = mercanciaCotRMB + comisionRMB + fleteRMB + otrosGastosRMB;
+  const totalChinaCLP_RMB = (totalChinaRMB / TC_RMB_USD) * tc;
+  const totalChinaCLP_USD = compartidosCotUSD * tc;
+  // Total China = RMB convertido + USD convertido. Si no hay datos RMB ni costos_china,
+  // fallback al precio_china legacy CLP × und (sin extras).
+  let totalChinaCLP;
+  if (tieneDataRmb || useLegacyCC) {
+    totalChinaCLP = totalChinaCLP_RMB + totalChinaCLP_USD;
   } else {
     totalChinaCLP = valorMercanciaCLPLegacy;
   }
+  const _usoOpLegacy = useLegacyCC && !tieneDataRmb;
+  // Para mantener compatibilidad de campos del return (seguroCalc para badge)
+  const seguroCalc = seguroOpCalc * share;
+  // Variables del return originales (renombradas a la convención existente)
+  const _valorMercanciaRMB = valorMercanciaRMB;
+  const _fleteRMB = fleteRMB;
+  const docOp = docOp_op * share;
+  const despacho = despacho_op * share;
+  const compraDocs = compraDocs_op * share;
+  const transporteCn = transporteCn_op * share;
+  const comisionPct = comisionPctEff;
+  const pesoTotal = pesoTotalCot;
 
   // ─── LADO CHILE (en CLP, ya calculado por calcCliente) ────────────────────
   // cda = aduana fija + arancel real (ZAGA lo paga, neto)
