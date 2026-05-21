@@ -280,12 +280,13 @@ export default function PortalSunny({ supabase, onLogout }) {
           opsPendientes.length === 0 ? <Empty zh="暂无重新报价请求" es="No hay operaciones esperando recotización" emoji="🔄" /> :
           opsPendientes.map(op => (
             <OpRecotizarCard key={op._id} op={op} cots={cots} supabase={supabase} onSaved={loadData} onEditCot={(cotId)=>{
-              // En vez de modal, llevar a Pend cotizar donde la cot está editable inline
+              // Llevar a Pend cotizar, EXPANDIR la cot elegida, y hacer scroll a ella
               setTab("pend_cot")
+              setEditing(cotId)
               setTimeout(()=>{
                 const el = document.getElementById("cot-" + cotId)
                 if (el) el.scrollIntoView({behavior:"smooth", block:"center"})
-              }, 200)
+              }, 250)
             }} />
           ))
         ) : loading ? (
@@ -315,7 +316,7 @@ export default function PortalSunny({ supabase, onLogout }) {
                 const op = ops.find(o => o._id === opId)
                 if (!op) return cotsDeOp.map(renderCard)
                 return (
-                  <OpGroupCard key={opId} op={op} cots={cotsDeOp} supabase={supabase} onSaved={loadData}>
+                  <OpGroupCard key={opId} op={op} cots={cotsDeOp} supabase={supabase} onSaved={loadData} editingId={editingId}>
                     {cotsDeOp.map(renderCard)}
                   </OpGroupCard>
                 )
@@ -330,8 +331,14 @@ export default function PortalSunny({ supabase, onLogout }) {
 }
 
 // ─── Card de grupo de operación consolidada (agrupa cots + chat de grupo) ─
-function OpGroupCard({ op, cots, supabase, onSaved, children }) {
+function OpGroupCard({ op, cots, supabase, onSaved, children, editingId }) {
   const [expanded, setExpanded] = useState(false)
+  // Auto-expandir si alguna cot del grupo coincide con editingId (click "Editar" desde Recotizar)
+  useEffect(() => {
+    if (editingId && cots.some(c => c._id === editingId)) {
+      setExpanded(true)
+    }
+  }, [editingId, cots])
   const [nuevoMsg, setNuevoMsg] = useState("")
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
