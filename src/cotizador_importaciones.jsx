@@ -2009,7 +2009,22 @@ Número de seguimiento: ${c.nro}`;
                 <button onClick={cerrar} style={{background:"#1a2740",color:"#94a3b8",border:"1px solid #2d4163",borderRadius:8,padding:"7px 14px",fontSize:13,cursor:"pointer"}}>✕ Cerrar</button>
               </div>
 
-              <div style={{padding:"20px 24px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              {/* TIPO DE CAMBIO — editable por OP, en barra superior (no rompe el grid 2-col) */}
+              <div style={{margin:"12px 24px 0",padding:"8px 14px",background:"#fefce8",border:"1px solid #fde047",borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                <div style={{fontSize:11,color:"#a16207",fontWeight:700}}>💱 Tipo de cambio para esta {opVinc?"OP":"cotización"}</div>
+                <div style={{display:"flex",gap:14,alignItems:"center"}}>
+                  <label style={{fontSize:11,color:"#475569",display:"flex",alignItems:"center",gap:5}}>
+                    RMB → USD:
+                    <input type="number" step="0.01" value={validarForm.tc_rmb_usd||7.2} onChange={e=>setValidarForm(p=>({...p,tc_rmb_usd:e.target.value}))} style={{width:70,padding:"3px 6px",border:"1px solid #facc15",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fff"}}/>
+                  </label>
+                  <label style={{fontSize:11,color:"#475569",display:"flex",alignItems:"center",gap:5}}>
+                    USD → CLP:
+                    <input type="number" step="1" value={validarForm.tc_usd_clp||950} onChange={e=>setValidarForm(p=>({...p,tc_usd_clp:e.target.value}))} style={{width:70,padding:"3px 6px",border:"1px solid #facc15",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fff"}}/>
+                  </label>
+                </div>
+              </div>
+
+              <div style={{padding:"16px 24px 20px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
                 {/* SECCIÓN 1 — 🇨🇳 Datos confirmados por Sunny (read-only) */}
                 <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:14}}>
                   <div style={{fontSize:11,color:"#92400e",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>🇨🇳 1. Datos confirmados por Sunny (read-only)</div>
@@ -2030,21 +2045,6 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{borderTop:"2px solid #c47830",marginTop:10,paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:800}}>
                     <span style={{color:"#854d0e"}}>Total China:</span>
                     <span style={{color:"#c47830"}}>{fmtRMB(totalChinaRMB)} ≈ {fmt(totalChinaCLP)}</span>
-                  </div>
-                </div>
-
-                {/* TIPO DE CAMBIO — editable por OP */}
-                <div style={{gridColumn:"1 / -1",background:"#fefce8",border:"1px solid #fde047",borderRadius:10,padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                  <div style={{fontSize:11,color:"#a16207",fontWeight:700}}>💱 Tipo de cambio para esta {opVinc?"OP":"cotización"}</div>
-                  <div style={{display:"flex",gap:14,alignItems:"center"}}>
-                    <label style={{fontSize:11,color:"#475569",display:"flex",alignItems:"center",gap:5}}>
-                      RMB → USD:
-                      <input type="number" step="0.01" value={validarForm.tc_rmb_usd||7.2} onChange={e=>setValidarForm(p=>({...p,tc_rmb_usd:e.target.value}))} style={{width:80,padding:"4px 7px",border:"1px solid #facc15",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fff"}}/>
-                    </label>
-                    <label style={{fontSize:11,color:"#475569",display:"flex",alignItems:"center",gap:5}}>
-                      USD → CLP:
-                      <input type="number" step="1" value={validarForm.tc_usd_clp||950} onChange={e=>setValidarForm(p=>({...p,tc_usd_clp:e.target.value}))} style={{width:80,padding:"4px 7px",border:"1px solid #facc15",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fff"}}/>
-                    </label>
                   </div>
                 </div>
 
