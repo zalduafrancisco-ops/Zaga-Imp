@@ -244,7 +244,7 @@ function calcCliente(d) {
 function calcCostoRealZaga(d, op, cotsEnOp = []) {
   const u = Number(d.unidades) || 0;
   // TC variable por OP (Francisco puede ajustar para cada operación)
-  const TC_RMB_USD = Number(op?.tc_rmb_usd ?? d?.tc_rmb_usd) || 7.2;
+  const TC_RMB_USD = Number(op?.tc_rmb_usd ?? d?.tc_rmb_usd) || 6.5;
   const tc = Number(op?.tc_usd_clp ?? op?.pago?.tc_efectivo ?? d?.tc_usd_clp ?? d?.pago?.tc_efectivo) || 950;
   const calc = calcCliente(d);
 
@@ -430,8 +430,8 @@ function calcConsolidado(cot, op, cotsEnOp) {
   const ahorroCdaCl = cdaStandaloneCl - cdaConsolidadoCl;
 
   // Ahorro 2 — Flete: tarifa standalone Sunny vs tarifa consolidada Sunny (si la dio)
-  // Lógica RMB nativo con fallback USD legacy. RMB → USD via tc_rmb_usd = 7.2
-  const TC_RMB_USD = 7.2;
+  // Lógica RMB nativo con fallback USD legacy. RMB → USD via tc_rmb_usd = 6.5 (conservador)
+  const TC_RMB_USD = Number(op?.tc_rmb_usd) || 6.5;
   const fleteRmbKg = Number(cc.flete_rmb_kg) || 0;
   const fleteUsdKgLegacy = Number(cc.flete_usd_kg) || 0;
   const tarifaOpKg = fleteRmbKg > 0 ? fleteRmbKg / TC_RMB_USD : fleteUsdKgLegacy;
@@ -1890,7 +1890,7 @@ Número de seguimiento: ${c.nro}`;
         const opVinc = c.operacion_id ? operaciones.find(o => o.id === c.operacion_id) : null;
         const cotsOpVinc = opVinc ? cotizaciones.filter(x => (opVinc.cotizaciones||[]).includes(x.id)) : [];
         // TCs editables (en validarForm o fallback al OP/cot/default)
-        const TC_RMB_USD = Number(validarForm.tc_rmb_usd ?? opVinc?.tc_rmb_usd ?? c.tc_rmb_usd) || 7.2;
+        const TC_RMB_USD = Number(validarForm.tc_rmb_usd ?? opVinc?.tc_rmb_usd ?? c.tc_rmb_usd) || 6.5;
         const tc = Number(validarForm.tc_usd_clp ?? opVinc?.tc_usd_clp ?? opVinc?.pago?.tc_efectivo ?? c.tc_usd_clp ?? c?.pago?.tc_efectivo) || 950;
 
         // ─── Lado China (desde Sunny) ──────────────────────────────────────
@@ -2015,7 +2015,7 @@ Número de seguimiento: ${c.nro}`;
                 <div style={{display:"flex",gap:14,alignItems:"center"}}>
                   <label style={{fontSize:11,color:"#475569",display:"flex",alignItems:"center",gap:5}}>
                     RMB → USD:
-                    <input type="number" step="0.01" value={validarForm.tc_rmb_usd||7.2} onChange={e=>setValidarForm(p=>({...p,tc_rmb_usd:e.target.value}))} style={{width:70,padding:"3px 6px",border:"1px solid #facc15",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fff"}}/>
+                    <input type="number" step="0.01" value={validarForm.tc_rmb_usd||6.5} onChange={e=>setValidarForm(p=>({...p,tc_rmb_usd:e.target.value}))} style={{width:70,padding:"3px 6px",border:"1px solid #facc15",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fff"}}/>
                   </label>
                   <label style={{fontSize:11,color:"#475569",display:"flex",alignItems:"center",gap:5}}>
                     USD → CLP:
@@ -4017,7 +4017,7 @@ Número de seguimiento: ${c.nro}`;
                             agencia: Number(c.agencia) || 0,
                             margen_obj_pct: Number(c.margen_obj_pct) || 25,
                             precio_acordado_und: Number(c.precio_final_acordado_und) || 0,
-                            tc_rmb_usd: Number(opVincBtn?.tc_rmb_usd ?? c.tc_rmb_usd) || 7.2,
+                            tc_rmb_usd: Number(opVincBtn?.tc_rmb_usd ?? c.tc_rmb_usd) || 6.5,
                             tc_usd_clp: Number(opVincBtn?.tc_usd_clp ?? opVincBtn?.pago?.tc_efectivo ?? c.tc_usd_clp ?? c?.pago?.tc_efectivo) || 950,
                           });
                           setVistaValidarId(c.id);
@@ -4968,7 +4968,7 @@ Número de seguimiento: ${c.nro}`;
                 {opForm.cotizaciones.length>0&&(()=>{
                   const cots=cotizaciones.filter(c=>opForm.cotizaciones.includes(c.id));
                   const cc=opForm.costos_china, ch=opForm.costos_chile, pg=opForm.pago;
-                  const tc=Number(pg.tc_efectivo)||950, tcRmb=tc/7.2;
+                  const tc=Number(pg.tc_efectivo)||950, tcRmb=tc/(Number(opForm.tc_rmb_usd)||6.5);
                   // Productos en RMB (ingresado manualmente por el agente)
                   const productosRMB=Number(cc.productos_rmb)||0;
                   const productosCLP=productosRMB*tcRmb;
