@@ -6422,6 +6422,9 @@ Número de seguimiento: ${c.nro}`;
                                     const newOp = {...op, consolidado_aplicado_cliente:true, fecha_aplicacion_cliente: new Date().toISOString()};
                                     delete newOp.id;
                                     await supabase.from("operaciones").update({datos:newOp,updated_at:new Date().toISOString()}).eq("id",op.id);
+                                    // Cots a promover a "cotizada": solo las que están en "solicitud" o vacío.
+                                    // No retroceder cots ya pagadas/en_camino/en_bodega/completada ni tocar no_prospero.
+                                    const promovibles = new Set(["", "solicitud"]);
                                     await Promise.all(cots.map(async c=>{
                                       const newCot={...c, consolidado_aplicado_cliente:true};
                                       const pv = preciosPorCot[c.id];
@@ -6429,13 +6432,27 @@ Número de seguimiento: ${c.nro}`;
                                         newCot.precio_final_acordado_und = pv.precio;
                                         newCot.margen_objetivo_pct = pv.margen;
                                       }
+                                      if (promovibles.has(c.estado || "")) {
+                                        newCot.estado = "cotizada";
+                                        newCot.checklist = {...(c.checklist||{}), cotizada: true};
+                                      }
                                       delete newCot.id; delete newCot._id; delete newCot._updated;
-                                      await supabase.from("cotizaciones").update({datos:newCot}).eq("id",c.id);
+                                      // Actualiza columna top-level `estado` además de `datos` para que el portal Sunny lo lea
+                                      const updates = {datos:newCot};
+                                      if (promovibles.has(c.estado || "")) updates.estado = "cotizada";
+                                      await supabase.from("cotizaciones").update(updates).eq("id",c.id);
                                     }));
                                     setOperaciones(prev=>prev.map(o=>o.id===op.id?{...newOp,id:op.id}:o));
                                     setCotizaciones(prev=>prev.map(c=>{
                                       const pv = preciosPorCot[c.id];
-                                      if (cots.find(x=>x.id===c.id)) return { ...c, consolidado_aplicado_cliente:true, ...(pv ? { precio_final_acordado_und: pv.precio, margen_objetivo_pct: pv.margen } : {}) };
+                                      if (cots.find(x=>x.id===c.id)) {
+                                        const patch = { ...c, consolidado_aplicado_cliente:true, ...(pv ? { precio_final_acordado_und: pv.precio, margen_objetivo_pct: pv.margen } : {}) };
+                                        if (promovibles.has(c.estado || "")) {
+                                          patch.estado = "cotizada";
+                                          patch.checklist = {...(c.checklist||{}), cotizada: true};
+                                        }
+                                        return patch;
+                                      }
                                       return c;
                                     }));
                                     showToast("✅ Consolidado aplicado — precios guardados");
