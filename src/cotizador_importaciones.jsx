@@ -1869,7 +1869,27 @@ Número de seguimiento: ${c.nro}`;
               const cotsCliente = cotsOp.filter(c => (c.cliente||"").trim() === vistaOpClienteT && !["no_prospero"].includes(c.estado));
               if (cotsCliente.length === 0) return null;
               const aplicado = op.consolidado_aplicado_cliente === true;
-              const consolidados = cotsCliente.map(c => ({ cot:c, calc: calcConsolidado(c, op, cotsOp) }));
+              // Override de precio: si en el panel admin hay un % util editado para esta cot,
+              // recalcular el totClIva con ese margen (preview sin guardar nada al cot).
+              // Esto permite ver la vista cliente sin necesidad de aplicar el consolidado.
+              const consolidados = cotsCliente.map(c => {
+                const calcStandard = calcConsolidado(c, op, cotsOp);
+                const margenPanel = margenesPorCot[c.id];
+                if (margenPanel != null && margenPanel > 0 && !c.precio_final_acordado_und) {
+                  // Recalcular con margen del panel
+                  const cz = calcCostoRealZaga(c, op, cotsOp);
+                  const costoNeto = (cz.totalChinaCLP || 0) + (cz.totalChileCLP || 0) + (cz.ivaAgenteAer || 0);
+                  const und = Number(c.unidades) || 0;
+                  if (und > 0 && costoNeto > 0) {
+                    const precioNetoUnd = (costoNeto / und) / (1 - margenPanel/100);
+                    const totClNeto = precioNetoUnd * und;
+                    const totClIvaOverride = totClNeto * 1.19;
+                    return { cot:c, calc: { ...calcStandard, consolidado: { ...(calcStandard?.consolidado||{}), totCl: totClNeto, totClIva: totClIvaOverride, esPreviewPanel: true } } };
+                  }
+                }
+                return { cot:c, calc: calcStandard };
+              });
+              const esPreviewPanel = consolidados.some(x => x.calc?.consolidado?.esPreviewPanel);
               const totConsolidadoIva = consolidados.reduce((s,x)=>s+(x.calc?.consolidado?.totClIva||0), 0);
               const totStandaloneIva = consolidados.reduce((s,x)=>s+(x.calc?.standalone?.totClIva||0), 0);
               const ahorroIva = totStandaloneIva - totConsolidadoIva;
@@ -1935,7 +1955,12 @@ Número de seguimiento: ${c.nro}`;
 
                     {!aplicado && (
                       <div className="opvc-alert no-print" style={{padding:"10px 32px",background:"#fff7ed",borderBottom:"1px solid #fed7aa",fontSize:11,color:"#92400e",fontStyle:"italic"}}>
-                        ⚠️ Esta cotización aún NO ha sido aplicada al cliente (admin debe presionar "✅ Aplicar consolidado al cliente" antes de enviar este PDF).
+                        ⚠️ Esta cotización aún NO ha sido aplicada al cliente (el cliente no la ve en su portal). Para que la vea, presiona "✅ Aplicar consolidado al cliente" en el panel admin.
+                      </div>
+                    )}
+                    {esPreviewPanel && (
+                      <div className="opvc-alert no-print" style={{padding:"10px 32px",background:"#ecfeff",borderBottom:"1px solid #a5f3fc",fontSize:11,color:"#0e7490",fontStyle:"italic"}}>
+                        👁 <b>Preview con % util del panel admin</b> — los precios que ves se calculan en vivo con los porcentajes que estás editando arriba. Nada está guardado en las cotizaciones aún.
                       </div>
                     )}
 
