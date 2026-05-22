@@ -828,6 +828,14 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
     ...p,
     ingresos_por_cliente: { ...(p.ingresos_por_cliente||{}), [cl]: { ...(p.ingresos_por_cliente?.[cl]||{}), fecha: val } }
   }));
+  const setIngresoFactNro = (cl, val) => setPagos(p => ({
+    ...p,
+    ingresos_por_cliente: { ...(p.ingresos_por_cliente||{}), [cl]: { ...(p.ingresos_por_cliente?.[cl]||{}), factura_nro: val } }
+  }));
+  const setIngresoFactLink = (cl, val) => setPagos(p => ({
+    ...p,
+    ingresos_por_cliente: { ...(p.ingresos_por_cliente||{}), [cl]: { ...(p.ingresos_por_cliente?.[cl]||{}), factura_link: val } }
+  }));
 
   // Helpers egresos
   const egresosDefs = [
@@ -896,19 +904,42 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
             const teor = cobradoTeoricoCliente(cl);
             const real = getIngreso(cl);
             const dif = teor - real;
+            const factNro = pagos.ingresos_por_cliente?.[cl]?.factura_nro || "";
+            const factLink = pagos.ingresos_por_cliente?.[cl]?.factura_link || "";
+            const tieneFactura = !!(factNro || factLink);
             return (
               <div key={cl} style={{padding:"8px 10px",background:"#f0fdf4",border:"1px solid #dcfce7",borderRadius:7,marginBottom:8}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                   <div style={{fontSize:12,fontWeight:700,color:"#0f172a"}}>👤 {cl}</div>
                   <div style={{fontSize:11,color:"#64748b"}}>Cobrar c/IVA: <b style={{color:"#15803d"}}>{fmt(teor)}</b></div>
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"auto 1fr auto",gap:8,alignItems:"center",fontSize:11}}>
+                <div style={{display:"grid",gridTemplateColumns:"auto 1fr auto",gap:8,alignItems:"center",fontSize:11,marginBottom:6}}>
                   <span style={{color:"#475569"}}>Recibido:</span>
                   {numInput(real, v=>setIngreso(cl, v))}
                   {dateInput(pagos.ingresos_por_cliente?.[cl]?.fecha, v=>setIngresoFecha(cl, v))}
                 </div>
-                <div style={{marginTop:6,fontSize:11,fontWeight:700,color:dif>0?"#c0392b":(dif<0?"#1aa358":"#64748b")}}>
-                  {dif>0 ? `⏳ Por cobrar: ${fmt(dif)}` : (dif<0 ? `⚠️ Cobró ${fmt(-dif)} de más` : "✓ Cobrado al día")}
+                <div style={{display:"grid",gridTemplateColumns:"auto 90px 1fr auto",gap:6,alignItems:"center",fontSize:11,marginBottom:6}}>
+                  <span style={{color:"#475569"}}>🧾 Factura:</span>
+                  <input type="text" placeholder="N°" value={factNro}
+                    onChange={e=>setIngresoFactNro(cl, e.target.value)}
+                    style={{padding:"5px 7px",border:"1px solid #cbd5e1",borderRadius:6,fontSize:11,fontFamily:"inherit",background:"#fff"}}/>
+                  <input type="url" placeholder="Link (Drive/OneDrive)" value={factLink}
+                    onChange={e=>setIngresoFactLink(cl, e.target.value)}
+                    style={{padding:"5px 7px",border:"1px solid #cbd5e1",borderRadius:6,fontSize:11,fontFamily:"inherit",background:"#fff",color:"#475569"}}/>
+                  {factLink ? (
+                    <a href={factLink} target="_blank" rel="noreferrer"
+                      style={{background:"#16a34a",color:"#fff",textDecoration:"none",borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>
+                      📄 Ver
+                    </a>
+                  ) : (
+                    <span style={{fontSize:10,color:"#c0392b",fontWeight:600,whiteSpace:"nowrap"}}>Sin facturar</span>
+                  )}
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11}}>
+                  <span style={{fontWeight:700,color:dif>0?"#c0392b":(dif<0?"#1aa358":"#64748b")}}>
+                    {dif>0 ? `⏳ Por cobrar: ${fmt(dif)}` : (dif<0 ? `⚠️ Cobró ${fmt(-dif)} de más` : "✓ Cobrado al día")}
+                  </span>
+                  {tieneFactura && <span style={{fontSize:10,color:"#16a34a",fontWeight:600}}>✓ Facturado{factNro?` (N° ${factNro})`:""}</span>}
                 </div>
               </div>
             );
