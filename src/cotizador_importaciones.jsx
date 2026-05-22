@@ -3488,8 +3488,10 @@ Número de seguimiento: ${c.nro}`;
                   </BLOCK>
                 )}
 
-                {/* ── BLOQUE CONFIGURACIÓN AÉREA — movido después de Cotización China para que producto/dimensiones/peso se llenen primero ── */}
-                {form.tipo==="cliente"&&form.transporte==="aereo"&&(
+                {/* ── BLOQUE CONFIGURACIÓN AÉREA — eliminado de la calculadora.
+                       Los temas aéreos (aduana, flete Sunny, Form F) ahora se gestionan
+                       desde el botón "🛬 Validar" de cada cot aérea en el Tracker. ── */}
+                {false&&form.tipo==="cliente"&&form.transporte==="aereo"&&(
                   <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                       <div style={{fontSize:11,color:"#c47830",fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>✈️ Configuración aérea</div>
@@ -3583,8 +3585,8 @@ Número de seguimiento: ${c.nro}`;
 
                 {form.tipo==="cliente"&&!esPaso1&&(
                   <BLOCK title="💰 Tu margen ZAGA" accent="#1aa358">
-                    {/* 🎯 Auto-margen objetivo (% sobre venta — gross margin) — solo aéreo */}
-                    {form.transporte==="aereo"&&Number(form.precio_china)>0&&Number(form.unidades)>0&&(
+                    {/* 🎯 Auto-margen objetivo aéreo — eliminado (se gestiona en 🛬 Validar) */}
+                    {false&&form.transporte==="aereo"&&Number(form.precio_china)>0&&Number(form.unidades)>0&&(
                       <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:9,padding:"10px 14px",marginBottom:12}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                           <span style={{fontSize:12,color:"#92400e",fontWeight:700}}>🎯 Auto-precio para</span>
@@ -4454,43 +4456,34 @@ Número de seguimiento: ${c.nro}`;
                         </div>
                       </div>
                       {c.calc&&(
-                        <div className="cot-card-meta" style={{display:"grid",gridTemplateColumns:isPropia?"repeat(4,1fr)":c.pago_100?"repeat(2,1fr)":"repeat(3,1fr)",gap:8,background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:12}}>
+                        <div className="cot-card-meta" style={{display:"grid",gridTemplateColumns:isPropia?"repeat(4,1fr)":c.pago_100?"1fr":"repeat(2,1fr)",gap:8,background:"#f8fafc",borderRadius:9,padding:"10px 14px",marginTop:12}}>
                         {isPropia
                           ? [["Costo total China",fmt(c.calc.tCh||0),"#2d78c8"],["Costo real/und",fmt(c.calc.cRUnd||0),"#2d78c8"],["Precio venta/und",fmt(c.calc.pvUnd||0),"#3d7fc4"],["Margen bruto",fmtP(c.calc.mgBruto),"#475569"]]
                               .map(([l,v,col])=>(<div key={l} style={{textAlign:"center"}}><div style={{fontSize:10,color:"#444",marginBottom:2}}>{l}</div><div style={{fontSize:12,fontWeight:600,color:col}}>{v}</div></div>))
                           : c.pago_100
-                          ? (<>
-                              {/* Bloque Pago Único */}
-                              <div style={{background:"#fff",borderRadius:7,padding:"8px 10px",border:"1px solid #f5c84255"}}>
-                                <div style={{fontSize:9,color:"#c9a055",textTransform:"uppercase",letterSpacing:.5,marginBottom:4,fontWeight:700}}>💰 Pago Único</div>
-                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:4}}>
-                                  <div style={{textAlign:"center",flex:1}}>
-                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>Cliente</div>
-                                    <div style={{fontSize:12,fontWeight:700,color:"#1aa358"}}>{fmt(c.calc.p1Cl||0)}</div>
-                                  </div>
-                                  <div style={{width:1,height:24,background:"#e2e8f0"}}/>
-                                  <div style={{textAlign:"center",flex:1}}>
-                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>China</div>
-                                    <div style={{fontSize:12,fontWeight:700,color:"#2d78c8"}}>{fmt(c.calc.p1Ch||0)}</div>
-                                  </div>
-                                </div>
-                              </div>
-                              {/* Bloque Total */}
-                              <div style={{background:"#fff",borderRadius:7,padding:"8px 10px",border:"1px solid #e2e8f0"}}>
-                                <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:.5,marginBottom:4,fontWeight:600}}>Total</div>
-                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:4}}>
-                                  <div style={{textAlign:"center",flex:1}}>
-                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>Cliente</div>
-                                    <div style={{fontSize:12,fontWeight:700,color:"#1aa358"}}>{fmt(c.calc.totCl||0)}</div>
-                                  </div>
-                                  <div style={{width:1,height:24,background:"#e2e8f0"}}/>
-                                  <div style={{textAlign:"center",flex:1}}>
-                                    <div style={{fontSize:9,color:"#64748b",marginBottom:1}}>China</div>
-                                    <div style={{fontSize:12,fontWeight:700,color:"#2d78c8"}}>{fmt(c.calc.tCh||0)}</div>
+                          ? (() => {
+                              // Cliente = precio acordado c/IVA si existe, sino calc.p1ClIva
+                              const totClienteCIva = Number(c.precio_final_acordado_und) > 0 && Number(c.unidades) > 0
+                                ? Number(c.precio_final_acordado_und) * Number(c.unidades)
+                                : (c.calc.p1ClIva || c.calc.p1Cl || 0);
+                              const totChina = c.calc.p1Ch || c.calc.tCh || 0;
+                              return (
+                                <div style={{background:"#fff",borderRadius:7,padding:"10px 12px",border:"1px solid #f5c84255"}}>
+                                  <div style={{fontSize:9,color:"#c9a055",textTransform:"uppercase",letterSpacing:.5,marginBottom:6,fontWeight:700}}>💰 Pago Único (c/IVA)</div>
+                                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6}}>
+                                    <div style={{textAlign:"center",flex:1}}>
+                                      <div style={{fontSize:9,color:"#64748b",marginBottom:2}}>Cliente paga</div>
+                                      <div style={{fontSize:14,fontWeight:800,color:"#1aa358"}}>{fmt(totClienteCIva)}</div>
+                                    </div>
+                                    <div style={{width:1,height:30,background:"#e2e8f0"}}/>
+                                    <div style={{textAlign:"center",flex:1}}>
+                                      <div style={{fontSize:9,color:"#64748b",marginBottom:2}}>Pagado a China</div>
+                                      <div style={{fontSize:14,fontWeight:800,color:"#2d78c8"}}>{fmt(totChina)}</div>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </>)
+                              );
+                            })()
                           : (<>
                               {/* Bloque 1er pago */}
                               <div style={{background:"#fff",borderRadius:7,padding:"8px 10px",border:"1px solid #e2e8f0"}}>
@@ -4731,7 +4724,9 @@ Número de seguimiento: ${c.nro}`;
                           setVistaValidarId(cFresh.id);
                         }} style={{background:"#c4783022",color:"#c47830",border:"1px solid #c4783055",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700}}>🛬 Validar</button>}
                         {!isPropia&&<button onClick={()=>setVistaId(c.id)} style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📄 Vista cliente</button>}
-                        <button onClick={()=>handleEdit(c)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>✏️ Editar</button>
+                        {c.transporte !== "aereo" && (
+                          <button onClick={()=>handleEdit(c)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>✏️ Editar</button>
+                        )}
                         <button onClick={()=>handleDelete(c.id)} style={{background:"#fff1f2",color:"#c0392b",border:"1px solid #ef444433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>🗑</button>
                       </div>
                     </div>
