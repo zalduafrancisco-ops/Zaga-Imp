@@ -6688,10 +6688,24 @@ Número de seguimiento: ${c.nro}`;
               const mesesConCierres=Object.keys(porMes).sort().reverse();
               if(mesesConCierres.length===0) return null;
 
-              const calcComisionMes=(lista)=>{
+              const esAereo=c=>c.transporte==="aereo";
+              const calcSub=(lista)=>{
                 const pct=lista.length>=6?0.25:0.20;
                 const base=lista.reduce((s,c)=>s+(c.calc?.ganImp||0),0);
                 return {pct,base,comision:base*pct,nro:lista.length};
+              };
+              const calcComisionMes=(lista)=>{
+                const aereo=lista.filter(esAereo);
+                const maritimo=lista.filter(c=>!esAereo(c));
+                const subAereo=calcSub(aereo);
+                const subMaritimo=calcSub(maritimo);
+                return {
+                  aereo:{...subAereo,lista:aereo},
+                  maritimo:{...subMaritimo,lista:maritimo},
+                  comisionTotal:subAereo.comision+subMaritimo.comision,
+                  baseTotal:subAereo.base+subMaritimo.base,
+                  nroTotal:lista.length,
+                };
               };
 
               // Pendiente de pago = mes anterior (primeros 5 días del mes actual)
@@ -6699,13 +6713,30 @@ Número de seguimiento: ${c.nro}`;
               const pendienteCalc=pendienteMes.length>0?calcComisionMes(pendienteMes):null;
               const diasMes=hoy.getDate();
 
+              const SubLinea=({sub,modo,color,icon})=>{
+                if(sub.nro===0) return null;
+                return(
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:"8px 10px",background:color+"08",borderRadius:8,border:`1px solid ${color}22`,flexWrap:"wrap"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                      <span style={{fontSize:13}}>{icon}</span>
+                      <span style={{fontSize:12,fontWeight:700,color}}>{modo}</span>
+                      <span style={{background:sub.nro>=6?"#b8922e22":"#2d78c822",color:sub.nro>=6?"#b8922e":"#2d78c8",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:`1px solid ${sub.nro>=6?"#b8922e44":"#2d78c844"}`}}>{sub.nro} {sub.nro>=6?"cierres → 25%":"cierres → 20%"}</span>
+                    </div>
+                    <div style={{display:"flex",gap:14,fontSize:11,flexWrap:"wrap"}}>
+                      <span style={{color:"#64748b"}}>Base: <b style={{color:"#0f172a"}}>{fmt(sub.base)}</b></span>
+                      <span style={{color:"#64748b"}}>Comisión: <b style={{color:"#a85590"}}>{fmt(sub.comision)}</b></span>
+                    </div>
+                  </div>
+                );
+              };
+
               return (
                 <div style={{background:"#040c18",borderRadius:14,padding:20,border:"1px solid #f9a8d4",marginBottom:20}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
                     <span style={{fontSize:20}}>👩‍💼</span>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,fontSize:14,color:"#a85590"}}>Comisiones Luisa</div>
-                      <div style={{fontSize:11,color:"#64748b"}}>20% por 1–5 cierres · 25% por 6+ cierres en el mes · Base: ganancia importación</div>
+                      <div style={{fontSize:11,color:"#64748b"}}>20% por 1–5 cierres · 25% por 6+ cierres · 🚢 Marítimo y ✈️ Aéreo se cuentan por separado · Base: ganancia importación</div>
                     </div>
                     <button onClick={()=>setSimModal(true)} style={{background:"#a8559018",color:"#a85590",border:"1px solid #f9a8d4",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700,whiteSpace:"nowrap"}}>🧮 Simulación total</button>
                   </div>
@@ -6719,7 +6750,7 @@ Número de seguimiento: ${c.nro}`;
                           {diasMes<=5?"Pago pendiente este mes":"Próximo vencimiento de pago"}
                         </div>
                         <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-                          {pendienteCalc.nro} cierres en {monthLabel(mesAnt)} · {fmtP(pendienteCalc.pct*100)} · Base: {fmt(pendienteCalc.base)} → <b style={{color:"#a85590"}}>{fmt(pendienteCalc.comision)}</b>
+                          {pendienteCalc.nroTotal} cierres en {monthLabel(mesAnt)} ({pendienteCalc.maritimo.nro}🚢 + {pendienteCalc.aereo.nro}✈️) · Base: {fmt(pendienteCalc.baseTotal)} → <b style={{color:"#a85590"}}>{fmt(pendienteCalc.comisionTotal)}</b>
                         </div>
                       </div>
                     </div>
@@ -6729,25 +6760,25 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
                     {mesesConCierres.map(m=>{
                       const lista=porMes[m];
-                      const {pct,base,comision,nro}=calcComisionMes(lista);
-                      const ganEmpresa=base-comision;
+                      const {aereo,maritimo,comisionTotal,baseTotal,nroTotal}=calcComisionMes(lista);
+                      const ganEmpresa=baseTotal-comisionTotal;
                       const esMesAnt=m===mesAnt;
                       return(
                         <div key={m} style={{background:"#ffffff",borderRadius:10,padding:"12px 16px",border:`1px solid ${esMesAnt?"#e9d5ff":"#e2e8f0"}`}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-                            <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:10}}>
+                            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                               <span style={{fontWeight:700,fontSize:13,color:esMesAnt?"#a85590":"#aaa",textTransform:"capitalize"}}>{monthLabel(m)}</span>
-                              <span style={{background:nro>=6?"#b8922e22":"#2d78c822",color:nro>=6?"#b8922e":"#2d78c8",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:`1px solid ${nro>=6?"#b8922e44":"#2d78c844"}`}}>{nro} {nro>=6?"cierres → 25%":"cierres → 20%"}</span>
+                              <span style={{background:"#f1f5f9",color:"#475569",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:"1px solid #e2e8f0"}}>{nroTotal} cierres</span>
                               {esMesAnt&&<span style={{background:"#c0392b18",color:"#c0392b",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:"1px solid #ef444433"}}>⚠ Pagar antes del 5</span>}
                             </div>
                             <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
                               <div style={{textAlign:"right"}}>
-                                <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>Gan. importación base</div>
-                                <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(base)}</div>
+                                <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>Base total</div>
+                                <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(baseTotal)}</div>
                               </div>
                               <div style={{textAlign:"right"}}>
-                                <div style={{fontSize:9,color:"#a85590",textTransform:"uppercase",letterSpacing:1}}>Comisión Luisa</div>
-                                <div style={{fontSize:15,fontWeight:800,color:"#a85590"}}>{fmt(comision)}</div>
+                                <div style={{fontSize:9,color:"#a85590",textTransform:"uppercase",letterSpacing:1}}>Comisión total</div>
+                                <div style={{fontSize:15,fontWeight:800,color:"#a85590"}}>{fmt(comisionTotal)}</div>
                               </div>
                               <div style={{textAlign:"right"}}>
                                 <div style={{fontSize:9,color:"#1aa358",textTransform:"uppercase",letterSpacing:1}}>Empresa neto</div>
@@ -6755,19 +6786,31 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                             </div>
                           </div>
-                          {/* Detalle por cotización */}
-                          <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:4}}>
-                            {lista.map(c=>{
-                              const g=c.calc?.ganImp||0;
-                              const com=g*pct;
-                              return(
-                                <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"4px 8px",background:"#f8fafc",borderRadius:6}}>
-                                  <span style={{color:"#475569"}}>{c.nro} · {c.cliente} · <span style={{color:"#0f172a"}}>{c.producto}</span></span>
-                                  <span style={{color:"#64748b"}}>Gan: <b style={{color:"#0f172a"}}>{fmt(g)}</b> → Com: <b style={{color:"#a85590"}}>{fmt(com)}</b></span>
-                                </div>
-                              );
-                            })}
+
+                          {/* Resumen por modalidad */}
+                          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
+                            <SubLinea sub={maritimo} modo="Marítimo" color="#2a8aaa" icon="🚢"/>
+                            <SubLinea sub={aereo} modo="Aéreo" color="#c47830" icon="✈️"/>
                           </div>
+
+                          {/* Detalle por cotización agrupado por modalidad */}
+                          {[["🚢 Marítimas",maritimo],["✈️ Aéreas",aereo]].map(([titulo,sub])=>sub.nro>0&&(
+                            <div key={titulo} style={{marginTop:6}}>
+                              <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{titulo} ({sub.nro})</div>
+                              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                                {sub.lista.map(c=>{
+                                  const g=c.calc?.ganImp||0;
+                                  const com=g*sub.pct;
+                                  return(
+                                    <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"4px 8px",background:"#f8fafc",borderRadius:6}}>
+                                      <span style={{color:"#475569"}}>{c.nro} · {c.cliente} · <span style={{color:"#0f172a"}}>{c.producto}</span></span>
+                                      <span style={{color:"#64748b"}}>Gan: <b style={{color:"#0f172a"}}>{fmt(g)}</b> → Com: <b style={{color:"#a85590"}}>{fmt(com)}</b></span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       );
                     })}
@@ -6836,43 +6879,72 @@ Número de seguimiento: ${c.nro}`;
         {/* ══ MODAL SIMULACIÓN COMISIONES LUISA ══ */}
         {simModal&&(()=>{
           const todas=cotizaciones.filter(c=>c.gestor==="luisa"&&c.tipo!=="propia"&&(c.calc?.ganImp||0)>0);
-          const totalGan=todas.reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+          const aereas=todas.filter(c=>c.transporte==="aereo");
+          const maritimas=todas.filter(c=>c.transporte!=="aereo");
+          const baseAer=aereas.reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+          const baseMar=maritimas.reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+          const totalGan=baseAer+baseMar;
           const com20=totalGan*0.20, com25=totalGan*0.25;
           const emp20=totalGan-com20, emp25=totalGan-com25;
+          const SubCard=({titulo,icon,color,lista,base})=>(
+            <div style={{background:color+"08",border:`1px solid ${color}33`,borderRadius:12,padding:"14px 18px"}}>
+              <div style={{fontSize:11,fontWeight:700,color,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>{icon} {titulo} · {lista.length} cots</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                <div style={{display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:11,color:"#64748b"}}>Base ganancia imp.</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(base)}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:11,color:"#2d78c8"}}>Comisión 20%</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#2d78c8"}}>{fmt(base*0.20)}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",borderTop:`1px solid ${color}33`,paddingTop:6}}>
+                  <span style={{fontSize:11,color:"#b8922e"}}>Comisión 25%</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#b8922e"}}>{fmt(base*0.25)}</span>
+                </div>
+              </div>
+            </div>
+          );
           return(
             <div style={{position:"fixed",inset:0,background:"#000c",zIndex:1600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-              <div style={{background:"#ffffff",borderRadius:16,border:"1px solid #e9d5ff",width:"100%",maxWidth:680,maxHeight:"90vh",display:"flex",flexDirection:"column"}}>
+              <div style={{background:"#ffffff",borderRadius:16,border:"1px solid #e9d5ff",width:"100%",maxWidth:820,maxHeight:"90vh",display:"flex",flexDirection:"column"}}>
                 {/* Header */}
                 <div style={{padding:"18px 24px",borderBottom:"1px solid #e2e8f0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:15,color:"#a85590"}}>🧮 Simulación total — Comisiones Luisa</div>
-                    <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Todas las cotizaciones asignadas a Luisa con ganancia calculada</div>
+                    <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Todas las cotizaciones asignadas a Luisa con ganancia calculada · Marítimo vs Aéreo</div>
                   </div>
                   <button onClick={()=>setSimModal(false)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontSize:13}}>✕</button>
                 </div>
 
-                {/* Resumen 20% vs 25% */}
-                <div style={{padding:"16px 24px",borderBottom:"1px solid #1e1e38"}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-                    {[[20,com20,emp20,"#2d78c8"],[25,com25,emp25,"#b8922e"]].map(([pct,com,emp,col])=>(
-                      <div key={pct} style={{background:`${col}11`,border:`1px solid ${col}33`,borderRadius:12,padding:"14px 18px"}}>
-                        <div style={{fontSize:11,fontWeight:700,color:col,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Escenario {pct}% · {todas.length} cotizaciones</div>
-                        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                            <span style={{fontSize:11,color:"#64748b"}}>Base total ganancia imp.</span>
-                            <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(totalGan)}</span>
+                {/* Resumen separado por modalidad */}
+                <div style={{padding:"16px 24px",borderBottom:"1px solid #e2e8f0"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                    <SubCard titulo="Marítimas" icon="🚢" color="#2a8aaa" lista={maritimas} base={baseMar}/>
+                    <SubCard titulo="Aéreas" icon="✈️" color="#c47830" lista={aereas} base={baseAer}/>
+                  </div>
+
+                  {/* Total combinado */}
+                  <div style={{background:"#a8559008",border:"1px solid #a8559033",borderRadius:12,padding:"14px 18px"}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"#a85590",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Total combinado · {todas.length} cotizaciones</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                      {[[20,com20,emp20,"#2d78c8"],[25,com25,emp25,"#b8922e"]].map(([pct,com,emp,col])=>(
+                        <div key={pct} style={{display:"flex",flexDirection:"column",gap:4}}>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span style={{fontSize:11,color:col,fontWeight:700}}>Escenario {pct}%</span>
+                            <span style={{fontSize:13,fontWeight:800,color:col}}>{fmt(com)}</span>
                           </div>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                            <span style={{fontSize:11,color:"#a85590"}}>Comisión Luisa ({pct}%)</span>
-                            <span style={{fontSize:15,fontWeight:800,color:"#a85590"}}>{fmt(com)}</span>
-                          </div>
-                          <div style={{borderTop:`1px solid ${col}33`,paddingTop:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                            <span style={{fontSize:11,color:"#1aa358"}}>Empresa neto</span>
-                            <span style={{fontSize:15,fontWeight:800,color:"#1aa358"}}>{fmt(emp)}</span>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span style={{fontSize:10,color:"#1aa358"}}>Empresa neto</span>
+                            <span style={{fontSize:11,fontWeight:700,color:"#1aa358"}}>{fmt(emp)}</span>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                    <div style={{borderTop:"1px solid #a8559033",marginTop:8,paddingTop:6,display:"flex",justifyContent:"space-between"}}>
+                      <span style={{fontSize:11,color:"#64748b"}}>Base total ganancia imp.</span>
+                      <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(totalGan)}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -6881,42 +6953,45 @@ Número de seguimiento: ${c.nro}`;
                   {todas.length===0?(
                     <div style={{textAlign:"center",padding:40,color:"#444"}}>No hay cotizaciones de Luisa con ganancia calculada aún.</div>
                   ):(
-                    <>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 2fr 1fr 1fr 1fr",gap:8,padding:"6px 8px",marginBottom:6}}>
-                        {["NRO","Cliente · Producto","Estado","Gan. imp.","Com. 20% / 25%"].map(h=>(
-                          <div key={h} style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>{h}</div>
-                        ))}
-                      </div>
-                      <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                        {todas.map(c=>{
-                          const g=c.calc?.ganImp||0;
-                          const sc2=EST_COLOR[c.estado]||"#888";
-                          return(
-                            <div key={c.id} style={{display:"grid",gridTemplateColumns:"1fr 2fr 1fr 1fr 1fr",gap:8,padding:"8px 10px",background:"#f8fafc",borderRadius:8,alignItems:"center",border:"1px solid #1e1e38"}}>
-                              <span style={{fontSize:11,color:"#64748b"}}>{c.nro}</span>
-                              <div>
-                                <div style={{fontSize:12,fontWeight:600,color:"#0f172a"}}>{c.cliente}</div>
-                                <div style={{fontSize:10,color:"#64748b"}}>{c.producto}</div>
+                    [["🚢 Marítimas",maritimas,"#2a8aaa",baseMar],["✈️ Aéreas",aereas,"#c47830",baseAer]].map(([titulo,lista,color,base])=>lista.length>0&&(
+                      <div key={titulo} style={{marginBottom:16}}>
+                        <div style={{fontSize:12,fontWeight:700,color,marginBottom:6,padding:"4px 8px",background:color+"11",borderRadius:6,borderLeft:`3px solid ${color}`}}>{titulo} — {lista.length} cots — Base {fmt(base)}</div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 2fr 1fr 1fr 1fr",gap:8,padding:"6px 8px",marginBottom:6}}>
+                          {["NRO","Cliente · Producto","Estado","Gan. imp.","Com. 20% / 25%"].map(h=>(
+                            <div key={h} style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>{h}</div>
+                          ))}
+                        </div>
+                        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {lista.map(c=>{
+                            const g=c.calc?.ganImp||0;
+                            const sc2=EST_COLOR[c.estado]||"#888";
+                            return(
+                              <div key={c.id} style={{display:"grid",gridTemplateColumns:"1fr 2fr 1fr 1fr 1fr",gap:8,padding:"8px 10px",background:"#f8fafc",borderRadius:8,alignItems:"center",border:"1px solid #e2e8f0"}}>
+                                <span style={{fontSize:11,color:"#64748b"}}>{c.nro}</span>
+                                <div>
+                                  <div style={{fontSize:12,fontWeight:600,color:"#0f172a"}}>{c.cliente}</div>
+                                  <div style={{fontSize:10,color:"#64748b"}}>{c.producto}</div>
+                                </div>
+                                <span style={{background:sc2+"22",color:sc2,fontSize:9,fontWeight:700,borderRadius:20,padding:"2px 7px",border:`1px solid ${sc2}33`,textAlign:"center"}}>{EST_LABEL[c.estado]||c.estado}</span>
+                                <span style={{fontSize:13,fontWeight:700,color:"#0f172a",textAlign:"right"}}>{fmt(g)}</span>
+                                <div style={{textAlign:"right"}}>
+                                  <div style={{fontSize:11,color:"#2d78c8"}}>{fmt(g*0.20)}</div>
+                                  <div style={{fontSize:11,color:"#b8922e"}}>{fmt(g*0.25)}</div>
+                                </div>
                               </div>
-                              <span style={{background:sc2+"22",color:sc2,fontSize:9,fontWeight:700,borderRadius:20,padding:"2px 7px",border:`1px solid ${sc2}33`,textAlign:"center"}}>{EST_LABEL[c.estado]||c.estado}</span>
-                              <span style={{fontSize:13,fontWeight:700,color:"#0f172a",textAlign:"right"}}>{fmt(g)}</span>
-                              <div style={{textAlign:"right"}}>
-                                <div style={{fontSize:11,color:"#2d78c8"}}>{fmt(g*0.20)}</div>
-                                <div style={{fontSize:11,color:"#b8922e"}}>{fmt(g*0.25)}</div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 2fr 1fr 1fr 1fr",gap:8,padding:"10px 10px",marginTop:8,borderTop:"1px solid #e2e8f0"}}>
-                        <div style={{gridColumn:"1/4",fontSize:12,fontWeight:700,color:"#64748b"}}>TOTAL ({todas.length} cotizaciones)</div>
-                        <div style={{fontSize:14,fontWeight:800,color:"#0f172a",textAlign:"right"}}>{fmt(totalGan)}</div>
-                        <div style={{textAlign:"right"}}>
-                          <div style={{fontSize:12,fontWeight:800,color:"#2d78c8"}}>{fmt(com20)}</div>
-                          <div style={{fontSize:12,fontWeight:800,color:"#b8922e"}}>{fmt(com25)}</div>
+                            );
+                          })}
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 2fr 1fr 1fr 1fr",gap:8,padding:"10px 10px",marginTop:8,borderTop:`1px dashed ${color}55`}}>
+                          <div style={{gridColumn:"1/4",fontSize:11,fontWeight:700,color}}>SUBTOTAL {titulo} ({lista.length})</div>
+                          <div style={{fontSize:13,fontWeight:800,color:"#0f172a",textAlign:"right"}}>{fmt(base)}</div>
+                          <div style={{textAlign:"right"}}>
+                            <div style={{fontSize:11,fontWeight:800,color:"#2d78c8"}}>{fmt(base*0.20)}</div>
+                            <div style={{fontSize:11,fontWeight:800,color:"#b8922e"}}>{fmt(base*0.25)}</div>
+                          </div>
                         </div>
                       </div>
-                    </>
+                    ))
                   )}
                 </div>
               </div>
