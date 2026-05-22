@@ -5117,7 +5117,7 @@ Número de seguimiento: ${c.nro}`;
                                     💾 Guardar nota
                                   </button>
                                 </div>
-                                {c.requiere_factura&&(
+                                {c.requiere_factura && c.transporte!=="aereo" && (
                                   <div style={{marginTop:14,background:"#f0fdf4",borderRadius:10,padding:"12px 14px",border:"1px solid #bbf7d0"}}>
                                     <div style={{fontSize:10,color:"#1aa358",marginBottom:10,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>🧾 Factura al cliente</div>
                                     <div style={{display:"flex",gap:8,flexDirection:"column"}}>
