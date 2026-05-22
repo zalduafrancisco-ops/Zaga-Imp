@@ -5652,12 +5652,27 @@ Número de seguimiento: ${c.nro}`;
                                   const costoConIvaAduana = costoNeto + ivaAduanaCLP + ivaAgenteCLP; // total que sale de caja al despacho
                                   const costoUnd = und > 0 ? costoNeto / und : 0;
                                   const costoUndCIva = und > 0 ? costoConIvaAduana / und : 0;
-                                  const margenPct = Number(margenesPorCot[cot.id] ?? cot.margen_objetivo_pct ?? 30);
-                                  const precioNetoUnd = costoUnd / (1 - margenPct/100);
-                                  const precioIvaUnd = precioNetoUnd * 1.19;
-                                  const totalIvaCliente = precioIvaUnd * und;
-                                  const totalNetoCliente = precioNetoUnd * und;
-                                  const ganancia = totalNetoCliente - costoNeto;
+                                  // Si hay precio acordado guardado Y la OP está cerrada/aplicada,
+                                  // el precio manda y el margen se calcula como resultado real.
+                                  // Si NO, el margen es el input editable y el precio se deriva.
+                                  const opCerrada = ["pagada","en_camino","en_bodega","completada"].includes(op.estado);
+                                  const precioAcordadoIvaUnd = Number(cot.precio_final_acordado_und) || 0;
+                                  let margenPct, precioNetoUnd, precioIvaUnd, totalIvaCliente, totalNetoCliente, ganancia;
+                                  if (precioAcordadoIvaUnd > 0 && (opCerrada || op.consolidado_aplicado_cliente)) {
+                                    precioIvaUnd = precioAcordadoIvaUnd;
+                                    precioNetoUnd = precioIvaUnd / 1.19;
+                                    totalIvaCliente = precioIvaUnd * und;
+                                    totalNetoCliente = precioNetoUnd * und;
+                                    ganancia = totalNetoCliente - costoNeto;
+                                    margenPct = totalNetoCliente > 0 ? (ganancia / totalNetoCliente) * 100 : 0;
+                                  } else {
+                                    margenPct = Number(margenesPorCot[cot.id] ?? cot.margen_objetivo_pct ?? 30);
+                                    precioNetoUnd = costoUnd / (1 - margenPct/100);
+                                    precioIvaUnd = precioNetoUnd * 1.19;
+                                    totalIvaCliente = precioIvaUnd * und;
+                                    totalNetoCliente = precioNetoUnd * und;
+                                    ganancia = totalNetoCliente - costoNeto;
+                                  }
                                   return { cot, und, chinaCLP, chileCLP, ivaAgenteCLP, ivaAduanaCLP, costoNeto, costoConIvaAduana, costoUnd, costoUndCIva, margenPct, precioNetoUnd, precioIvaUnd, totalIvaCliente, totalNetoCliente, ganancia };
                                 });
                                 const totChinaCLP   = detalles.reduce((s,d)=>s+d.chinaCLP,0);
@@ -5710,10 +5725,13 @@ Número de seguimiento: ${c.nro}`;
                                               <td style={{padding:"5px 6px",textAlign:"right",color:"#cbd5e1"}}>{fmt(d.chileCLP)}</td>
                                               <td style={{padding:"5px 6px",textAlign:"right",color:"#c9a055",fontWeight:700}}>{fmt(d.costoUnd)}</td>
                                               <td style={{padding:"5px 4px",textAlign:"center"}}>
-                                                <input type="number" step="1" min="0" max="100" value={d.margenPct}
-                                                  disabled={["pagada","en_camino","en_bodega","completada"].includes(op.estado)}
-                                                  onChange={e=>setMargenesPorCot(prev=>({...prev,[d.cot.id]:Number(e.target.value)||0}))}
-                                                  style={{width:46,padding:"3px 5px",border:"1px solid "+(["pagada","en_camino","en_bodega","completada"].includes(op.estado)?"#475569":"#06b6d4"),borderRadius:5,fontSize:11,textAlign:"right",background:"#06b6d422",color:"#fff",fontFamily:"inherit",cursor:["pagada","en_camino","en_bodega","completada"].includes(op.estado)?"not-allowed":"text",opacity:["pagada","en_camino","en_bodega","completada"].includes(op.estado)?0.6:1}}/>
+                                                {["pagada","en_camino","en_bodega","completada"].includes(op.estado) ? (
+                                                  <span style={{display:"inline-block",width:46,padding:"3px 5px",border:"1px solid #475569",borderRadius:5,fontSize:11,textAlign:"right",background:"#1e293b",color:"#94a3b8",opacity:0.85}}>{d.margenPct.toFixed(1)}</span>
+                                                ) : (
+                                                  <input type="number" step="1" min="0" max="100" value={d.margenPct}
+                                                    onChange={e=>setMargenesPorCot(prev=>({...prev,[d.cot.id]:Number(e.target.value)||0}))}
+                                                    style={{width:46,padding:"3px 5px",border:"1px solid #06b6d4",borderRadius:5,fontSize:11,textAlign:"right",background:"#06b6d422",color:"#fff",fontFamily:"inherit"}}/>
+                                                )}
                                               </td>
                                               <td style={{padding:"5px 6px",textAlign:"right",color:"#fff",fontWeight:700}}>{fmt(d.precioNetoUnd)}</td>
                                               <td style={{padding:"5px 6px",textAlign:"right",color:"#fff",fontWeight:800}}>{fmt(d.totalNetoCliente)}</td>
