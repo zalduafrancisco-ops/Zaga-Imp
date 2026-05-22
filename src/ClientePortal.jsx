@@ -894,11 +894,6 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6,flexWrap:"wrap"}}>
                               <span style={{background:"#040c18",color:"#c9a055",fontSize:12,fontWeight:800,borderRadius:6,padding:"3px 10px"}}>{op.nro}</span>
                               <span style={{fontSize:11,fontWeight:700,background:"#fef3c7",color:"#92400e",padding:"3px 10px",borderRadius:10}}>{estLabel}</span>
-                              {calc.esMultiCliente && (
-                                <span style={{background:"#eef6ff",color:"#2d78c8",fontSize:10,fontWeight:700,borderRadius:10,padding:"3px 9px",border:"1px solid #bfdbfe"}}>
-                                  Consolidado con otros clientes
-                                </span>
-                              )}
                             </div>
                             <div style={{fontSize:12,color:"#475569"}}>
                               {calc.cotsOp.length} producto{calc.cotsOp.length!==1?"s":""} tuyo{calc.cotsOp.length!==1?"s":""} · <b>{fmtN(undTotal)}</b> unidades

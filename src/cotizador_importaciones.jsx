@@ -1869,21 +1869,25 @@ Número de seguimiento: ${c.nro}`;
               const cotsCliente = cotsOp.filter(c => (c.cliente||"").trim() === vistaOpClienteT && !["no_prospero"].includes(c.estado));
               if (cotsCliente.length === 0) return null;
               const aplicado = op.consolidado_aplicado_cliente === true;
-              // Vista cliente SIEMPRE refleja el panel admin (consolidado, no precio individual).
-              // Si hay margen del panel en state, recalcula on-the-fly desde costo neto.
-              // Esto override CUALQUIER precio_final_acordado_und guardado.
+              // Vista cliente:
+              // - Si OP YA APLICADA: usar precios guardados (precio_final_acordado_und)
+              //   = exactamente lo que el cliente ve en su portal.
+              // - Si NO aplicada: preview con margenesPorCot del panel admin
+              //   (cambios live sin guardar).
               const consolidados = cotsCliente.map(c => {
                 const calcStandard = calcConsolidado(c, op, cotsOp);
-                const margenPanel = margenesPorCot[c.id] ?? c.margen_objetivo_pct;
-                if (margenPanel != null && margenPanel > 0) {
-                  const cz = calcCostoRealZaga(c, op, cotsOp);
-                  const costoNeto = (cz.totalChinaCLP || 0) + (cz.totalChileCLP || 0) + (cz.ivaAgenteAer || 0);
-                  const und = Number(c.unidades) || 0;
-                  if (und > 0 && costoNeto > 0) {
-                    const precioNetoUnd = (costoNeto / und) / (1 - margenPanel/100);
-                    const totClNeto = precioNetoUnd * und;
-                    const totClIvaOverride = totClNeto * 1.19;
-                    return { cot:c, calc: { ...calcStandard, consolidado: { ...(calcStandard?.consolidado||{}), totCl: totClNeto, totClIva: totClIvaOverride, esPreviewPanel: true } } };
+                if (!aplicado) {
+                  const margenPanel = margenesPorCot[c.id] ?? c.margen_objetivo_pct;
+                  if (margenPanel != null && margenPanel > 0) {
+                    const cz = calcCostoRealZaga(c, op, cotsOp);
+                    const costoNeto = (cz.totalChinaCLP || 0) + (cz.totalChileCLP || 0) + (cz.ivaAgenteAer || 0);
+                    const und = Number(c.unidades) || 0;
+                    if (und > 0 && costoNeto > 0) {
+                      const precioNetoUnd = (costoNeto / und) / (1 - margenPanel/100);
+                      const totClNeto = precioNetoUnd * und;
+                      const totClIvaOverride = totClNeto * 1.19;
+                      return { cot:c, calc: { ...calcStandard, consolidado: { ...(calcStandard?.consolidado||{}), totCl: totClNeto, totClIva: totClIvaOverride, esPreviewPanel: true } } };
+                    }
                   }
                 }
                 return { cot:c, calc: calcStandard };
@@ -1957,7 +1961,7 @@ Número de seguimiento: ${c.nro}`;
                         ⚠️ Esta cotización aún NO ha sido aplicada al cliente (el cliente no la ve en su portal). Para que la vea, presiona "✅ Aplicar consolidado al cliente" en el panel admin.
                       </div>
                     )}
-                    {esPreviewPanel && (
+                    {esPreviewPanel && !aplicado && (
                       <div className="opvc-alert no-print" style={{padding:"10px 32px",background:"#ecfeff",borderBottom:"1px solid #a5f3fc",fontSize:11,color:"#0e7490",fontStyle:"italic"}}>
                         👁 <b>Preview con % util del panel admin</b> — los precios que ves se calculan en vivo con los porcentajes que estás editando arriba. Nada está guardado en las cotizaciones aún.
                       </div>
@@ -5887,8 +5891,8 @@ Número de seguimiento: ${c.nro}`;
                                     }));
                                     showToast("✅ Consolidado aplicado — precios guardados");
                                   }catch(e){showToast("Error: "+e.message,"err");}
-                                }} disabled={op.consolidado_aplicado_cliente || (op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)} style={{background:op.consolidado_aplicado_cliente?"#f0fdf4":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#e2e8f0":"#1aa358"),color:op.consolidado_aplicado_cliente?"#1aa358":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#94a3b8":"#fff"),border:`1px solid ${op.consolidado_aplicado_cliente?"#bbf7d0":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#cbd5e1":"#1aa358")}`,borderRadius:7,padding:"8px 14px",fontSize:12,cursor:(!op.consolidado_aplicado_cliente && !(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny))?"pointer":"not-allowed",fontWeight:700}}>
-                                  ✅ {op.consolidado_aplicado_cliente?"Ya aplicado a clientes":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"Esperando respuesta Sunny...":"Aplicar consolidado al cliente")}
+                                }} disabled={op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny} style={{background:(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#e2e8f0":(op.consolidado_aplicado_cliente?"#0d9870":"#1aa358"),color:(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#94a3b8":"#fff",border:`1px solid ${(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#cbd5e1":(op.consolidado_aplicado_cliente?"#0d9870":"#1aa358")}`,borderRadius:7,padding:"8px 14px",fontSize:12,cursor:(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"not-allowed":"pointer",fontWeight:700}}>
+                                  {(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"⏳ Esperando respuesta Sunny...":(op.consolidado_aplicado_cliente?"🔄 Re-aplicar consolidado al cliente":"✅ Aplicar consolidado al cliente")}
                                 </button>
                                 {/* Botón sincronizar estados */}
                                 {(()=>{
