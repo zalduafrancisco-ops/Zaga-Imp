@@ -878,7 +878,15 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
     return s + getEgreso(e.key);
   }, 0);
   const gananciaTeorica = (totIngresoTeorico/1.19) - totCostoNeto;
-  const gananciaReal = (totIngresoReal/1.19) - totEgresoReal;
+  // Ganancia real: si faltan pagos por cargar, usamos el costo teórico como
+  // egreso estimado para no inflar artificialmente la ganancia.
+  // Solo usamos el egreso real cuando supera el teórico (pagos más caros de lo previsto).
+  const egresoParaReal = Math.max(totEgresoReal, totCostoNeto);
+  const ingresoParaReal = totIngresoReal > 0 ? totIngresoReal : totIngresoTeorico;
+  const faltaCargarPagos = totEgresoReal > 0 && totEgresoReal < totCostoNeto;
+  const noHayPagosRegistrados = totEgresoReal === 0;
+  const noHayIngresosRegistrados = totIngresoReal === 0;
+  const gananciaReal = (ingresoParaReal/1.19) - egresoParaReal;
   const diffGanancia = gananciaReal - gananciaTeorica;
 
   async function guardar(){
@@ -1072,14 +1080,27 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
             <div style={{fontSize:10,color:"#64748b",marginTop:4,fontStyle:"italic"}}>según cálculos del cotizador</div>
           </div>
           <div style={{background: gananciaReal>=gananciaTeorica?"#14532d":"#3f2410",borderRadius:10,padding:"18px 20px",border:`2px solid ${gananciaReal>=gananciaTeorica?"#16a34a":"#fbbf24"}`}}>
-            <div style={{fontSize:10,color: gananciaReal>=gananciaTeorica?"#bbf7d0":"#fde68a",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>🏆 Ganancia REAL neta</div>
+            <div style={{fontSize:10,color: gananciaReal>=gananciaTeorica?"#bbf7d0":"#fde68a",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>
+              🏆 Ganancia REAL neta {(faltaCargarPagos || noHayPagosRegistrados || noHayIngresosRegistrados) && <span style={{fontWeight:600,color:"#fde68a"}}>(estimada)</span>}
+            </div>
             <div style={{fontSize:32,fontWeight:900,color: gananciaReal>=gananciaTeorica?"#22c55e":"#fbbf24",lineHeight:1.2}}>{fmt(gananciaReal)}</div>
-            {Math.abs(diffGanancia)>1000 ? (
+            {(faltaCargarPagos || noHayPagosRegistrados) && (
+              <div style={{fontSize:10,color:"#fde68a",marginTop:4,fontStyle:"italic"}}>
+                {noHayPagosRegistrados
+                  ? `Usando costo teórico como egreso (${fmt(totCostoNeto)}). Carga pagos a Sunny/Chile para ver ganancia real.`
+                  : `Faltan pagos por cargar: $${(totCostoNeto - totEgresoReal).toLocaleString("es-CL")} pendientes vs teórico.`}
+              </div>
+            )}
+            {noHayIngresosRegistrados && !faltaCargarPagos && !noHayPagosRegistrados && (
+              <div style={{fontSize:10,color:"#fde68a",marginTop:4,fontStyle:"italic"}}>Cliente aún no pagó — usando cobrado teórico.</div>
+            )}
+            {!faltaCargarPagos && !noHayPagosRegistrados && !noHayIngresosRegistrados && Math.abs(diffGanancia)>1000 && (
               <div style={{fontSize:12,fontWeight:700,color:diffGanancia>=0?"#22c55e":"#fca5a5",marginTop:4}}>
                 {diffGanancia>=0?"▲ +":"▼ "}{fmt(Math.abs(diffGanancia))} vs teórico ({diffGanancia>=0?"ganaste más":"perdiste"})
               </div>
-            ) : (
-              <div style={{fontSize:10,color:"#94a3b8",marginTop:4,fontStyle:"italic"}}>Sin datos reales aún</div>
+            )}
+            {!faltaCargarPagos && !noHayPagosRegistrados && !noHayIngresosRegistrados && Math.abs(diffGanancia)<=1000 && (
+              <div style={{fontSize:10,color:"#94a3b8",marginTop:4,fontStyle:"italic"}}>✓ Real al día con lo esperado</div>
             )}
           </div>
         </div>
