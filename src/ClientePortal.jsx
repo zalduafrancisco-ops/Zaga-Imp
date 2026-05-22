@@ -460,7 +460,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
       }
       var res = await supabase.from("cotizaciones").insert(row)
       if(res.error) throw res.error
-      showToast("✓ Cotizacion "+nuevoNro+" enviada — Sunny la verá pronto","ok")
+      showToast("✓ Cotización "+nuevoNro+" enviada — nuestro agente en China la verá pronto","ok")
       setNuevaForm({ producto:"", url_referencia:"", unidades:"", transporte:"aereo", url_imagen:"", notas:"" })
       setMostrarFormNueva(false)
       cargar()
@@ -1463,14 +1463,14 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
             <div style={{padding:"20px 24px",borderBottom:"1px solid #e2e8f0",background:"#040c18",borderRadius:"14px 14px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
                 <div style={{fontSize:11,color:"#94a3b8",letterSpacing:1.5,textTransform:"uppercase",fontWeight:600}}>Nueva solicitud</div>
-                <div style={{fontSize:18,color:"#c9a055",fontWeight:700,marginTop:2}}>📥 Cotización para Sunny</div>
+                <div style={{fontSize:18,color:"#c9a055",fontWeight:700,marginTop:2}}>📥 Cotización a nuestro agente en China</div>
               </div>
               <button onClick={function(){ setMostrarFormNueva(false) }}
                 style={{background:"transparent",border:"none",color:"#94a3b8",fontSize:22,cursor:"pointer",padding:0,lineHeight:1}}>×</button>
             </div>
             <div style={{padding:"20px 24px"}}>
               <div style={{fontSize:12,color:"#475569",marginBottom:16,lineHeight:1.5,background:"#f8fafc",padding:"10px 12px",borderRadius:8,border:"1px solid #e2e8f0"}}>
-                💡 Esta solicitud va directo a Sunny (nuestra agente en China) para que la cotice. Te avisaremos por acá cuando esté lista con precio y disponibilidad.
+                💡 Esta solicitud va directo a nuestro agente en China para que la cotice. Te avisaremos por acá cuando esté lista con precio y disponibilidad.
               </div>
 
               <div style={{marginBottom:14}}>
