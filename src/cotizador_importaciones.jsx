@@ -1242,6 +1242,12 @@ export default function App({ supabase, usuario, onLogout }){
   const [vistaValidarId,setVistaValidarId] = useState(null); // ID de cot aérea para validar
   const [validarForm,setValidarForm]     = useState({}); // costos Chile editables + margen + precio acordado
   const [margenesPorCot,setMargenesPorCot] = useState({}); // {cotId: pct} margen objetivo por cot en panel OP
+  // Notificaciones cots nuevas creadas por cliente (autoservicio portal cliente)
+  const [cotsVistas,setCotsVistas] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("zaga_cots_cliente_vistas")||"[]") } catch(e) { return [] }
+  });
+  const cotsClienteNuevasIdsRef = useRef(new Set());
+  const yaInicializoNotifRef = useRef(false);
   const [dashFilter,setDashFilter]       = useState("todas");
   const [dashTipo,setDashTipo]           = useState("clientes");
   const [dashClienteFiltro,setDashClienteFiltro] = useState("todos");
@@ -1370,6 +1376,49 @@ export default function App({ supabase, usuario, onLogout }){
       document.removeEventListener("visibilitychange", onVisibilidad);
     };
   },[]);
+
+  // ── NOTIFICACIÓN cots nuevas creadas por cliente desde portal ──
+  // Detecta cots con creada_por_cliente=true y estado=solicitud que no están
+  // en cotsVistas. Si aparecen NUEVAS respecto al render anterior, reproduce beep.
+  useEffect(() => {
+    const nuevas = cotizaciones.filter(c => c.creada_por_cliente === true && c.estado === "solicitud" && !cotsVistas.includes(c.id));
+    const ids = nuevas.map(c => c.id);
+    const newOnes = ids.filter(id => !cotsClienteNuevasIdsRef.current.has(id));
+    if (yaInicializoNotifRef.current && newOnes.length > 0 && tab2 !== "tracker") {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) {
+          const ctx = new Ctx();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.value = 880;
+          osc.type = "sine";
+          gain.gain.setValueAtTime(0.18, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.6);
+        }
+      } catch(e) {}
+      showToast(`🔔 ${newOnes.length} cotización${newOnes.length>1?"es":""} nueva${newOnes.length>1?"s":""} del cliente`, "ok");
+    }
+    cotsClienteNuevasIdsRef.current = new Set(ids);
+    yaInicializoNotifRef.current = true;
+  }, [cotizaciones, cotsVistas]);
+
+  // Al entrar a tracker, marcar todas las cots cliente nuevas como vistas
+  useEffect(() => {
+    if (tab2 === "tracker") {
+      const idsNuevas = cotizaciones.filter(c => c.creada_por_cliente === true && c.estado === "solicitud" && !cotsVistas.includes(c.id)).map(c => c.id);
+      if (idsNuevas.length > 0) {
+        const nuevoSet = [...new Set([...cotsVistas, ...idsNuevas])];
+        setCotsVistas(nuevoSet);
+        try { localStorage.setItem("zaga_cots_cliente_vistas", JSON.stringify(nuevoSet)); } catch(e) {}
+      }
+    }
+  }, [tab2, cotizaciones]);
+
+  const cotsNuevasCount = cotizaciones.filter(c => c.creada_por_cliente === true && c.estado === "solicitud" && !cotsVistas.includes(c.id)).length;
 
   const exportarDatos=()=>{
     try{
@@ -1888,7 +1937,7 @@ export default function App({ supabase, usuario, onLogout }){
         {/* NAV TABS */}
         <div className="nav-tabs" style={{maxWidth:1280,margin:"0 auto",padding:"0 24px",display:"flex",gap:0,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
           {[["calc","Calculadora"],["tracker",`Tracker (${cotizaciones.length})`],["operaciones",`✈️ Operaciones${operaciones.length>0?` (${operaciones.length})`:""}`],["dashboard","Dashboard"],["clientes","Clientes"],["luisa","Luisa"]].map(([k,l])=>(
-            <button key={k} onClick={()=>setTab(k)} style={{
+            <button key={k} onClick={()=>setTab(k)} style={{position:"relative",
               background:"transparent",
               color:tab2===k?"#ffffff":"rgba(255,255,255,0.4)",
               border:"none",
@@ -1899,7 +1948,14 @@ export default function App({ supabase, usuario, onLogout }){
               fontSize:13,
               transition:"color .2s",
               fontFamily:"inherit"
-            }}>{l}</button>
+            }}>
+              {l}
+              {k==="tracker" && cotsNuevasCount > 0 && (
+                <span style={{position:"absolute",top:6,right:6,background:"#ef4444",color:"#fff",borderRadius:10,minWidth:18,height:18,fontSize:10,fontWeight:800,padding:"0 5px",display:"inline-flex",alignItems:"center",justifyContent:"center",animation:"pulse 1.5s ease-in-out infinite",boxShadow:"0 0 0 0 rgba(239,68,68,0.4)"}}>
+                  🔔{cotsNuevasCount}
+                </span>
+              )}
+            </button>
           ))}
         </div>
       </div>

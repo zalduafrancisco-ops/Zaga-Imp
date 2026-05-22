@@ -171,6 +171,10 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   var prevCotsRef = useRef([])                          // snapshot previo para detectar notas nuevas del admin
   var [operaciones, setOperaciones] = useState([])     // operaciones consolidadas del cliente
   var [opOpenId, setOpOpenId] = useState(null)         // operación expandida
+  // Form nueva cotizacion (cliente auto-servicio)
+  var [mostrarFormNueva, setMostrarFormNueva] = useState(false)
+  var [nuevaForm, setNuevaForm] = useState({ producto:"", url_referencia:"", unidades:"", transporte:"aereo", url_imagen:"", notas:"" })
+  var [creandoCot, setCreandoCot] = useState(false)
 
   var showToast = function(msg, type){
     setToast({ msg: msg, type: type||"ok" })
@@ -408,6 +412,64 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
       var el = document.getElementById("cot-"+cotId)
       if(el) el.scrollIntoView({behavior:"smooth", block:"start"})
     }, 200)
+  }
+
+  // ── Crear nueva cotizacion (auto-servicio cliente) ────────────
+  var crearCotizacion = async function(){
+    // Validar campos obligatorios
+    if(!nuevaForm.producto.trim()){ showToast("Falta nombre del producto","err"); return }
+    if(!nuevaForm.url_referencia.trim()){ showToast("Falta URL de referencia","err"); return }
+    if(!nuevaForm.unidades || Number(nuevaForm.unidades) <= 0){ showToast("Falta cantidad de unidades","err"); return }
+    setCreandoCot(true)
+    try{
+      var ahora = new Date()
+      var ts = String(Date.now())
+      // Generar correlativo COT-XXX (max actual + 1)
+      var maxNro = 0
+      cotizaciones.forEach(function(c){
+        var m = String(c.nro||"").match(/COT-(\d+)/)
+        if(m) maxNro = Math.max(maxNro, Number(m[1]))
+      })
+      var nuevoNro = "COT-" + String(maxNro+1).padStart(3,"0")
+      var clienteNombre = (perfil.cliente_nombre || perfil.nombre || "").trim()
+      var datos = {
+        id: ts,
+        nro: nuevoNro,
+        cliente: clienteNombre,
+        gestor: "cliente",
+        tipo: "cliente",
+        estado: "solicitud",
+        producto: nuevaForm.producto.trim(),
+        url_referencia: nuevaForm.url_referencia.trim(),
+        unidades: Number(nuevaForm.unidades),
+        transporte: nuevaForm.transporte,
+        url_imagen_cliente: nuevaForm.url_imagen.trim(),
+        nota_cliente: nuevaForm.notas.trim(),
+        fecha_solicitud: ahora.toISOString().split("T")[0],
+        origen: "portal_cliente",
+        creada_por_cliente: true,
+      }
+      var row = {
+        id: ts,
+        nro: nuevoNro,
+        cliente: clienteNombre,
+        gestor: "cliente",
+        estado: "solicitud",
+        tipo: "cliente",
+        datos: datos,
+      }
+      var res = await supabase.from("cotizaciones").insert(row)
+      if(res.error) throw res.error
+      showToast("✓ Cotizacion "+nuevoNro+" enviada — Sunny la verá pronto","ok")
+      setNuevaForm({ producto:"", url_referencia:"", unidades:"", transporte:"aereo", url_imagen:"", notas:"" })
+      setMostrarFormNueva(false)
+      cargar()
+    }catch(e){
+      console.error(e)
+      showToast("Error al crear cotizacion: "+(e.message||"desconocido"),"err")
+    }finally{
+      setCreandoCot(false)
+    }
   }
 
   // ── Totales sobre TODAS las cotizaciones ──────────────────────
@@ -747,15 +809,21 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
               </div>
             )}
 
-            {/* BIENVENIDA */}
-            <div style={{marginBottom:20}}>
-              <div style={{fontSize:20,fontWeight:700,color:"#0f172a"}}>Hola, {perfil.nombre} 👋</div>
-              <div style={{fontSize:13,color:"#64748b",marginTop:4}}>
-                {activas.length>0
-                  ? "Tienes "+activas.length+" importacion"+(activas.length>1?"es":"")+" activa"+(activas.length>1?"s":"")+"."
-                  : completadas.length>0?"Todo al dia con tus importaciones."
-                  : "Tus cotizaciones estan siendo revisadas."}
+            {/* BIENVENIDA + boton nueva cotizacion */}
+            <div style={{marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"flex-end",flexWrap:"wrap",gap:12}}>
+              <div>
+                <div style={{fontSize:20,fontWeight:700,color:"#0f172a"}}>Hola, {perfil.nombre} 👋</div>
+                <div style={{fontSize:13,color:"#64748b",marginTop:4}}>
+                  {activas.length>0
+                    ? "Tienes "+activas.length+" importacion"+(activas.length>1?"es":"")+" activa"+(activas.length>1?"s":"")+"."
+                    : completadas.length>0?"Todo al dia con tus importaciones."
+                    : "Tus cotizaciones estan siendo revisadas."}
+                </div>
               </div>
+              <button onClick={function(){ setMostrarFormNueva(true) }}
+                style={{background:"#040c18",color:"#c9a055",border:"2px solid #c9a055",borderRadius:10,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 2px 8px rgba(0,0,0,0.1)"}}>
+                ➕ Nueva cotización
+              </button>
             </div>
 
             {/* ALERTA PENDIENTES */}
@@ -1386,6 +1454,91 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
           <span>ZAGA Import · zagaimp.com · {new Date().getFullYear()}</span>
         </div>
       </div>
+
+      {/* MODAL NUEVA COTIZACION */}
+      {mostrarFormNueva && (
+        <div onClick={function(e){ if(e.target===e.currentTarget) setMostrarFormNueva(false) }}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto"}}>
+          <div style={{background:"#fff",borderRadius:14,maxWidth:540,width:"100%",maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"20px 24px",borderBottom:"1px solid #e2e8f0",background:"#040c18",borderRadius:"14px 14px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:11,color:"#94a3b8",letterSpacing:1.5,textTransform:"uppercase",fontWeight:600}}>Nueva solicitud</div>
+                <div style={{fontSize:18,color:"#c9a055",fontWeight:700,marginTop:2}}>📥 Cotización para Sunny</div>
+              </div>
+              <button onClick={function(){ setMostrarFormNueva(false) }}
+                style={{background:"transparent",border:"none",color:"#94a3b8",fontSize:22,cursor:"pointer",padding:0,lineHeight:1}}>×</button>
+            </div>
+            <div style={{padding:"20px 24px"}}>
+              <div style={{fontSize:12,color:"#475569",marginBottom:16,lineHeight:1.5,background:"#f8fafc",padding:"10px 12px",borderRadius:8,border:"1px solid #e2e8f0"}}>
+                💡 Esta solicitud va directo a Sunny (nuestra agente en China) para que la cotice. Te avisaremos por acá cuando esté lista con precio y disponibilidad.
+              </div>
+
+              <div style={{marginBottom:14}}>
+                <label style={{display:"block",fontSize:11,fontWeight:700,color:"#475569",marginBottom:5}}>📦 Producto *</label>
+                <input type="text" value={nuevaForm.producto}
+                  onChange={function(e){ var v=e.target.value; setNuevaForm(function(p){ return Object.assign({},p,{producto:v}) }) }}
+                  placeholder="Ej: Reloj cuarzo dorado para mujer"
+                  style={{width:"100%",padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:8,fontSize:13,fontFamily:"inherit",boxSizing:"border-box"}}/>
+              </div>
+
+              <div style={{marginBottom:14}}>
+                <label style={{display:"block",fontSize:11,fontWeight:700,color:"#475569",marginBottom:5}}>🔗 URL de referencia (Alibaba / AliExpress) *</label>
+                <input type="url" value={nuevaForm.url_referencia}
+                  onChange={function(e){ var v=e.target.value; setNuevaForm(function(p){ return Object.assign({},p,{url_referencia:v}) }) }}
+                  placeholder="https://alibaba.com/product/..."
+                  style={{width:"100%",padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:8,fontSize:13,fontFamily:"inherit",boxSizing:"border-box"}}/>
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+                <div>
+                  <label style={{display:"block",fontSize:11,fontWeight:700,color:"#475569",marginBottom:5}}>🔢 Cantidad (unidades) *</label>
+                  <input type="number" min="1" step="1" value={nuevaForm.unidades}
+                    onChange={function(e){ var v=e.target.value; setNuevaForm(function(p){ return Object.assign({},p,{unidades:v}) }) }}
+                    placeholder="Ej: 1000"
+                    style={{width:"100%",padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:8,fontSize:13,fontFamily:"inherit",boxSizing:"border-box"}}/>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:11,fontWeight:700,color:"#475569",marginBottom:5}}>✈️ Transporte</label>
+                  <select value={nuevaForm.transporte}
+                    onChange={function(e){ var v=e.target.value; setNuevaForm(function(p){ return Object.assign({},p,{transporte:v}) }) }}
+                    style={{width:"100%",padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:8,fontSize:13,fontFamily:"inherit",boxSizing:"border-box",background:"#fff"}}>
+                    <option value="aereo">✈️ Aéreo (25 días)</option>
+                    <option value="maritimo">🚢 Marítimo (90 días)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{marginBottom:14}}>
+                <label style={{display:"block",fontSize:11,fontWeight:700,color:"#475569",marginBottom:5}}>🖼️ URL imagen (opcional)</label>
+                <input type="url" value={nuevaForm.url_imagen}
+                  onChange={function(e){ var v=e.target.value; setNuevaForm(function(p){ return Object.assign({},p,{url_imagen:v}) }) }}
+                  placeholder="https://... (si quieres adjuntar imagen aparte)"
+                  style={{width:"100%",padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:8,fontSize:13,fontFamily:"inherit",boxSizing:"border-box"}}/>
+              </div>
+
+              <div style={{marginBottom:18}}>
+                <label style={{display:"block",fontSize:11,fontWeight:700,color:"#475569",marginBottom:5}}>📝 Notas adicionales (color, talla, especificaciones)</label>
+                <textarea value={nuevaForm.notas}
+                  onChange={function(e){ var v=e.target.value; setNuevaForm(function(p){ return Object.assign({},p,{notas:v}) }) }}
+                  rows={3}
+                  placeholder="Ej: en color dorado, con caja de regalo, logo grabado..."
+                  style={{width:"100%",padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:8,fontSize:13,fontFamily:"inherit",boxSizing:"border-box",resize:"vertical"}}/>
+              </div>
+
+              <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+                <button onClick={function(){ setMostrarFormNueva(false) }} disabled={creandoCot}
+                  style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:creandoCot?"not-allowed":"pointer",fontFamily:"inherit"}}>
+                  Cancelar
+                </button>
+                <button onClick={crearCotizacion} disabled={creandoCot}
+                  style={{background:creandoCot?"#94a3b8":"#040c18",color:"#c9a055",border:"none",borderRadius:8,padding:"10px 20px",fontSize:13,fontWeight:700,cursor:creandoCot?"not-allowed":"pointer",fontFamily:"inherit"}}>
+                  {creandoCot?"Enviando...":"✓ Enviar a ZAGA"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
