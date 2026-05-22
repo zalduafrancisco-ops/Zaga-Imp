@@ -142,11 +142,12 @@ export default function PortalSunny({ supabase, onLogout }) {
   // Pend. cotizar incluye:
   //   1. cots con estado 'solicitud' (admin pide cotización)
   //   2. cots en 'solicitud' o 'cotizada' vinculadas a OP en borrador
-  //      (mira tanto c.operacion_id como op.cotizaciones para robustez)
+  //      pero SOLO si el admin aún NO aplicó el consolidado al cliente.
+  //      Una vez aplicado, las cots pasan a "Pend. cliente" y desaparecen de aquí.
   const opsBorradorMap = new Map()
   ;(Array.isArray(ops) ? ops : []).forEach(o => {
     if (!o || !o._id) return
-    if (!o.estado || o.estado === "borrador") {
+    if ((!o.estado || o.estado === "borrador") && o.consolidado_aplicado_cliente !== true) {
       const cotIds = new Set(Array.isArray(o.cotizaciones) ? o.cotizaciones : [])
       opsBorradorMap.set(o._id, cotIds)
     }
