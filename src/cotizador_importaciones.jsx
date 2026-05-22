@@ -1067,36 +1067,45 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
 
       {/* COMPARATIVO TEÓRICO vs REAL */}
       <div style={{marginTop:14,padding:14,background:"#0f1e30",borderRadius:8,color:"#fff"}}>
-        <div style={{fontSize:10,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10}}>📊 Comparativo teórico (cotizador) vs real (caja)</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,fontSize:12}}>
+        <div style={{fontSize:10,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:14}}>📊 Comparativo teórico (cotizador) vs real (caja)</div>
+
+        {/* Ganancia en GRANDE: 2 cards lado a lado */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+          <div style={{background:"#1a2740",borderRadius:10,padding:"18px 20px",border:"1px solid #c9a05533"}}>
+            <div style={{fontSize:10,color:"#c9a055",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>🧮 Ganancia teórica neta</div>
+            <div style={{fontSize:28,fontWeight:900,color:"#cbd5e1",lineHeight:1.2}}>{fmt(gananciaTeorica)}</div>
+            <div style={{fontSize:10,color:"#64748b",marginTop:4,fontStyle:"italic"}}>según cálculos del cotizador</div>
+          </div>
+          <div style={{background: gananciaReal>=gananciaTeorica?"#14532d":"#3f2410",borderRadius:10,padding:"18px 20px",border:`2px solid ${gananciaReal>=gananciaTeorica?"#16a34a":"#fbbf24"}`}}>
+            <div style={{fontSize:10,color: gananciaReal>=gananciaTeorica?"#bbf7d0":"#fde68a",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>🏆 Ganancia REAL neta</div>
+            <div style={{fontSize:32,fontWeight:900,color: gananciaReal>=gananciaTeorica?"#22c55e":"#fbbf24",lineHeight:1.2}}>{fmt(gananciaReal)}</div>
+            {Math.abs(diffGanancia)>1000 ? (
+              <div style={{fontSize:12,fontWeight:700,color:diffGanancia>=0?"#22c55e":"#fca5a5",marginTop:4}}>
+                {diffGanancia>=0?"▲ +":"▼ "}{fmt(Math.abs(diffGanancia))} vs teórico ({diffGanancia>=0?"ganaste más":"perdiste"})
+              </div>
+            ) : (
+              <div style={{fontSize:10,color:"#94a3b8",marginTop:4,fontStyle:"italic"}}>Sin datos reales aún</div>
+            )}
+          </div>
+        </div>
+
+        {/* Datos auxiliares en pequeño */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,fontSize:11,paddingTop:12,borderTop:"1px solid #1a2740"}}>
           <div>
-            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Cobrado teórico</div>
+            <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Cobrado teórico</div>
             <div style={{fontWeight:700}}>{fmt(totIngresoTeorico)}</div>
           </div>
           <div>
-            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Cobrado real</div>
+            <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Cobrado real</div>
             <div style={{fontWeight:700,color:"#22c55e"}}>{fmt(totIngresoReal)}</div>
           </div>
           <div>
-            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Costo teórico ZAGA</div>
+            <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Costo teórico</div>
             <div style={{fontWeight:700}}>{fmt(totCostoNeto)}</div>
           </div>
           <div>
-            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Pagado real ZAGA</div>
+            <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Pagado real</div>
             <div style={{fontWeight:700,color:"#c47830"}}>{fmt(totEgresoReal)}</div>
-          </div>
-          <div>
-            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Ganancia teórica neta</div>
-            <div style={{fontWeight:700}}>{fmt(gananciaTeorica)}</div>
-          </div>
-          <div>
-            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Ganancia real neta</div>
-            <div style={{fontWeight:800,color: gananciaReal>=gananciaTeorica?"#22c55e":"#fbbf24",fontSize:14}}>{fmt(gananciaReal)}</div>
-            {Math.abs(diffGanancia)>1000 && (
-              <div style={{fontSize:10,color:diffGanancia>=0?"#22c55e":"#fca5a5",marginTop:2}}>
-                {diffGanancia>=0?"+":""}{fmt(diffGanancia)} vs teórico
-              </div>
-            )}
           </div>
         </div>
       </div>
