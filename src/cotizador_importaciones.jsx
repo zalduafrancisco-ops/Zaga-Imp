@@ -6689,21 +6689,19 @@ Número de seguimiento: ${c.nro}`;
               if(mesesConCierres.length===0) return null;
 
               const esAereo=c=>c.transporte==="aereo";
-              const calcSub=(lista)=>{
-                const pct=lista.length>=6?0.25:0.20;
-                const base=lista.reduce((s,c)=>s+(c.calc?.ganImp||0),0);
-                return {pct,base,comision:base*pct,nro:lista.length};
-              };
               const calcComisionMes=(lista)=>{
+                // % se determina por TOTAL de cierres del mes (global, no por modalidad)
+                const pct=lista.length>=6?0.25:0.20;
                 const aereo=lista.filter(esAereo);
                 const maritimo=lista.filter(c=>!esAereo(c));
-                const subAereo=calcSub(aereo);
-                const subMaritimo=calcSub(maritimo);
+                const baseAereo=aereo.reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+                const baseMar=maritimo.reduce((s,c)=>s+(c.calc?.ganImp||0),0);
                 return {
-                  aereo:{...subAereo,lista:aereo},
-                  maritimo:{...subMaritimo,lista:maritimo},
-                  comisionTotal:subAereo.comision+subMaritimo.comision,
-                  baseTotal:subAereo.base+subMaritimo.base,
+                  pct,
+                  aereo:{pct,base:baseAereo,comision:baseAereo*pct,nro:aereo.length,lista:aereo},
+                  maritimo:{pct,base:baseMar,comision:baseMar*pct,nro:maritimo.length,lista:maritimo},
+                  comisionTotal:(baseAereo+baseMar)*pct,
+                  baseTotal:baseAereo+baseMar,
                   nroTotal:lista.length,
                 };
               };
@@ -6720,7 +6718,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                       <span style={{fontSize:13}}>{icon}</span>
                       <span style={{fontSize:12,fontWeight:700,color}}>{modo}</span>
-                      <span style={{background:sub.nro>=6?"#b8922e22":"#2d78c822",color:sub.nro>=6?"#b8922e":"#2d78c8",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:`1px solid ${sub.nro>=6?"#b8922e44":"#2d78c844"}`}}>{sub.nro} {sub.nro>=6?"cierres → 25%":"cierres → 20%"}</span>
+                      <span style={{background:"#f1f5f9",color:"#475569",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:"1px solid #e2e8f0"}}>{sub.nro} cierres</span>
                     </div>
                     <div style={{display:"flex",gap:14,fontSize:11,flexWrap:"wrap"}}>
                       <span style={{color:"#64748b"}}>Base: <b style={{color:"#0f172a"}}>{fmt(sub.base)}</b></span>
@@ -6736,7 +6734,7 @@ Número de seguimiento: ${c.nro}`;
                     <span style={{fontSize:20}}>👩‍💼</span>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,fontSize:14,color:"#a85590"}}>Comisiones Luisa</div>
-                      <div style={{fontSize:11,color:"#64748b"}}>20% por 1–5 cierres · 25% por 6+ cierres · 🚢 Marítimo y ✈️ Aéreo se cuentan por separado · Base: ganancia importación</div>
+                      <div style={{fontSize:11,color:"#64748b"}}>20% por 1–5 cierres · 25% por 6+ cierres (sobre el TOTAL del mes, marítimo + aéreo) · Base: ganancia importación</div>
                     </div>
                     <button onClick={()=>setSimModal(true)} style={{background:"#a8559018",color:"#a85590",border:"1px solid #f9a8d4",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700,whiteSpace:"nowrap"}}>🧮 Simulación total</button>
                   </div>
@@ -6760,7 +6758,7 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
                     {mesesConCierres.map(m=>{
                       const lista=porMes[m];
-                      const {aereo,maritimo,comisionTotal,baseTotal,nroTotal}=calcComisionMes(lista);
+                      const {pct,aereo,maritimo,comisionTotal,baseTotal,nroTotal}=calcComisionMes(lista);
                       const ganEmpresa=baseTotal-comisionTotal;
                       const esMesAnt=m===mesAnt;
                       return(
@@ -6768,7 +6766,7 @@ Número de seguimiento: ${c.nro}`;
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:10}}>
                             <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                               <span style={{fontWeight:700,fontSize:13,color:esMesAnt?"#a85590":"#aaa",textTransform:"capitalize"}}>{monthLabel(m)}</span>
-                              <span style={{background:"#f1f5f9",color:"#475569",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:"1px solid #e2e8f0"}}>{nroTotal} cierres</span>
+                              <span style={{background:nroTotal>=6?"#b8922e22":"#2d78c822",color:nroTotal>=6?"#b8922e":"#2d78c8",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:`1px solid ${nroTotal>=6?"#b8922e44":"#2d78c844"}`}}>{nroTotal} cierres → {fmtP(pct*100)}</span>
                               {esMesAnt&&<span style={{background:"#c0392b18",color:"#c0392b",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:"1px solid #ef444433"}}>⚠ Pagar antes del 5</span>}
                             </div>
                             <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
@@ -6800,7 +6798,7 @@ Número de seguimiento: ${c.nro}`;
                               <div style={{display:"flex",flexDirection:"column",gap:4}}>
                                 {sub.lista.map(c=>{
                                   const g=c.calc?.ganImp||0;
-                                  const com=g*sub.pct;
+                                  const com=g*pct;
                                   return(
                                     <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"4px 8px",background:"#f8fafc",borderRadius:6}}>
                                       <span style={{color:"#475569"}}>{c.nro} · {c.cliente} · <span style={{color:"#0f172a"}}>{c.producto}</span></span>
