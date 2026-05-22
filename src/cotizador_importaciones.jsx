@@ -5844,7 +5844,9 @@ Número de seguimiento: ${c.nro}`;
                                   📢 {op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny?"Esperando Sunny...":"Notificar Sunny para recotizar"}
                                 </button>
                                 <button onClick={async()=>{
-                                  // Construir precios finales por cot desde margenesPorCot del panel
+                                  // Construir precios finales por cot desde margenesPorCot del panel.
+                                  // precio_final_acordado_und se guarda CON IVA (asi lo interpreta el cliente
+                                  // y el resto del cotizador).
                                   const preciosPorCot = {};
                                   const cotsActivasApl = cots.filter(c => !["no_prospero"].includes(c.estado));
                                   for (const c of cotsActivasApl) {
@@ -5854,14 +5856,15 @@ Número de seguimiento: ${c.nro}`;
                                     const und = Number(c.unidades) || 0;
                                     if (und > 0 && costoNeto > 0) {
                                       const precioNetoUnd = (costoNeto / und) / (1 - margenPanel/100);
-                                      preciosPorCot[c.id] = { precio: Math.round(precioNetoUnd), margen: margenPanel };
+                                      const precioIvaUnd = precioNetoUnd * 1.19; // ← CON IVA
+                                      preciosPorCot[c.id] = { precio: Math.round(precioIvaUnd), margen: margenPanel };
                                     }
                                   }
                                   const previewLines = Object.entries(preciosPorCot).map(([id,v]) => {
                                     const c = cotsActivasApl.find(x => x.id===id);
-                                    return `  ${c?.nro || id}: ${v.margen}% → $${v.precio.toLocaleString("es-CL")}/und`;
+                                    return `  ${c?.nro || id}: ${v.margen}% → $${v.precio.toLocaleString("es-CL")}/und c/IVA`;
                                   }).join("\n");
-                                  if(!confirm(`✅ Aplicar consolidado al cliente — OP ${op.nro}?\n\nSe guardarán estos precios y el cliente los verá en su portal:\n\n${previewLines}\n\nMargen actual en el panel:`))return;
+                                  if(!confirm(`✅ Aplicar consolidado al cliente — OP ${op.nro}?\n\nSe guardarán estos precios CON IVA y el cliente los verá en su portal:\n\n${previewLines}`))return;
                                   try{
                                     const newOp = {...op, consolidado_aplicado_cliente:true, fecha_aplicacion_cliente: new Date().toISOString()};
                                     delete newOp.id;
