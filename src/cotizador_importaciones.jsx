@@ -264,11 +264,11 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
     return esC && undC > 0 ? p * Math.ceil(uc / undC) : p * uc;
   };
 
-  // ─── Share por VALOR de mercancía (preferido; suma=1) ──────────────────
-  // Las cots con productos más caros absorben más costos fijos (aduana, doc op,
-  // despacho CN, etc.). Esto da márgenes más parejos entre cots: una cot
-  // chica pero valiosa no se "lleva gratis" la aduana.
-  // Fallback: CBM si no hay valor mercancía. Luego peso. Luego 1/N.
+  // ─── Share por CBM (preferido; suma=1) ──────────────────────────────────
+  // Compartidos de envío (aduana, doc op, despacho CN, etc.) se prorratean por
+  // CBM porque es lo que físicamente ocupan en el contenedor/AWB. Coherente
+  // con cómo Sunny cobra el flete (por peso volumétrico).
+  // Fallback: VALOR mercancía si no hay CBM. Luego peso. Luego 1/N.
   const getValorMercRMB = (c) => {
     const rmb = Number(c.precio_china_rmb) || 0;
     const uc  = Number(c.unidades) || 0;
@@ -277,16 +277,16 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
   let share = 1;
   let totalCbmOp = 0, totalPesoOp = 0, totalValorOp = 0;
   if (op && cotsEnOp && cotsEnOp.length > 1) {
-    totalValorOp = cotsEnOp.reduce((s, c) => s + getValorMercRMB(c), 0);
     totalCbmOp = cotsEnOp.reduce((s, c) => s + getCbm(c), 0);
+    totalValorOp = cotsEnOp.reduce((s, c) => s + getValorMercRMB(c), 0);
     totalPesoOp = cotsEnOp.reduce((s, c) => s + getPesoReal(c), 0);
     const valorCot = getValorMercRMB(d);
     const cbmCot = getCbm(d);
     const pesoCot = getPesoReal(d);
-    if (totalValorOp > 0 && valorCot > 0) {
-      share = valorCot / totalValorOp;
-    } else if (totalCbmOp > 0) {
+    if (totalCbmOp > 0 && cbmCot > 0) {
       share = cbmCot / totalCbmOp;
+    } else if (totalValorOp > 0 && valorCot > 0) {
+      share = valorCot / totalValorOp;
     } else if (totalPesoOp > 0) {
       share = pesoCot / totalPesoOp;
     } else {
@@ -5646,10 +5646,10 @@ Número de seguimiento: ${c.nro}`;
                                   const und = Number(cot.unidades) || 0;
                                   const chinaCLP = cz.totalChinaCLP || 0;
                                   const chileCLP = cz.totalChileCLP || 0; // aduana neta + arancel (proporcional)
-                                  const ivaAgenteCLP = cz.ivaAgenteAer || 0;
-                                  const ivaAduanaCLP = cz.ivaAduanaAer || 0; // IVA aduana (sale de caja, recuperable F29)
-                                  const costoNeto = chinaCLP + chileCLP + ivaAgenteCLP; // operacional (sin IVA aduana)
-                                  const costoConIvaAduana = costoNeto + ivaAduanaCLP; // total que sale de caja para liberar mercadería
+                                  const ivaAgenteCLP = cz.ivaAgenteAer || 0; // IVA agente Leslie (recuperable F29)
+                                  const ivaAduanaCLP = cz.ivaAduanaAer || 0; // IVA aduana (recuperable F29)
+                                  const costoNeto = chinaCLP + chileCLP; // operacional (ambos IVA son recuperables, NO costo)
+                                  const costoConIvaAduana = costoNeto + ivaAduanaCLP + ivaAgenteCLP; // total que sale de caja al despacho
                                   const costoUnd = und > 0 ? costoNeto / und : 0;
                                   const costoUndCIva = und > 0 ? costoConIvaAduana / und : 0;
                                   const margenPct = Number(margenesPorCot[cot.id] ?? cot.margen_objetivo_pct ?? 30);
@@ -5806,12 +5806,12 @@ Número de seguimiento: ${c.nro}`;
                                       </div>
                                       <div style={{padding:"14px 16px",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10}}>
                                         <div style={{fontSize:10,color:"#1e40af",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>🇨🇱 Costo Chile</div>
-                                        <div style={{fontSize:22,fontWeight:800,color:"#2563eb"}}>{fmt(totChileCLP + totIvaAgente)}</div>
-                                        <div style={{fontSize:9,color:"#475569",marginTop:2}}>Aduana neta + IVA agente</div>
+                                        <div style={{fontSize:22,fontWeight:800,color:"#2563eb"}}>{fmt(totChileCLP)}</div>
+                                        <div style={{fontSize:9,color:"#475569",marginTop:2}}>Aduana neta + arancel</div>
                                       </div>
                                       <div style={{padding:"14px 16px",background:"#fefce8",border:"1px solid #fde047",borderRadius:10}}>
-                                        <div style={{fontSize:10,color:"#854d0e",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>🧾 IVA aduana (a pagar)</div>
-                                        <div style={{fontSize:22,fontWeight:800,color:"#a16207"}}>{fmt(totIvaAduana)}</div>
+                                        <div style={{fontSize:10,color:"#854d0e",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>🧾 IVA aduana + agente (recuperable)</div>
+                                        <div style={{fontSize:22,fontWeight:800,color:"#a16207"}}>{fmt(totIvaAduana + totIvaAgente)}</div>
                                         <div style={{fontSize:9,color:"#475569",marginTop:2}}>Sale de caja, se recupera por F29</div>
                                       </div>
                                       <div style={{padding:"14px 16px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10}}>
@@ -5825,8 +5825,8 @@ Número de seguimiento: ${c.nro}`;
                                       </div>
                                     </div>
                                     <div style={{marginTop:12,padding:"10px 14px",background:"#f8fafc",borderRadius:8,fontSize:11,color:"#475569",lineHeight:1.6}}>
-                                      <b>💡 Costo total ZAGA (a desembolsar):</b> {fmt(totCostoCIva)} CLP <span style={{color:"#94a3b8"}}>(China {fmt(totChinaCLP)} + Chile {fmt(totChileCLP + totIvaAgente)} + IVA aduana {fmt(totIvaAduana)})</span>
-                                      <br/><b>Recuperable F29:</b> {fmt(totIvaAduana + totIvaAgente)} CLP (IVA aduana + IVA agente) — se compensan con el IVA débito de la factura al cliente.
+                                      <b>💡 Costo total ZAGA (a desembolsar al despacho):</b> {fmt(totCostoCIva)} CLP <span style={{color:"#94a3b8"}}>(China {fmt(totChinaCLP)} + Chile {fmt(totChileCLP)} + IVA aduana+agente {fmt(totIvaAduana + totIvaAgente)})</span>
+                                      <br/><b>Costo NETO real ZAGA:</b> {fmt(totCostoNeto)} CLP (sin IVAs, ambos recuperables F29 — se compensan con el IVA débito al cliente).
                                     </div>
                                   </div>
                                   </>
