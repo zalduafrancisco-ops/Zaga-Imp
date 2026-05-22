@@ -5725,10 +5725,10 @@ Número de seguimiento: ${c.nro}`;
                                           <tr style={{background:"#dcfce7",color:"#14532d"}}>
                                             <th style={{padding:"7px 8px",textAlign:"left",fontWeight:700}}>Cot</th>
                                             <th style={{padding:"7px 8px",textAlign:"right",fontWeight:700}}>Und</th>
-                                            <th style={{padding:"7px 8px",textAlign:"right",fontWeight:700}}>Costo /und c/IVA</th>
-                                            <th style={{padding:"7px 8px",textAlign:"right",fontWeight:700}}>Costo total c/IVA</th>
-                                            <th style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#15803d"}}>Precio /und c/IVA</th>
-                                            <th style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#15803d"}}>Venta total c/IVA</th>
+                                            <th title="Costo neto/und + IVA aduana proporcional. NO es costo × 1,19. El IVA aduana solo grava el CIF (mercancía + flete + seguro), NO la aduana chilena ni los servicios del agente. Es flujo de caja al despacho, recuperable por F29." style={{padding:"7px 8px",textAlign:"right",fontWeight:700,cursor:"help",textDecoration:"underline dotted #14532d99"}}>Costo /und c/IVA ℹ️</th>
+                                            <th title="Costo neto total + IVA aduana total prorrateado (recuperable F29). Es lo que sale de caja al momento del despacho para liberar esta cot." style={{padding:"7px 8px",textAlign:"right",fontWeight:700,cursor:"help",textDecoration:"underline dotted #14532d99"}}>Costo total c/IVA ℹ️</th>
+                                            <th title="Precio neto por unidad × 1,19 (IVA al cliente)." style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#15803d",cursor:"help",textDecoration:"underline dotted #15803d99"}}>Precio /und c/IVA ℹ️</th>
+                                            <th title="Lo que el cliente paga total en la factura (precio /und c/IVA × unidades)." style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#15803d",cursor:"help",textDecoration:"underline dotted #15803d99"}}>Venta total c/IVA ℹ️</th>
                                           </tr>
                                         </thead>
                                         <tbody>
@@ -5753,8 +5753,9 @@ Número de seguimiento: ${c.nro}`;
                                         </tbody>
                                       </table>
                                     </div>
-                                    <div style={{marginTop:8,fontSize:10,color:"#15803d",fontStyle:"italic",lineHeight:1.5}}>
-                                      💡 <b>Costo c/IVA</b> = costo neto ZAGA + IVA aduana (sale de caja al despacho, recuperable F29) · <b>Precio c/IVA</b> = precio neto × 1,19 (lo que el cliente paga en la factura).
+                                    <div style={{marginTop:8,fontSize:10,color:"#15803d",fontStyle:"italic",lineHeight:1.6}}>
+                                      💡 <b>Costo c/IVA ≠ Costo × 1,19.</b> Es <b>Costo neto + IVA aduana proporcional</b> (sale de caja al despacho, recuperable F29). El IVA aduana solo grava el CIF (mercancía + flete + seguro), no la aduana chilena ni servicios del agente.<br/>
+                                      <b>Precio c/IVA</b> = precio neto × 1,19 (lo que el cliente paga en la factura). Pasa el mouse sobre los títulos ℹ️ para ver fórmulas.
                                     </div>
                                   </div>
 
