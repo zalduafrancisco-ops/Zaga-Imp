@@ -4703,7 +4703,7 @@ Número de seguimiento: ${c.nro}`;
                       const CLIENTE_STEPS=[
                         {estado:"solicitud",  icon:"📝",label:"Solicitud / esperando China",  color:"#6a9fd4",checks:[]},
                         {estado:"cotizada",   icon:"💬",label:"Cotizada al cliente",          color:"#2d78c8",checks:[],special:"decision"},
-                        {estado:"pagada",     icon:"💰",label:"Pagada / Importando",          color:"#c47830",checks:["pago1_cliente","factura1","pago_china","en_produccion","almacen_china","ctrl_calidad"]},
+                        {estado:"pagada",     icon:"💰",label:"Pagada / Importando",          color:"#c47830",checks:[]},
                         {estado:"en_camino",  icon:"✈️",label:"En camino",                    color:"#a85590",checks:[]},
                         {estado:"en_bodega",  icon:"🇨🇱",label:"En bodega (disponible)",      color:"#3d7fc4",checks:["llego_chile","pago2_cliente","factura2"]},
                         {estado:"completada", icon:"✓",label:"Completada",                    color:"#0d9870",checks:["retirado_bodega"]},
@@ -4711,7 +4711,7 @@ Número de seguimiento: ${c.nro}`;
                       const PROPIA_STEPS=[
                         {estado:"solicitud",  icon:"📝",label:"Solicitud / esperando China",  color:"#6a9fd4",checks:[]},
                         {estado:"cotizada",   icon:"💬",label:"Cotización revisada",          color:"#2d78c8",checks:[]},
-                        {estado:"pagada",     icon:"💰",label:"Pagada / Importando",          color:"#c47830",checks:["pago_china","en_produccion","almacen_china","ctrl_calidad"]},
+                        {estado:"pagada",     icon:"💰",label:"Pagada / Importando",          color:"#c47830",checks:[]},
                         {estado:"en_camino",  icon:"✈️",label:"En camino",                    color:"#a85590",checks:["despachado"]},
                         {estado:"en_bodega",  icon:"🇨🇱",label:"En bodega (disponible)",      color:"#3d7fc4",checks:["llego_chile","retirado_bodega"]},
                         {estado:"completada", icon:"✓",label:"Completada",                    color:"#0d9870",checks:["en_venta","vendido_50","vendido_100"]},
