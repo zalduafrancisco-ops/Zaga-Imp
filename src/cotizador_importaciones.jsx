@@ -7400,7 +7400,16 @@ Número de seguimiento: ${c.nro}`;
           const calcMes=(lista)=>{
             const n=lista.length, pct=n>=6?0.25:0.20;
             const base=lista.reduce((s,c)=>s+(c.calc?.ganImp||0),0);
-            return {n,pct,base,com:base*pct,emp:base*(1-pct)};
+            // Desglose por modalidad (pct global del mes se aplica a las dos)
+            const aereoLista=lista.filter(c=>c.transporte==="aereo");
+            const marLista=lista.filter(c=>c.transporte!=="aereo");
+            const baseAer=aereoLista.reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+            const baseMar=marLista.reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+            return {
+              n,pct,base,com:base*pct,emp:base*(1-pct),
+              aereo:{lista:aereoLista,n:aereoLista.length,base:baseAer,com:baseAer*pct},
+              maritimo:{lista:marLista,n:marLista.length,base:baseMar,com:baseMar*pct},
+            };
           };
 
           // Mes en curso: cotizaciones con 1er pago en mes actual
@@ -7480,6 +7489,21 @@ Número de seguimiento: ${c.nro}`;
                       <span style={{fontSize:22,fontWeight:800,color:"#a85590"}}>{fmt(mesActualCalc.com)}</span>
                     </div>
                   </div>
+                  {/* Desglose por modalidad */}
+                  {(mesActualCalc.maritimo.n+mesActualCalc.aereo.n)>0&&(
+                    <div style={{marginTop:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                      {[
+                        ["🚢 Marítimo","#2a8aaa",mesActualCalc.maritimo],
+                        ["✈️ Aéreo","#c47830",mesActualCalc.aereo],
+                      ].map(([lbl,col,sub])=>(
+                        <div key={lbl} style={{background:sub.n>0?col+"08":"#f1f5f9",border:`1px solid ${sub.n>0?col+"33":"#e2e8f0"}`,borderRadius:7,padding:"6px 9px"}}>
+                          <div style={{fontSize:10,fontWeight:700,color:sub.n>0?col:"#94a3b8",marginBottom:2}}>{lbl} · {sub.n}</div>
+                          <div style={{fontSize:10,color:"#64748b"}}>Base <b style={{color:"#0f172a"}}>{fmt(sub.base)}</b></div>
+                          <div style={{fontSize:10,color:"#64748b"}}>Com. <b style={{color:"#a85590"}}>{fmt(sub.com)}</b></div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {/* barra progreso hacia 6 cierres */}
                   <div style={{marginTop:14}}>
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#64748b",marginBottom:4}}>
@@ -7533,12 +7557,12 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{fontSize:12,fontWeight:700,color:"#a85590",marginBottom:16,textTransform:"uppercase",letterSpacing:1}}>📈 Historial de comisiones por mes</div>
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
                     {[...meses].reverse().map(m=>{
-                      const {n,pct,base,com,emp}=calcMes(porMes[m]);
+                      const {n,pct,base,com,emp,aereo,maritimo}=calcMes(porMes[m]);
                       const esPendiente=m===mesAnt&&hoy.getDate()<=5;
                       return(
                         <div key={m} style={{background:esPendiente?"#08121e":"#f8fafc",borderRadius:10,padding:"12px 16px",border:`1px solid ${esPendiente?"#c0392b33":"#1a2d45"}`}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-                            <div style={{display:"flex",alignItems:"center",gap:10}}>
+                            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                               <span style={{fontWeight:700,fontSize:13,textTransform:"capitalize",color:esPendiente?"#c0392b":"#0f172a"}}>{monthLabel(m)}</span>
                               <span style={{background:n>=6?"#c9a05522":"#a8559022",color:n>=6?"#c9a055":"#a85590",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:`1px solid ${n>=6?"#c9a05544":"#a8559044"}`}}>{n} {n>=6?"cierres · 25% 🏆":"cierres · 20%"}</span>
                               {esPendiente&&<span style={{background:"#c0392b18",color:"#c0392b",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:"1px solid #ef444433"}}>⚠ Pago pendiente</span>}
@@ -7554,14 +7578,39 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                             </div>
                           </div>
-                          {/* Mini detalle */}
-                          <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
-                            {porMes[m].map(c=>(
-                              <div key={c.id} style={{background:"#f1f5f9",borderRadius:6,padding:"3px 10px",fontSize:10,color:"#777"}}>
-                                {c.nro} · {c.cliente} · <span style={{color:"#a85590",fontWeight:600}}>{fmt((c.calc?.ganImp||0)*pct)}</span>
+
+                          {/* Desglose por modalidad */}
+                          <div style={{marginTop:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}} className="luisa-grid">
+                            {[
+                              ["🚢 Marítimo","#2a8aaa",maritimo],
+                              ["✈️ Aéreo","#c47830",aereo],
+                            ].map(([lbl,col,sub])=>(
+                              <div key={lbl} style={{background:sub.n>0?col+"08":"#f1f5f9",border:`1px solid ${sub.n>0?col+"33":"#e2e8f0"}`,borderRadius:8,padding:"8px 10px"}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                                  <span style={{fontSize:11,fontWeight:700,color:sub.n>0?col:"#94a3b8"}}>{lbl}</span>
+                                  <span style={{fontSize:10,color:"#64748b"}}>{sub.n} cierres</span>
+                                </div>
+                                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#64748b"}}>
+                                  <span>Base: <b style={{color:"#0f172a"}}>{fmt(sub.base)}</b></span>
+                                  <span>Comisión: <b style={{color:"#a85590"}}>{fmt(sub.com)}</b></span>
+                                </div>
                               </div>
                             ))}
                           </div>
+
+                          {/* Mini detalle agrupado por modalidad */}
+                          {[["🚢 Marítimas",maritimo,"#2a8aaa"],["✈️ Aéreas",aereo,"#c47830"]].map(([titulo,sub,col])=>sub.n>0&&(
+                            <div key={titulo} style={{marginTop:8}}>
+                              <div style={{fontSize:9,color:col,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{titulo}</div>
+                              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                                {sub.lista.map(c=>(
+                                  <div key={c.id} style={{background:"#f1f5f9",borderRadius:6,padding:"3px 10px",fontSize:10,color:"#777"}}>
+                                    {c.nro} · {c.cliente} · <span style={{color:"#a85590",fontWeight:600}}>{fmt((c.calc?.ganImp||0)*pct)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       );
                     })}
