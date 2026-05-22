@@ -5400,65 +5400,10 @@ Número de seguimiento: ${c.nro}`;
                       {/* Bloque consolidado expandible */}
                       {expanded&&(
                         <div className="op-cons-block" style={{marginTop:14,padding:14,background:"#fafafa",borderRadius:9,border:"1px solid #e2e8f0"}}>
-                          <div style={{fontSize:11,color:"#c9a055",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>💎 Comparativa standalone vs consolidado</div>
                           {consolidados.length===0?(
                             <div style={{fontSize:12,color:"#94a3b8",fontStyle:"italic"}}>No hay cotizaciones activas en esta operación (todas están rechazadas/anuladas/no procesadas).</div>
                           ):(
                             <>
-                              <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-                                <table className="op-cons-table" style={{width:"100%",fontSize:12,borderCollapse:"collapse",minWidth:520}}>
-                                  <thead>
-                                    <tr style={{background:"#f1f5f9",color:"#64748b"}}>
-                                      <th style={{padding:"6px 8px",textAlign:"left",fontWeight:700}}>Cotización</th>
-                                      <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700}}>Standalone</th>
-                                      <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700}}>Consolidado</th>
-                                      <th style={{padding:"6px 8px",textAlign:"right",fontWeight:700,color:"#1aa358"}}>Ahorro</th>
-                                      <th style={{padding:"6px 8px",textAlign:"center",fontWeight:700,fontSize:10}}>→ Cliente</th>
-                                      <th style={{padding:"6px 8px",textAlign:"center",fontWeight:700,fontSize:10}}>→ ZAGA</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {consolidados.map(({cot,calc})=>{
-                                      const diffCIva = calc.standalone.totClIva - calc.consolidado.totClIva;
-                                      return (
-                                      <tr key={cot.id} style={{borderTop:"1px solid #e2e8f0"}}>
-                                        <td style={{padding:"7px 8px"}}>
-                                          <div style={{fontSize:11,fontWeight:700,color:"#0f172a"}}>{cot.nro} · {cot.producto}</div>
-                                          <div style={{fontSize:10,color:"#64748b"}}>👤 {cot.cliente||"—"} · modo {calc.ahorro.modoUsado}{calc.consolidado.esPrecioAcordado?" · 🎯 acordado":""}</div>
-                                        </td>
-                                        <td style={{padding:"7px 8px",textAlign:"right"}}>{fmt(calc.standalone.totClIva)}</td>
-                                        <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#0f172a"}}>{fmt(calc.consolidado.totClIva)}</td>
-                                        <td style={{padding:"7px 8px",textAlign:"right",color: diffCIva >= 0 ? "#1aa358" : "#c0392b",fontWeight:700}}>{diffCIva >= 0 ? "-" : "+"}{fmt(Math.abs(diffCIva))}</td>
-                                        <td style={{padding:"7px 8px",textAlign:"right",color:"#16a34a"}}>{fmt(calc.ahorro.cliente)}</td>
-                                        <td style={{padding:"7px 8px",textAlign:"right",color:"#c9a055"}}>{fmt(calc.ahorro.zaga)}</td>
-                                      </tr>
-                                      );
-                                    })}
-                                    {(()=>{
-                                      const totalStandalone = consolidados.reduce((s,x)=>s+(x.calc.standalone.totClIva||0), 0);
-                                      const totalConsolidado = consolidados.reduce((s,x)=>s+(x.calc.consolidado.totClIva||0), 0);
-                                      const totalCliente = consolidados.reduce((s,x)=>s+x.calc.ahorro.cliente, 0);
-                                      const totalZaga = consolidados.reduce((s,x)=>s+x.calc.ahorro.zaga, 0);
-                                      return (
-                                        <tr style={{borderTop:"2px solid #c9a055",background:"#fef9c3"}}>
-                                          <td style={{padding:"8px",fontSize:11,fontWeight:800,color:"#854d0e"}}>TOTAL OPERACIÓN</td>
-                                          <td style={{padding:"8px",textAlign:"right",fontSize:13,fontWeight:800,color:"#854d0e"}}>{fmt(totalStandalone)}</td>
-                                          <td style={{padding:"8px",textAlign:"right",fontSize:13,fontWeight:800,color:"#0f172a"}}>{fmt(totalConsolidado)}</td>
-                                          <td style={{padding:"8px",textAlign:"right",fontWeight:800,color: ahorroTotalOp>=0 ? "#1aa358" : "#c0392b",fontSize:13}}>
-                                            {ahorroTotalOp>=0 ? "-" : "+"}{fmt(Math.abs(ahorroTotalOp))}
-                                          </td>
-                                          <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#16a34a"}}>{fmt(totalCliente)}</td>
-                                          <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#c9a055"}}>{fmt(totalZaga)}</td>
-                                        </tr>
-                                      );
-                                    })()}
-                                  </tbody>
-                                </table>
-                              </div>
-                              <div className="op-cons-footer" style={{fontSize:10,color:"#64748b",marginTop:8,fontStyle:"italic",lineHeight:1.5}}>
-                                Distribución de ahorro: <b>{(()=>{ const m=op.distribucion_ahorro||"auto"; if(m==="cliente_100") return "100% al cliente (manual override)"; if(m==="split_50_50") return "50% cliente / 50% ZAGA (manual)"; return clienteUnico?"100% al cliente (auto: cliente único)":"50% cliente / 50% ZAGA (auto: multi-cliente)"; })()}</b> · Reparto de costos compartidos por <b>modo Sunny auto</b> (mayor entre peso o volumen) · Aduana fija prorrateada + flete usando tarifa consolidada Sunny ({op.flete_rmb_kg_consolidado?`RMB/kg ${op.flete_rmb_kg_consolidado}`:(op.flete_usd_kg_consolidado?`USD/kg ${op.flete_usd_kg_consolidado}`:"aún no actualizada")})
-                              </div>
-
                               {/* ── PANEL COMPARATIVO RMB CON SUNNY (réplica Excel Sunny) ── */}
                               {(() => {
                                 const cotsActivas = cots.filter(c => !["no_prospero"].includes(c.estado));
