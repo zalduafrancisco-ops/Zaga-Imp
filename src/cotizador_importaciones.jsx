@@ -1492,6 +1492,40 @@ export default function App({ supabase, usuario, onLogout }){
     setEditId(null); setForm(defaultForm); setTab("tracker");
   };
 
+  // Marca cot como "no prosperó" + la saca de la OP si pertenecía a una.
+  const handleMarcarNoProspero = async (id) => {
+    const cot = cotizaciones.find(c => c.id === id);
+    if (!cot) return;
+    const opVinc = cot.operacion_id ? operaciones.find(o => o.id === cot.operacion_id) : null;
+    const enOpMsg = opVinc ? `\n\nTambién se quitará automáticamente de ${opVinc.nro} (consolidado).` : "";
+    if (!confirm(`¿Marcar ${cot.nro || "esta cot"} como NO PROSPERÓ?\n\nQuedará cerrada en "❌ No procesadas". El cliente verá el estado actualizado.${enOpMsg}\n\nEsta acción no afecta los precios ni cálculos de las otras cots del consolidado (sus precios quedan intactos).`)) return;
+    try {
+      // 1. Actualizar cot: estado no_prospero + limpiar operacion_id
+      const { operacion_id, ...rest } = cot;
+      const newCotDatos = { ...rest, estado: "no_prospero" };
+      delete newCotDatos.id;
+      await supabase.from("cotizaciones")
+        .update({ datos: newCotDatos, estado: "no_prospero", updated_at: new Date().toISOString() })
+        .eq("id", id);
+      // 2. Si pertenecía a una OP: sacarla del array op.cotizaciones
+      if (opVinc) {
+        const newCotsArr = (opVinc.cotizaciones || []).filter(cId => cId !== id);
+        const newOpDatos = { ...opVinc, cotizaciones: newCotsArr };
+        delete newOpDatos.id;
+        await supabase.from("operaciones")
+          .update({ datos: newOpDatos, updated_at: new Date().toISOString() })
+          .eq("id", opVinc.id);
+        setOperaciones(prev => prev.map(o => o.id === opVinc.id ? { ...newOpDatos, id: opVinc.id } : o));
+      }
+      // 3. Actualizar state local
+      setCotizaciones(prev => prev.map(c => c.id === id ? { ...newCotDatos, id } : c));
+      showToast(`✓ ${cot.nro || "Cotización"} marcada como No prosperó${opVinc ? " y removida de " + opVinc.nro : ""}`);
+    } catch (e) {
+      console.error(e);
+      showToast("Error: " + (e.message || "no se pudo actualizar"), "err");
+    }
+  };
+
   const handleEstado=async(id,estado)=>{
     const cot = cotizaciones.find(c => c.id === id);
     const estadoAnterior = cot?.estado;
@@ -4690,10 +4724,17 @@ Número de seguimiento: ${c.nro}`;
                         <div style={{borderTop:"1px solid #e2e8f0",padding:"20px 24px"}}>
                           {/* Botón guardar y sincronizar — fuerza upsert + recarga para todos los portales */}
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:14,padding:"10px 12px",background:"#040c1808",border:"1px solid #c9a05533",borderRadius:8,flexWrap:"wrap"}}>
-                            <div style={{fontSize:11,color:"#475569",lineHeight:1.4}}>
+                            <div style={{fontSize:11,color:"#475569",lineHeight:1.4,flex:1,minWidth:200}}>
                               <b style={{color:"#0f172a"}}>💡 Tip:</b> los cambios se guardan automáticos, pero si quieres forzar sync en todos los portales (Sunny + cliente), usa este botón.
                             </div>
-                            <button onClick={()=>handleGuardarSincronizar(c.id)} style={{background:"#1aa358",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",boxShadow:"0 1px 4px rgba(26,163,88,0.3)"}}>💾 Guardar y sincronizar</button>
+                            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                              {c.estado !== "no_prospero" && (
+                                <button onClick={()=>handleMarcarNoProspero(c.id)} style={{background:"#fff1f2",color:"#c0392b",border:"1px solid #fecaca",borderRadius:8,padding:"9px 16px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}}>
+                                  ❌ Marcar no prosperó
+                                </button>
+                              )}
+                              <button onClick={()=>handleGuardarSincronizar(c.id)} style={{background:"#1aa358",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",boxShadow:"0 1px 4px rgba(26,163,88,0.3)"}}>💾 Guardar y sincronizar</button>
+                            </div>
                           </div>
 
                           {/* Aviso ajuste cantidad por empaque (solo si hay diferencia con und_caja) */}
