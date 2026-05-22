@@ -5673,10 +5673,14 @@ Número de seguimiento: ${c.nro}`;
                                 const totUnd        = detalles.reduce((s,d)=>s+d.und,0);
                                 return (
                                   <>
+                                  {(() => {
+                                    const opCerrada = ["pagada","en_camino","en_bodega","completada"].includes(op.estado);
+                                    return null;
+                                  })()}
                                   {/* TABLA 1: SIN IVA — costos, propuesta cliente, ganancia */}
                                   <div style={{marginTop:14,padding:14,background:"linear-gradient(135deg,#0f1e30 0%,#040c18 100%)",borderRadius:10,color:"#fff",border:"1px solid #c9a05544"}}>
                                     <div style={{fontSize:11,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-                                      <span>💼 Costo y propuesta cliente — OP {op.nro} (sin IVA)</span>
+                                      <span>💼 Costo y propuesta cliente — OP {op.nro} (sin IVA){["pagada","en_camino","en_bodega","completada"].includes(op.estado) && <span style={{marginLeft:8,fontSize:10,background:"#1aa35833",color:"#bbf7d0",padding:"2px 8px",borderRadius:10}}>🔒 OP cerrada · precios congelados</span>}</span>
                                       <span style={{fontSize:10,background:"#facc1522",color:"#facc15",padding:"2px 8px",borderRadius:10,fontWeight:600}}>💱 RMB {TC_RMB_USD} · USD {tc}</span>
                                     </div>
                                     <div style={{fontSize:10,color:"#94a3b8",marginBottom:10,fontStyle:"italic"}}>
@@ -5707,8 +5711,9 @@ Número de seguimiento: ${c.nro}`;
                                               <td style={{padding:"5px 6px",textAlign:"right",color:"#c9a055",fontWeight:700}}>{fmt(d.costoUnd)}</td>
                                               <td style={{padding:"5px 4px",textAlign:"center"}}>
                                                 <input type="number" step="1" min="0" max="100" value={d.margenPct}
+                                                  disabled={["pagada","en_camino","en_bodega","completada"].includes(op.estado)}
                                                   onChange={e=>setMargenesPorCot(prev=>({...prev,[d.cot.id]:Number(e.target.value)||0}))}
-                                                  style={{width:46,padding:"3px 5px",border:"1px solid #06b6d4",borderRadius:5,fontSize:11,textAlign:"right",background:"#06b6d422",color:"#fff",fontFamily:"inherit"}}/>
+                                                  style={{width:46,padding:"3px 5px",border:"1px solid "+(["pagada","en_camino","en_bodega","completada"].includes(op.estado)?"#475569":"#06b6d4"),borderRadius:5,fontSize:11,textAlign:"right",background:"#06b6d422",color:"#fff",fontFamily:"inherit",cursor:["pagada","en_camino","en_bodega","completada"].includes(op.estado)?"not-allowed":"text",opacity:["pagada","en_camino","en_bodega","completada"].includes(op.estado)?0.6:1}}/>
                                               </td>
                                               <td style={{padding:"5px 6px",textAlign:"right",color:"#fff",fontWeight:700}}>{fmt(d.precioNetoUnd)}</td>
                                               <td style={{padding:"5px 6px",textAlign:"right",color:"#fff",fontWeight:800}}>{fmt(d.totalNetoCliente)}</td>
@@ -5729,17 +5734,19 @@ Número de seguimiento: ${c.nro}`;
                                         </tbody>
                                       </table>
                                     </div>
-                                    <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
-                                      {[10,15,20,25,28,30,35].map(p => (
-                                        <button key={p} onClick={()=>{
-                                          const next={};
-                                          detalles.forEach(d => { next[d.cot.id]=p; });
-                                          setMargenesPorCot(prev=>({...prev,...next}));
-                                        }} style={{background:"#06b6d422",color:"#06b6d4",border:"1px solid #06b6d455",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                                          Aplicar {p}% a todas
-                                        </button>
-                                      ))}
-                                    </div>
+                                    {!["pagada","en_camino","en_bodega","completada"].includes(op.estado) && (
+                                      <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
+                                        {[10,15,20,25,28,30,35].map(p => (
+                                          <button key={p} onClick={()=>{
+                                            const next={};
+                                            detalles.forEach(d => { next[d.cot.id]=p; });
+                                            setMargenesPorCot(prev=>({...prev,...next}));
+                                          }} style={{background:"#06b6d422",color:"#06b6d4",border:"1px solid #06b6d455",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                                            Aplicar {p}% a todas
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* TABLA 2: CON IVA — valores finales para factura/cobro */}
@@ -5891,8 +5898,8 @@ Número de seguimiento: ${c.nro}`;
                                     }));
                                     showToast("✅ Consolidado aplicado — precios guardados");
                                   }catch(e){showToast("Error: "+e.message,"err");}
-                                }} disabled={op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny} style={{background:(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#e2e8f0":(op.consolidado_aplicado_cliente?"#0d9870":"#1aa358"),color:(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#94a3b8":"#fff",border:`1px solid ${(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#cbd5e1":(op.consolidado_aplicado_cliente?"#0d9870":"#1aa358")}`,borderRadius:7,padding:"8px 14px",fontSize:12,cursor:(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"not-allowed":"pointer",fontWeight:700}}>
-                                  {(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"⏳ Esperando respuesta Sunny...":(op.consolidado_aplicado_cliente?"🔄 Re-aplicar consolidado al cliente":"✅ Aplicar consolidado al cliente")}
+                                }} disabled={(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny) || ["pagada","en_camino","en_bodega","completada"].includes(op.estado)} style={{background:["pagada","en_camino","en_bodega","completada"].includes(op.estado)?"#e2e8f0":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#e2e8f0":(op.consolidado_aplicado_cliente?"#0d9870":"#1aa358")),color:(["pagada","en_camino","en_bodega","completada"].includes(op.estado) || (op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny))?"#94a3b8":"#fff",border:`1px solid ${["pagada","en_camino","en_bodega","completada"].includes(op.estado)?"#cbd5e1":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#cbd5e1":(op.consolidado_aplicado_cliente?"#0d9870":"#1aa358"))}`,borderRadius:7,padding:"8px 14px",fontSize:12,cursor:((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny) || ["pagada","en_camino","en_bodega","completada"].includes(op.estado))?"not-allowed":"pointer",fontWeight:700}} title={["pagada","en_camino","en_bodega","completada"].includes(op.estado)?"OP cerrada (pagada/en camino/en bodega/completada) — los precios al cliente quedan congelados":""}>
+                                  {["pagada","en_camino","en_bodega","completada"].includes(op.estado)?"🔒 OP cerrada · precios congelados":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"⏳ Esperando respuesta Sunny...":(op.consolidado_aplicado_cliente?"🔄 Re-aplicar consolidado al cliente":"✅ Aplicar consolidado al cliente"))}
                                 </button>
                                 {/* Botón sincronizar estados */}
                                 {(()=>{
