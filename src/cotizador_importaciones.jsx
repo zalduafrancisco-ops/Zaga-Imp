@@ -806,6 +806,193 @@ const METRIC=({label,value,sub,color})=>(
     {sub&&<div style={{fontSize:10,color:"#444",marginTop:2}}>{sub}</div>}
   </div>
 );
+// ─── Bloque "Pagos reales de la OP" — admin lleva ingresos por cliente + egresos a Sunny/Chile ───
+function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCostoNeto, fmt }){
+  const [pagos, setPagos] = useState(op.pagos_reales || {});
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const cotsActivas = cots.filter(c => !["no_prospero"].includes(c.estado));
+  const clientes = [...new Set(cotsActivas.map(c => (c.cliente||"").trim()).filter(Boolean))];
+
+  // Helpers ingresos por cliente
+  const cobradoTeoricoCliente = (cl) => cotsActivas
+    .filter(c => (c.cliente||"").trim() === cl)
+    .reduce((s, c) => s + ((Number(c.precio_final_acordado_und)||0) * (Number(c.unidades)||0)), 0);
+  const getIngreso = (cl) => Number(pagos.ingresos_por_cliente?.[cl]?.recibido) || 0;
+  const setIngreso = (cl, val) => setPagos(p => ({
+    ...p,
+    ingresos_por_cliente: { ...(p.ingresos_por_cliente||{}), [cl]: { ...(p.ingresos_por_cliente?.[cl]||{}), recibido: Number(val)||0 } }
+  }));
+  const setIngresoFecha = (cl, val) => setPagos(p => ({
+    ...p,
+    ingresos_por_cliente: { ...(p.ingresos_por_cliente||{}), [cl]: { ...(p.ingresos_por_cliente?.[cl]||{}), fecha: val } }
+  }));
+
+  // Helpers egresos
+  const egresosDefs = [
+    { key:"pago1_sunny", lbl:"1er pago Sunny", emoji:"🇨🇳" },
+    { key:"pago2_sunny", lbl:"2do pago Sunny", emoji:"🇨🇳" },
+    { key:"pago3_sunny", lbl:"3er pago Sunny", emoji:"🇨🇳" },
+    { key:"pago_final_chile", lbl:"Pago final Chile (Leslie / aduana)", emoji:"🇨🇱" },
+    { key:"pagos_extras", lbl:"Pagos extras / diferencias", emoji:"⚙️" },
+  ];
+  const getEgreso = (k) => Number(pagos.egresos?.[k]?.monto) || 0;
+  const setEgreso = (k, field, val) => setPagos(p => ({
+    ...p,
+    egresos: { ...(p.egresos||{}), [k]: { ...(p.egresos?.[k]||{}), [field]: field==="monto" ? (Number(val)||0) : val } }
+  }));
+
+  // Totales
+  const totIngresoTeorico = cotsActivas.reduce((s, c) => s + ((Number(c.precio_final_acordado_und)||0) * (Number(c.unidades)||0)), 0);
+  const totIngresoReal = clientes.reduce((s, cl) => s + getIngreso(cl), 0);
+  const porCobrar = totIngresoTeorico - totIngresoReal;
+  const totEgresoReal = egresosDefs.reduce((s, e) => s + getEgreso(e.key), 0);
+  const gananciaTeorica = (totIngresoTeorico/1.19) - totCostoNeto;
+  const gananciaReal = (totIngresoReal/1.19) - totEgresoReal;
+  const diffGanancia = gananciaReal - gananciaTeorica;
+
+  async function guardar(){
+    setSaving(true);
+    setMsg(null);
+    try {
+      const { data: fresca } = await supabase.from("operaciones").select("datos").eq("id", op.id).single();
+      const datosMerged = { ...(fresca?.datos||op), pagos_reales: pagos };
+      const { error } = await supabase.from("operaciones").update({ datos: datosMerged, updated_at: new Date().toISOString() }).eq("id", op.id);
+      if (error) throw error;
+      setOperaciones(prev => prev.map(o => o.id===op.id ? { ...o, pagos_reales: pagos } : o));
+      setMsg({ tipo:"ok", txt:"✅ Pagos guardados" });
+      setTimeout(()=>setMsg(null), 2000);
+    } catch(e){
+      setMsg({ tipo:"err", txt:"⚠️ " + (e.message||"Error al guardar") });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const numInput = (val, onChange, w=110, ph="0") => (
+    <input type="number" step="1" min="0" value={val||""} placeholder={ph}
+      onChange={e=>onChange(e.target.value)}
+      style={{width:w,padding:"5px 7px",border:"1px solid #cbd5e1",borderRadius:6,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fff"}}/>
+  );
+  const dateInput = (val, onChange) => (
+    <input type="date" value={val||""} onChange={e=>onChange(e.target.value)}
+      style={{padding:"5px 7px",border:"1px solid #cbd5e1",borderRadius:6,fontSize:11,fontFamily:"inherit",background:"#fff",color:"#475569"}}/>
+  );
+
+  return (
+    <div style={{marginTop:14,padding:14,background:"#f8fafc",border:"1px solid #cbd5e1",borderRadius:10}}>
+      <div style={{fontSize:11,color:"#0f172a",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+        <span>💰 Pagos reales OP {op.nro} — seguimiento ingresos / egresos</span>
+        {msg && <span style={{fontSize:11,fontWeight:600,color:msg.tipo==="ok"?"#16a34a":"#c0392b"}}>{msg.txt}</span>}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+        {/* INGRESOS POR CLIENTE */}
+        <div style={{background:"#fff",borderRadius:8,border:"1px solid #bbf7d0",padding:12}}>
+          <div style={{fontSize:11,color:"#15803d",fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>📥 Ingresos por cliente</div>
+          {clientes.length===0 && <div style={{fontSize:11,color:"#94a3b8",fontStyle:"italic"}}>Sin clientes activos en esta OP</div>}
+          {clientes.map(cl => {
+            const teor = cobradoTeoricoCliente(cl);
+            const real = getIngreso(cl);
+            const dif = teor - real;
+            return (
+              <div key={cl} style={{padding:"8px 10px",background:"#f0fdf4",border:"1px solid #dcfce7",borderRadius:7,marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#0f172a"}}>👤 {cl}</div>
+                  <div style={{fontSize:11,color:"#64748b"}}>Cobrar c/IVA: <b style={{color:"#15803d"}}>{fmt(teor)}</b></div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"auto 1fr auto",gap:8,alignItems:"center",fontSize:11}}>
+                  <span style={{color:"#475569"}}>Recibido:</span>
+                  {numInput(real, v=>setIngreso(cl, v))}
+                  {dateInput(pagos.ingresos_por_cliente?.[cl]?.fecha, v=>setIngresoFecha(cl, v))}
+                </div>
+                <div style={{marginTop:6,fontSize:11,fontWeight:700,color:dif>0?"#c0392b":(dif<0?"#1aa358":"#64748b")}}>
+                  {dif>0 ? `⏳ Por cobrar: ${fmt(dif)}` : (dif<0 ? `⚠️ Cobró ${fmt(-dif)} de más` : "✓ Cobrado al día")}
+                </div>
+              </div>
+            );
+          })}
+          <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid #dcfce7",display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:800}}>
+            <span style={{color:"#0f172a"}}>TOTAL recibido</span>
+            <span style={{color:"#15803d"}}>{fmt(totIngresoReal)}</span>
+          </div>
+          {porCobrar>0 && (
+            <div style={{marginTop:4,padding:"6px 10px",background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:6,fontSize:11,color:"#92400e",fontWeight:600}}>
+              ⏳ Por cobrar a clientes: {fmt(porCobrar)}
+            </div>
+          )}
+        </div>
+
+        {/* EGRESOS */}
+        <div style={{background:"#fff",borderRadius:8,border:"1px solid #fed7aa",padding:12}}>
+          <div style={{fontSize:11,color:"#c47830",fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>📤 Egresos / Pagos hechos por ZAGA</div>
+          {egresosDefs.map(e => (
+            <div key={e.key} style={{padding:"8px 10px",background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:7,marginBottom:8}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#0f172a",marginBottom:6}}>{e.emoji} {e.lbl}</div>
+              <div style={{display:"grid",gridTemplateColumns:"auto 1fr auto",gap:8,alignItems:"center",fontSize:11,marginBottom:5}}>
+                <span style={{color:"#475569"}}>Monto:</span>
+                {numInput(getEgreso(e.key), v=>setEgreso(e.key,"monto",v))}
+                {dateInput(pagos.egresos?.[e.key]?.fecha, v=>setEgreso(e.key,"fecha",v))}
+              </div>
+              <input type="text" placeholder="Nota (opcional)" value={pagos.egresos?.[e.key]?.nota||""}
+                onChange={ev=>setEgreso(e.key,"nota",ev.target.value)}
+                style={{width:"100%",padding:"5px 7px",border:"1px solid #fed7aa",borderRadius:6,fontSize:11,fontFamily:"inherit",background:"#fff",color:"#475569"}}/>
+            </div>
+          ))}
+          <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid #fed7aa",display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:800}}>
+            <span style={{color:"#0f172a"}}>TOTAL pagado real</span>
+            <span style={{color:"#c47830"}}>{fmt(totEgresoReal)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* COMPARATIVO TEÓRICO vs REAL */}
+      <div style={{marginTop:14,padding:14,background:"#0f1e30",borderRadius:8,color:"#fff"}}>
+        <div style={{fontSize:10,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10}}>📊 Comparativo teórico (cotizador) vs real (caja)</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,fontSize:12}}>
+          <div>
+            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Cobrado teórico</div>
+            <div style={{fontWeight:700}}>{fmt(totIngresoTeorico)}</div>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Cobrado real</div>
+            <div style={{fontWeight:700,color:"#22c55e"}}>{fmt(totIngresoReal)}</div>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Costo teórico ZAGA</div>
+            <div style={{fontWeight:700}}>{fmt(totCostoNeto)}</div>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Pagado real ZAGA</div>
+            <div style={{fontWeight:700,color:"#c47830"}}>{fmt(totEgresoReal)}</div>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Ganancia teórica neta</div>
+            <div style={{fontWeight:700}}>{fmt(gananciaTeorica)}</div>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>Ganancia real neta</div>
+            <div style={{fontWeight:800,color: gananciaReal>=gananciaTeorica?"#22c55e":"#fbbf24",fontSize:14}}>{fmt(gananciaReal)}</div>
+            {Math.abs(diffGanancia)>1000 && (
+              <div style={{fontSize:10,color:diffGanancia>=0?"#22c55e":"#fca5a5",marginTop:2}}>
+                {diffGanancia>=0?"+":""}{fmt(diffGanancia)} vs teórico
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{marginTop:12,display:"flex",gap:10,alignItems:"center",justifyContent:"flex-end"}}>
+        <button onClick={guardar} disabled={saving}
+          style={{background:saving?"#cbd5e1":"#1aa358",color:"#fff",border:"none",borderRadius:7,padding:"8px 18px",fontSize:12,fontWeight:700,cursor:saving?"not-allowed":"pointer",fontFamily:"inherit"}}>
+          {saving?"Guardando...":"💾 Guardar pagos"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function NInput({label,field,form,setForm,color,placeholder,note}){
   return(
     <div>
@@ -5847,6 +6034,9 @@ Número de seguimiento: ${c.nro}`;
                                       <br/><b>Costo NETO real ZAGA:</b> {fmt(totCostoNeto)} CLP (sin IVAs, ambos recuperables F29 — se compensan con el IVA débito al cliente).
                                     </div>
                                   </div>
+
+                                  {/* BLOQUE PAGOS REALES — admin lleva ingresos por cliente + egresos */}
+                                  <PagosRealesOp op={op} cots={cots} supabase={supabase} setOperaciones={setOperaciones} totVentaIva={totVentaIva} totCostoNeto={totCostoNeto} fmt={fmt} />
                                   </>
                                 );
                               })()}
