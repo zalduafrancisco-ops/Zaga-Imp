@@ -4701,7 +4701,7 @@ Número de seguimiento: ${c.nro}`;
                     {isOpen&&<CardErrorBoundary>{(()=>{
                       const CHKL_LABELS={enviado_china:"Enviado a China para cotizar",china_cotizo:"China respondió cotización",cot_enviada:"Cotización enviada al cliente",cliente_acepto:"Cliente aceptó",pago1_cliente:"1er pago recibido del cliente",factura1:"Factura 1er pago emitida",pago_china:"Pago a China realizado",en_produccion:"En proceso de producción",almacen_china:"Ingreso en almacén de China",ctrl_calidad:"Control de calidad en China OK",despachado:"Despachado desde China",llego_chile:"Llegó a Chile",retirado_bodega:"Retirado a mi bodega",pago2_cliente:"2do pago recibido del cliente",factura2:"Factura 2do pago emitida",en_venta:"Producto en venta / publicado",vendido_50:"50% vendido",vendido_100:"100% vendido"};
                       const CLIENTE_STEPS=[
-                        {estado:"solicitud",  icon:"📝",label:"Solicitud / esperando China",  color:"#6a9fd4",checks:["enviado_china","china_cotizo"]},
+                        {estado:"solicitud",  icon:"📝",label:"Solicitud / esperando China",  color:"#6a9fd4",checks:[]},
                         {estado:"cotizada",   icon:"💬",label:"Cotizada al cliente",          color:"#2d78c8",checks:[],special:"decision"},
                         {estado:"pagada",     icon:"💰",label:"Pagada / Importando",          color:"#c47830",checks:["pago1_cliente","factura1","pago_china","en_produccion","almacen_china","ctrl_calidad"]},
                         {estado:"en_camino",  icon:"✈️",label:"En camino",                    color:"#a85590",checks:[]},
@@ -4709,7 +4709,7 @@ Número de seguimiento: ${c.nro}`;
                         {estado:"completada", icon:"✓",label:"Completada",                    color:"#0d9870",checks:["retirado_bodega"]},
                       ];
                       const PROPIA_STEPS=[
-                        {estado:"solicitud",  icon:"📝",label:"Solicitud / esperando China",  color:"#6a9fd4",checks:["enviado_china","china_cotizo"]},
+                        {estado:"solicitud",  icon:"📝",label:"Solicitud / esperando China",  color:"#6a9fd4",checks:[]},
                         {estado:"cotizada",   icon:"💬",label:"Cotización revisada",          color:"#2d78c8",checks:[]},
                         {estado:"pagada",     icon:"💰",label:"Pagada / Importando",          color:"#c47830",checks:["pago_china","en_produccion","almacen_china","ctrl_calidad"]},
                         {estado:"en_camino",  icon:"✈️",label:"En camino",                    color:"#a85590",checks:["despachado"]},
