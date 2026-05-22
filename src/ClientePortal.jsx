@@ -687,10 +687,23 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
           .stats-row{grid-template-columns:1fr 1fr !important}
           .check-grid{grid-template-columns:1fr !important}
           .header-actions{gap:6px !important}
-          .cot-header{flex-direction:column !important;align-items:flex-start !important}
-          .cot-meta{flex-direction:row;justify-content:space-between;width:100%;margin-top:8px}
-          .arrival-card{flex-direction:column !important;gap:10px !important}
-          .arrival-days{text-align:left !important}
+
+          /* PROXIMA LLEGADA: mantener una sola linea compacta, solo numero grande */
+          .arrival-card{padding:10px 14px !important;gap:8px !important;flex-direction:row !important;flex-wrap:nowrap !important;align-items:center !important}
+          .arrival-icon{width:36px !important;height:36px !important;font-size:18px !important;border-radius:9px !important}
+          .arrival-info{gap:10px !important}
+          .arrival-tag{font-size:9px !important;margin-bottom:1px !important;letter-spacing:.5px !important}
+          .arrival-prod{font-size:12px !important}
+          .arrival-date{font-size:10px !important;margin-top:1px !important}
+          .arrival-days{text-align:right !important;flex-shrink:0 !important}
+          .arrival-days-num{font-size:28px !important;line-height:1 !important}
+          .arrival-days-lbl{font-size:9px !important}
+
+          /* COT CARD: mantener fila, imagen + texto + meta en linea */
+          .cot-header{flex-direction:row !important;align-items:center !important;padding:10px 12px !important;gap:10px !important}
+          .cot-thumb{width:54px !important;height:54px !important;border-radius:8px !important}
+          .cot-meta{flex-direction:column !important;align-items:flex-end !important;width:auto !important;margin-top:0 !important;gap:4px !important;flex-shrink:0 !important}
+
           .filtros-row{gap:5px !important}
         }
       `}</style>
@@ -857,17 +870,17 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
               var dias = getDias(proxLlegada.fecha_llegada_est)
               return (
                 <div className="arrival-card" style={{background:"#040c18",borderRadius:14,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:14}}>
-                    <div style={{width:44,height:44,background:"rgba(201,160,85,0.15)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{proxLlegada.transporte==="aereo"?"✈️":"🚢"}</div>
-                    <div>
-                      <div style={{fontSize:10,color:"#c9a055",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Proxima llegada estimada</div>
-                      <div style={{fontSize:14,fontWeight:700,color:"#f8fafc"}}>{proxLlegada.producto}</div>
-                      <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{fmtDate(proxLlegada.fecha_llegada_est)}</div>
+                  <div className="arrival-info" style={{display:"flex",alignItems:"center",gap:14,flex:1,minWidth:0}}>
+                    <div className="arrival-icon" style={{width:44,height:44,background:"rgba(201,160,85,0.15)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{proxLlegada.transporte==="aereo"?"✈️":"🚢"}</div>
+                    <div style={{minWidth:0,flex:1}}>
+                      <div className="arrival-tag" style={{fontSize:10,color:"#c9a055",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Proxima llegada estimada</div>
+                      <div className="arrival-prod" style={{fontSize:14,fontWeight:700,color:"#f8fafc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{proxLlegada.producto}</div>
+                      <div className="arrival-date" style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{fmtDate(proxLlegada.fecha_llegada_est)}</div>
                     </div>
                   </div>
                   <div className="arrival-days" style={{textAlign:"right",flexShrink:0}}>
-                    <div style={{fontSize:36,fontWeight:800,color:"#c9a055",lineHeight:1}}>{dias!=null?(dias>0?dias:"Hoy!"):"?"}</div>
-                    {dias>0&&<div style={{fontSize:11,color:"#64748b"}}>dias restantes</div>}
+                    <div className="arrival-days-num" style={{fontSize:36,fontWeight:800,color:"#c9a055",lineHeight:1}}>{dias!=null?(dias>0?dias:"Hoy!"):"?"}</div>
+                    {dias>0&&<div className="arrival-days-lbl" style={{fontSize:11,color:"#64748b"}}>dias restantes</div>}
                   </div>
                 </div>
               )
@@ -1152,7 +1165,7 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                           </div>
                         </div>
                         {/* Imagen — columna propia, centrada verticalmente */}
-                        {getImagenes(c.imagen_url)[0]&&<img src={proxyImg(getImagenes(c.imagen_url)[0])} alt={c.producto} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:76,height:76,objectFit:"cover",borderRadius:10,border:"1px solid #e2e8f0",flexShrink:0,alignSelf:"center"}}/>}
+                        {getImagenes(c.imagen_url)[0]&&<img className="cot-thumb" src={proxyImg(getImagenes(c.imagen_url)[0])} alt={c.producto} referrerPolicy="no-referrer" onError={e=>{e.target.style.display='none'}} style={{width:76,height:76,objectFit:"cover",borderRadius:10,border:"1px solid #e2e8f0",flexShrink:0,alignSelf:"center"}}/>}
 
                         <div className="cot-meta" style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
                           {!isRech&&(
