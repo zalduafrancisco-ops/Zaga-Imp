@@ -175,6 +175,42 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   var [mostrarFormNueva, setMostrarFormNueva] = useState(false)
   var [nuevaForm, setNuevaForm] = useState({ producto:"", url_referencia:"", unidades:"", transporte:"aereo", url_imagen:"", notas:"" })
   var [creandoCot, setCreandoCot] = useState(false)
+  var [buscandoImagen, setBuscandoImagen] = useState(false)
+
+  // Extrae la primera URL valida de un texto cualquiera (limpieza al pegar)
+  var extraerURL = function(texto){
+    if(!texto) return ""
+    var match = String(texto).match(/https?:\/\/[^\s"'<>)\]\}]+/i)
+    return match ? match[0] : texto.trim()
+  }
+
+  // Intenta obtener la imagen principal del producto usando Microlink (Open Graph)
+  var buscarImagenAutomatica = async function(){
+    var url = nuevaForm.url_referencia.trim()
+    if(!url){ showToast("Primero pega la URL del producto","err"); return }
+    if(!/^https?:\/\//i.test(url)){ showToast("La URL no es valida","err"); return }
+    setBuscandoImagen(true)
+    try{
+      var apiUrl = "https://api.microlink.io/?url=" + encodeURIComponent(url) + "&meta=true"
+      var res = await fetch(apiUrl)
+      var json = await res.json()
+      var imgUrl = json && json.data && json.data.image && json.data.image.url
+      if(!imgUrl && json && json.data && json.data.logo && json.data.logo.url){
+        imgUrl = json.data.logo.url
+      }
+      if(imgUrl){
+        setNuevaForm(function(p){ return Object.assign({},p,{ url_imagen: imgUrl }) })
+        showToast("✓ Imagen encontrada","ok")
+      } else {
+        showToast("No se pudo extraer imagen automaticamente — pegala manual","err")
+      }
+    }catch(e){
+      console.error(e)
+      showToast("Error al buscar imagen: "+(e.message||"red"),"err")
+    }finally{
+      setBuscandoImagen(false)
+    }
+  }
 
   var showToast = function(msg, type){
     setToast({ msg: msg, type: type||"ok" })
@@ -1498,8 +1534,20 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                 <label style={{display:"block",fontSize:11,fontWeight:700,color:"#475569",marginBottom:5}}>🔗 URL de referencia (Alibaba / AliExpress) *</label>
                 <input type="url" value={nuevaForm.url_referencia}
                   onChange={function(e){ var v=e.target.value; setNuevaForm(function(p){ return Object.assign({},p,{url_referencia:v}) }) }}
+                  onPaste={function(e){
+                    var raw = (e.clipboardData||window.clipboardData).getData("text")
+                    var clean = extraerURL(raw)
+                    if(clean !== raw){
+                      e.preventDefault()
+                      setNuevaForm(function(p){ return Object.assign({},p,{url_referencia: clean}) })
+                      showToast("✓ URL extraida del texto pegado","ok")
+                    }
+                  }}
                   placeholder="https://alibaba.com/product/..."
                   style={{width:"100%",padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:8,fontSize:13,fontFamily:"inherit",boxSizing:"border-box"}}/>
+                <div style={{fontSize:10,color:"#94a3b8",marginTop:4,fontStyle:"italic"}}>
+                  💡 Tip: si copias el texto completo desde Alibaba, se extrae solo la URL automáticamente.
+                </div>
               </div>
 
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
@@ -1523,10 +1571,33 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
 
               <div style={{marginBottom:14}}>
                 <label style={{display:"block",fontSize:11,fontWeight:700,color:"#475569",marginBottom:5}}>🖼️ URL imagen (opcional)</label>
-                <input type="url" value={nuevaForm.url_imagen}
-                  onChange={function(e){ var v=e.target.value; setNuevaForm(function(p){ return Object.assign({},p,{url_imagen:v}) }) }}
-                  placeholder="https://... (si quieres adjuntar imagen aparte)"
-                  style={{width:"100%",padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:8,fontSize:13,fontFamily:"inherit",boxSizing:"border-box"}}/>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <input type="url" value={nuevaForm.url_imagen}
+                    onChange={function(e){ var v=e.target.value; setNuevaForm(function(p){ return Object.assign({},p,{url_imagen:v}) }) }}
+                    onPaste={function(e){
+                      var raw = (e.clipboardData||window.clipboardData).getData("text")
+                      var clean = extraerURL(raw)
+                      if(clean !== raw){
+                        e.preventDefault()
+                        setNuevaForm(function(p){ return Object.assign({},p,{url_imagen: clean}) })
+                      }
+                    }}
+                    placeholder="https://... o usa el botón →"
+                    style={{flex:1,padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:8,fontSize:13,fontFamily:"inherit",boxSizing:"border-box"}}/>
+                  <button onClick={buscarImagenAutomatica} disabled={buscandoImagen||!nuevaForm.url_referencia}
+                    title="Buscar imagen automáticamente desde la URL del producto"
+                    style={{background:buscandoImagen||!nuevaForm.url_referencia?"#e2e8f0":"#0f172a",color:buscandoImagen||!nuevaForm.url_referencia?"#94a3b8":"#c9a055",border:"none",borderRadius:8,padding:"10px 14px",fontSize:12,fontWeight:700,cursor:buscandoImagen||!nuevaForm.url_referencia?"not-allowed":"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>
+                    {buscandoImagen?"⏳":"🔍 Buscar"}
+                  </button>
+                </div>
+                {nuevaForm.url_imagen && (
+                  <div style={{marginTop:8,display:"flex",alignItems:"center",gap:8}}>
+                    <img src={nuevaForm.url_imagen} alt="preview" referrerPolicy="no-referrer"
+                      onError={function(e){ e.target.style.display='none' }}
+                      style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0"}}/>
+                    <span style={{fontSize:10,color:"#64748b",fontStyle:"italic"}}>Vista previa</span>
+                  </div>
+                )}
               </div>
 
               <div style={{marginBottom:18}}>
