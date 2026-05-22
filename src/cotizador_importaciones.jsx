@@ -860,6 +860,12 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
     const ivaCom = Number(e.iva_comision) || (com * 0.19);
     return clp + com + ivaCom;
   };
+  // Pago Chile (Leslie + IVA aduana) — 2 componentes
+  const isPagoChile = (k) => k === "pago_final_chile";
+  const calcTotalChile = (k) => {
+    const e = pagos.egresos?.[k] || {};
+    return (Number(e.servicio_aduana) || 0) + (Number(e.iva_aduana) || 0);
+  };
   const setEgresoCampo = (k, field, val) => setPagos(p => ({
     ...p,
     egresos: { ...(p.egresos||{}), [k]: { ...(p.egresos?.[k]||{}), [field]: field==="fecha"||field==="nota" ? val : (Number(val)||0) } }
@@ -869,10 +875,14 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
   const totIngresoTeorico = cotsActivas.reduce((s, c) => s + ((Number(c.precio_final_acordado_und)||0) * (Number(c.unidades)||0)), 0);
   const totIngresoReal = clientes.reduce((s, cl) => s + getIngreso(cl), 0);
   const porCobrar = totIngresoTeorico - totIngresoReal;
-  // Total egreso: pagos Sunny usan calcTotalCLPPagoSunny (CLP + comisión + IVA), otros usan monto directo
+  // Total egreso: pagos Sunny y Chile usan sus formulas detalladas, otros usan monto directo
   const totEgresoReal = egresosDefs.reduce((s, e) => {
     if (isPagoSunny(e.key)) {
       const c = calcTotalCLPPagoSunny(e.key);
+      return s + (c > 0 ? c : getEgreso(e.key));
+    }
+    if (isPagoChile(e.key)) {
+      const c = calcTotalChile(e.key);
       return s + (c > 0 ? c : getEgreso(e.key));
     }
     return s + getEgreso(e.key);
@@ -1046,7 +1056,41 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
                 </div>
               );
             }
-            // Pagos no Sunny: monto simple
+            if (isPagoChile(e.key)) {
+              const serv = Number(eData.servicio_aduana) || 0;
+              const iva = Number(eData.iva_aduana) || 0;
+              const totalChile = serv + iva;
+              return (
+                <div key={e.key} style={{padding:"10px 12px",background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:7,marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#0f172a"}}>{e.emoji} {e.lbl}</div>
+                    {dateInput(eData.fecha, v=>setEgreso(e.key,"fecha",v))}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"160px 1fr",gap:6,alignItems:"center",fontSize:11,marginBottom:6}}>
+                    <span style={{color:"#475569"}}>🛃 Servicio aduana:</span>
+                    {numInput(serv, v=>setEgreso(e.key,"servicio_aduana",v))}
+                  </div>
+                  <div style={{fontSize:10,color:"#92400e",fontStyle:"italic",marginBottom:6,marginLeft:6}}>
+                    Honorarios + EDI + despacho + aeropuerto + aforo + IVA agente Leslie
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"160px 1fr",gap:6,alignItems:"center",fontSize:11,marginBottom:6}}>
+                    <span style={{color:"#475569"}}>🧾 IVA productos (aduana):</span>
+                    {numInput(iva, v=>setEgreso(e.key,"iva_aduana",v))}
+                  </div>
+                  <div style={{fontSize:10,color:"#92400e",fontStyle:"italic",marginBottom:6,marginLeft:6}}>
+                    IVA del CIF al fisco — recuperable F29
+                  </div>
+                  <div style={{padding:"7px 10px",background:"#fef3c7",border:"1px solid #fde68a",borderRadius:6,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,marginBottom:6}}>
+                    <span style={{fontWeight:600,color:"#78350f"}}>💵 Total pagado Chile:</span>
+                    <span style={{fontWeight:800,color:"#0f172a"}}>{fmt(totalChile)}</span>
+                  </div>
+                  <input type="text" placeholder="Nota (opcional)" value={eData.nota||""}
+                    onChange={ev=>setEgreso(e.key,"nota",ev.target.value)}
+                    style={{width:"100%",padding:"5px 7px",border:"1px solid #fed7aa",borderRadius:6,fontSize:11,fontFamily:"inherit",background:"#fff",color:"#475569"}}/>
+                </div>
+              );
+            }
+            // Pagos no Sunny ni Chile: monto simple (pagos extras)
             return (
               <div key={e.key} style={{padding:"8px 10px",background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:7,marginBottom:8}}>
                 <div style={{fontSize:12,fontWeight:700,color:"#0f172a",marginBottom:6}}>{e.emoji} {e.lbl}</div>
