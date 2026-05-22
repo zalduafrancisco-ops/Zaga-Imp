@@ -5727,7 +5727,7 @@ Número de seguimiento: ${c.nro}`;
                                       </table>
                                     </div>
                                     <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
-                                      {[25,28,30,32,35].map(p => (
+                                      {[10,15,20,25,28,30,35].map(p => (
                                         <button key={p} onClick={()=>{
                                           const next={};
                                           detalles.forEach(d => { next[d.cot.id]=p; });
