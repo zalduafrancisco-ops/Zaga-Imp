@@ -1229,10 +1229,10 @@ export default function App({ supabase, usuario, onLogout }){
   const [openId,setOpenId]               = useState(null);
   const [filterEstado,setFilterEstado]   = useState("todos");
   const [filterCliente,setFilterCliente] = useState("todos");
-  const [filtroClienteCalc,setFiltroClienteCalc] = useState("");
   const [filterGestor,setFilterGestor]   = useState("todos");
   const [filterTransporte,setFilterTransporte] = useState("todos");
   const [mostrarOtrosClientes,setMostrarOtrosClientes] = useState(false);
+  const [mostrarOtrosClientesCalc,setMostrarOtrosClientesCalc] = useState(false);
   const [searchQuery,setSearchQuery]     = useState("");
   const [toast,setToast]                 = useState(null);
   const [vistaId,setVistaId]             = useState(null);
@@ -3231,44 +3231,60 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{marginBottom:12}}>
                       <label style={{display:"block",fontSize:10,color:"#777",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Cliente</label>
                       {clientesUnicos.length>0&&(()=>{
-                        const filtroLow = filtroClienteCalc.trim().toLowerCase();
-                        const clientesFiltrados = filtroLow
-                          ? clientesUnicos.filter(cl => cl.toLowerCase().includes(filtroLow))
-                          : clientesUnicos;
+                        const clientesConCount = clientesUnicos.map(cl => ({
+                          key: cl,
+                          count: cotizaciones.filter(c=>c.cliente===cl).length,
+                        })).filter(c => c.count > 0).sort((a,b) => b.count - a.count);
+                        const TOP_N = 5;
+                        const topClientes = clientesConCount.slice(0, TOP_N);
+                        const otrosClientes = clientesConCount.slice(TOP_N);
+                        const otrosCotsTotal = otrosClientes.reduce((s,c)=>s+c.count, 0);
+                        const filtroEnOtros = otrosClientes.some(c => c.key === form.cliente);
+                        const chipStyle = (activo, esTop) => ({
+                          background: activo ? "#f0fdf4" : (esTop ? "#fef9c3" : "#f8fafc"),
+                          color: activo ? "#1aa358" : (esTop ? "#854d0e" : "#64748b"),
+                          border: `1px solid ${activo ? "#22c55e66" : (esTop ? "#fde68a" : "#e2e8f0")}`,
+                          borderRadius: 20, padding: "4px 12px", fontSize: 12, cursor: "pointer",
+                          fontWeight: activo ? 700 : (esTop ? 600 : 400),
+                        });
+                        const setCliente = (cl) => setForm(p=>({...p,cliente:cl,categoria_cliente:cotizaciones.filter(c=>c.cliente===cl).slice(-1)[0]?.categoria_cliente||p.categoria_cliente}));
                         return (
                         <div style={{marginBottom:8}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,gap:8,flexWrap:"wrap"}}>
-                            <div style={{fontSize:11,color:"#64748b"}}>Clientes anteriores ({clientesUnicos.length}):</div>
-                            {clientesUnicos.length>=5 && (
-                              <div style={{position:"relative",flex:"0 0 auto"}}>
-                                <input type="text" placeholder="🔍 Buscar cliente..." value={filtroClienteCalc}
-                                  onChange={e=>setFiltroClienteCalc(e.target.value)}
-                                  style={{padding:"4px 28px 4px 10px",border:"1px solid #e2e8f0",borderRadius:8,fontSize:11,outline:"none",width:170,fontFamily:"inherit"}}/>
-                                {filtroClienteCalc && (
-                                  <button onClick={()=>setFiltroClienteCalc("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"#f1f5f9",border:"none",color:"#64748b",borderRadius:4,padding:"1px 5px",fontSize:10,cursor:"pointer"}}>✕</button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                            {clientesFiltrados.map(cl=>(
-                              <button key={cl} onClick={()=>setForm(p=>({...p,cliente:cl,categoria_cliente:cotizaciones.filter(c=>c.cliente===cl).slice(-1)[0]?.categoria_cliente||p.categoria_cliente}))}
-                                style={{background:form.cliente===cl?"#f0fdf4":"#f8fafc",color:form.cliente===cl?"#1aa358":"#64748b",border:`1px solid ${form.cliente===cl?"#22c55e66":"#e2e8f0"}`,borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontWeight:form.cliente===cl?700:400}}>
-                                {cl}
+                          <div style={{fontSize:11,color:"#64748b",marginBottom:6}}>Clientes anteriores ({clientesUnicos.length}):</div>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                            {topClientes.map((c, idx) => (
+                              <button key={c.key} onClick={()=>setCliente(c.key)} style={chipStyle(form.cliente===c.key, idx<3)}>
+                                {idx<3 && "⭐ "}{c.key} <span style={{opacity:.6}}>({c.count})</span>
                               </button>
                             ))}
-                            {clientesFiltrados.length===0 && filtroLow && (
-                              <span style={{fontSize:11,color:"#94a3b8",fontStyle:"italic",padding:"4px 8px"}}>Sin resultados para "{filtroClienteCalc}"</span>
+                            {otrosClientes.length > 0 && (
+                              <button onClick={()=>setMostrarOtrosClientesCalc(!mostrarOtrosClientesCalc)} style={{
+                                background: filtroEnOtros ? "#f0fdf4" : (mostrarOtrosClientesCalc ? "#eef6ff" : "#f8fafc"),
+                                color: filtroEnOtros ? "#1aa358" : (mostrarOtrosClientesCalc ? "#2d78c8" : "#64748b"),
+                                border: `1px solid ${filtroEnOtros ? "#22c55e66" : (mostrarOtrosClientesCalc ? "#bfdbfe" : "#e2e8f0")}`,
+                                borderRadius: 20, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600,
+                              }}>
+                                {mostrarOtrosClientesCalc ? "▴" : "▾"} Otros {otrosClientes.length} <span style={{opacity:.6}}>({otrosCotsTotal} cots)</span>
+                              </button>
                             )}
                             <button onClick={()=>setForm(p=>({...p,cliente:""}))}
                               style={{background:(!form.cliente||!clientesUnicos.includes(form.cliente))?"#eff6ff":"#f8fafc",color:(!form.cliente||!clientesUnicos.includes(form.cliente))?"#3d7fc4":"#64748b",border:`1px solid ${(!form.cliente||!clientesUnicos.includes(form.cliente))?"#3d7fc455":"#e2e8f0"}`,borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontWeight:(!form.cliente||!clientesUnicos.includes(form.cliente))?700:400}}>
                               ✦ Nuevo cliente
                             </button>
                           </div>
+                          {mostrarOtrosClientesCalc && otrosClientes.length > 0 && (
+                            <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",paddingLeft:10,paddingTop:6,paddingBottom:4,borderLeft:"2px solid #e2e8f0",marginLeft:6,marginTop:6}}>
+                              {otrosClientes.map(c => (
+                                <button key={c.key} onClick={()=>setCliente(c.key)} style={chipStyle(form.cliente===c.key, false)}>
+                                  {c.key} <span style={{opacity:.6}}>({c.count})</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         );
                       })()}
-                      <input value={form.cliente||""} onChange={e=>setForm(p=>({...p,cliente:e.target.value}))} placeholder={clientesUnicos.length>0?"Elige arriba o escribe un cliente nuevo":"Nombre del cliente"} style={{width:"100%",background:"#f8fafc",border:`1px solid ${form.cliente&&clientesUnicos.includes(form.cliente)?"#22c55e66":"#e2e8f0"}`,borderRadius:8,color:form.cliente&&clientesUnicos.includes(form.cliente)?"#1aa358":"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                      <input value={form.cliente||""} onChange={e=>setForm(p=>({...p,cliente:e.target.value}))} placeholder={clientesUnicos.length>0?"Elige arriba o escribe un cliente nuevo":"Nombre del cliente"} style={{width:"100%",background:"#f8fafc",border:`1px solid ${form.cliente&&clientesUnicos.includes(form.cliente)?"#22c55e66":"#e2e8f0"}`,borderRadius:8,color:form.cliente&&clientesUnicos.includes(form.cliente)?"#1aa358":"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box",marginTop:8}}/>
                     </div>
                   )}
                   {form.tipo==="cliente"&&(
