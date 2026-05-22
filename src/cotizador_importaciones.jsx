@@ -1022,11 +1022,6 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
                     <span style={{color:"#475569"}}>CLP pagado:</span>
                     {numInput(clp, v=>setEgreso(e.key,"clp_enviado",v))}
                   </div>
-                  {clpDesdeRMB > 0 && Math.abs(clpDesdeRMB - clp) > 1000 && clp > 0 && (
-                    <div style={{fontSize:10,color:"#92400e",fontStyle:"italic",marginBottom:6}}>
-                      💡 ¥{rmb.toLocaleString("es-CL")} × TC {tc} = ${clpDesdeRMB.toLocaleString("es-CL")} (diferencia ${Math.abs(clpDesdeRMB - clp).toLocaleString("es-CL")})
-                    </div>
-                  )}
                   <div style={{display:"grid",gridTemplateColumns:"100px 1fr 100px 1fr",gap:6,alignItems:"center",fontSize:11,marginBottom:6}}>
                     <span style={{color:"#475569"}}>Comisión WU:</span>
                     {numInput(com, v=>{ setEgreso(e.key,"comision",v); setEgreso(e.key,"iva_comision", v*0.19); })}
