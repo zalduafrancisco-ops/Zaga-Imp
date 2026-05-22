@@ -2276,11 +2276,11 @@ Número de seguimiento: ${c.nro}`;
                 </div>
                 <div style={{border:"2px solid #1a1a2e22",borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden",background:"#fff"}}>
                   {(()=>{
-                    const imps=cotizaciones.filter(c=>c.cliente===clienteSeleccionado&&c.tipo!=="propia");
-                    const totP=imps.reduce((s,c)=>s+(c.calc?.totCl||0),0);
+                    const imps=cotizaciones.filter(c=>c.cliente===clienteSeleccionado&&c.tipo!=="propia"&&c.estado!=="no_prospero");
+                    const totP=imps.reduce((s,c)=>s+(c.calc?.totClIvaFinal||c.calc?.totClIva||(c.calc?.totCl||0)*1.19),0);
                     const totU=imps.reduce((s,c)=>s+(Number(c.unidades)||0),0);
-                    const tot1=imps.reduce((s,c)=>s+(c.calc?.p1Cl||0),0);
-                    const tot2=imps.reduce((s,c)=>s+(c.calc?.p2Cl||0),0);
+                    const tot1=imps.reduce((s,c)=>s+(c.calc?.p1ClIva||(c.calc?.p1Cl||0)*1.19),0);
+                    const tot2=imps.reduce((s,c)=>s+(c.calc?.p2ClIva||(c.calc?.p2Cl||0)*1.19),0);
                     const comp=imps.filter(c=>c.estado==="completada").length;
                     return(<>
                       <div style={{padding:"20px 32px",borderBottom:"2px solid #f0f0f0",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
@@ -2306,7 +2306,7 @@ Número de seguimiento: ${c.nro}`;
                                 <span style={{background:sc,color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:700}}>{sl}</span>
                               </div>
                               <div style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,background:"#fff"}}>
-                                {[["Unidades",fmtN(c.unidades)],["Solicitud",c.fecha_solicitud||"-"],["Llegada est.",c.fecha_llegada_est||"-"],["1er pago",fmt(c.calc?.p1Cl)],["2do pago",fmt(c.calc?.p2Cl)]].map(([l,v])=>(
+                                {[["Unidades",fmtN(c.unidades)],["Solicitud",c.fecha_solicitud||"-"],["Llegada est.",c.fecha_llegada_est||"-"],["1er pago",fmt(c.calc?.p1ClIva||(c.calc?.p1Cl||0)*1.19)],["2do pago",fmt(c.calc?.p2ClIva||(c.calc?.p2Cl||0)*1.19)]].map(([l,v])=>(
                                   <div key={l}><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>{l}</div><div style={{fontSize:12,fontWeight:700,color:"#222"}}>{v}</div></div>
                                 ))}
                               </div>
@@ -7018,11 +7018,13 @@ Número de seguimiento: ${c.nro}`;
           });
 
           // KPIs sobre TODAS (sin filtro)
+          // - totPagado / tot1er / tot2do: usan valores CON IVA (lo que el cliente realmente paga / factura)
+          // - totGanancia: usa ganImpAjustado (considera precio_final_acordado_und si fue editado)
           const totUnidades=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(Number(c.unidades)||0),0);
-          const totPagado=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.totCl||0),0);
-          const tot1er=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.p1Cl||0),0);
-          const tot2do=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.p2Cl||0),0);
-          const totGanancia=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImp||0),0);
+          const totPagado=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.totClIvaFinal||c.calc?.totClIva||(c.calc?.totCl||0)*1.19),0);
+          const tot1er=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.p1ClIva||(c.calc?.p1Cl||0)*1.19),0);
+          const tot2do=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.p2ClIva||(c.calc?.p2Cl||0)*1.19),0);
+          const totGanancia=todasCliente.filter(c=>!RECHAZADAS.includes(c.estado)).reduce((s,c)=>s+(c.calc?.ganImpAjustado||c.calc?.ganImp||0),0);
           const enCurso=todasCliente.filter(c=>PROCESADAS.includes(c.estado)&&c.estado!=="completada").length;
           const completadas=todasCliente.filter(c=>c.estado==="completada").length;
           const rechazadas=todasCliente.filter(c=>RECHAZADAS.includes(c.estado)).length;
@@ -7251,125 +7253,6 @@ Número de seguimiento: ${c.nro}`;
                     );
                   })()}
 
-                  {/* FILTROS */}
-                  <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
-                    {[
-                      ["todas",`Todas (${todasCliente.length})`,null],
-                      ["activas",`Activas (${enCurso})`,  "#2563eb"],
-                      ["completadas",`Completadas (${completadas})`,"#16a34a"],
-                      ["rechazadas",`Rechazadas / Anuladas (${rechazadas})`,"#94a3b8"],
-                    ].map(([k,l,col])=>(
-                      <button key={k} onClick={()=>setFiltroCliente(k)} style={{
-                        background:filtroCliente===k?(col||"#0f172a")+"18":"#f8fafc",
-                        color:filtroCliente===k?(col||"#0f172a"):"#64748b",
-                        border:`1px solid ${filtroCliente===k?(col||"#0f172a")+"44":"#e2e8f0"}`,
-                        borderRadius:20,padding:"5px 14px",fontSize:12,cursor:"pointer",fontWeight:filtroCliente===k?700:400
-                      }}>{l}</button>
-                    ))}
-                  </div>
-
-                  {/* LISTA */}
-                  <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
-                    {impsCliente.length===0&&<div style={{textAlign:"center",padding:30,color:"#94a3b8",fontSize:13}}>Sin cotizaciones en esta categoría.</div>}
-                    {impsCliente.map(c=>{
-                      const sc=EST_COLOR[c.estado]||"#888", sl=EST_LABEL[c.estado]||c.estado;
-                      const prog=checkProg(c);
-                      const diasLL=c.fecha_llegada_est?Math.ceil((new Date(c.fecha_llegada_est)-new Date())/(1000*60*60*24)):null;
-                      const isRech=RECHAZADAS.includes(c.estado);
-                      return(
-                        <div key={c.id} style={{background:isRech?"#fafafa":"#ffffff",borderRadius:10,padding:16,border:"1px solid #e2e8f0",borderLeft:`4px solid ${sc}`,opacity:isRech?.7:1}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
-                            <div style={{flex:1}}>
-                              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
-                                <span style={{fontWeight:700,fontSize:14,color:isRech?"#94a3b8":"#0f172a"}}>{c.producto}</span>
-                                <span onClick={()=>setPreviewId(c.id)} style={{fontSize:11,color:"#2d78c8",cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted"}}>{c.nro}</span>
-                                <span style={{background:sc+"22",color:sc,border:`1px solid ${sc}44`,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600}}>{sl}</span>
-                                {diasLL!==null&&!isRech&&<span style={{background:"#f9741618",color:"#c47830",border:"1px solid #f9741633",borderRadius:20,padding:"2px 9px",fontSize:11}}>{diasLL>0?`🚢 ${diasLL}d`:diasLL===0?"¡Llega hoy!":`⚠️ ${Math.abs(diasLL)}d atraso`}</span>}
-                              </div>
-                              <div style={{fontSize:12,color:"#64748b"}}>📅 {c.fecha_solicitud||"-"}{c.fecha_llegada_est&&!isRech?` · 🏁 ${c.fecha_llegada_est}`:""}</div>
-                              {!isRech&&(
-                                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
-                                  <div style={{width:100,height:3,background:"#f1f5f9",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",background:sc,borderRadius:4,width:`${(prog.done/prog.total)*100}%`}}/></div>
-                                  <span style={{fontSize:11,color:"#64748b"}}>{prog.done}/{prog.total} pasos</span>
-                                </div>
-                              )}
-                              {c.motivo_no_procesada&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>Motivo: {c.motivo_no_procesada}</div>}
-                            </div>
-                            {!isRech&&c.calc&&(
-                              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,minWidth:240}}>
-                                {(c.pago_100?[["Unidades",fmtN(c.unidades),"#0f172a"],["💰 Pago Único",fmt(c.calc?.p1Cl),"#c9a055"],["Total",fmt(c.calc?.totCl),"#16a34a"]]:[["Unidades",fmtN(c.unidades),"#0f172a"],["1er Pago",fmt(c.calc?.p1Cl),"#16a34a"],["2do Pago",fmt(c.calc?.p2Cl),"#334155"]]).map(([l,v,col])=>(
-                                  <div key={l} style={{background:"#f8fafc",borderRadius:7,padding:"7px 8px",textAlign:"center"}}>
-                                    <div style={{fontSize:10,color:"#64748b",marginBottom:2}}>{l}</div>
-                                    <div style={{fontSize:12,fontWeight:700,color:col}}>{v}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {isRech&&(
-                              <div style={{fontSize:12,color:"#94a3b8",alignSelf:"center"}}>{fmtN(c.unidades)} und</div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{fontSize:11,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:10}}>📄 Vista para enviar al cliente</div>
-                  <div ref={vistaClienteRef} style={{background:"#fff",borderRadius:16,overflow:"hidden",color:"#222",fontFamily:"'Segoe UI',Arial,sans-serif",border:"1px solid #e5e7eb"}}>
-                    <div style={{background:"#f1f5f9",padding:"24px 32px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:10}}>
-                    <img src={LOGO_DARK} alt="ZAGA IMP" style={{height:28,width:"auto",objectFit:"contain"}}/>
-                    <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Estado de Importaciones</div>
-                  </div>
-                      <div style={{textAlign:"right"}}><div style={{fontSize:13,color:"#c9a055",fontWeight:700}}>{clienteSeleccionado}</div><div style={{fontSize:11,color:"#64748b"}}>{todayStr()}</div></div>
-                    </div>
-                    <div style={{padding:"20px 32px",borderBottom:"2px solid #f0f0f0",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
-                      {[["Total importaciones",impsCliente.length,"#0c1a2e"],["Total facturado",fmt(totPagado),"#0f7040"],["Unidades",fmtN(totUnidades),"#1d4ed8"],["Completadas",completadas,"#0d9870"]].map(([l,v,col])=>(
-                        <div key={l} style={{textAlign:"center"}}>
-                          <div style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{l}</div>
-                          <div style={{fontSize:20,fontWeight:800,color:col}}>{v}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{padding:"20px 32px"}}>
-                      <div style={{fontSize:12,fontWeight:700,color:"#333",marginBottom:12}}>Detalle de importaciones</div>
-                      {impsCliente.map(c=>{
-                        const sc=EST_COLOR[c.estado]||"#888", sl=EST_LABEL[c.estado]||c.estado;
-                        const prog=checkProg(c);
-                        const diasLL=c.fecha_llegada_est?Math.ceil((new Date(c.fecha_llegada_est)-new Date())/(1000*60*60*24)):null;
-                        return(
-                          <div key={c.id} style={{borderRadius:10,border:`2px solid ${sc}33`,marginBottom:12,overflow:"hidden"}}>
-                            <div style={{background:sc+"11",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${sc}22`}}>
-                              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                                <span style={{fontWeight:700,fontSize:13,color:"#222"}}>{c.producto}</span>
-                                <span style={{fontSize:11,color:"#64748b"}}>{c.nro}</span>
-                              </div>
-                              <span style={{background:sc,color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:700}}>{sl}</span>
-                            </div>
-                            <div style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,background:"#fff"}}>
-                              {[["Unidades",fmtN(c.unidades)],["Solicitud",c.fecha_solicitud||"-"],["Llegada est.",c.fecha_llegada_est||"-"],["1er pago",fmt(c.calc?.p1Cl)],["2do pago",fmt(c.calc?.p2Cl)]].map(([l,v])=>(
-                                <div key={l}><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>{l}</div><div style={{fontSize:12,fontWeight:700,color:"#222"}}>{v}</div></div>
-                              ))}
-                            </div>
-                            <div style={{padding:"8px 16px",background:"#f9f9f9",borderTop:`1px solid ${sc}22`}}>
-                              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                                <div style={{flex:1,height:6,background:"#e5e7eb",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",background:sc,borderRadius:4,width:`${(prog.done/prog.total)*100}%`}}/></div>
-                                <span style={{fontSize:11,color:"#666",whiteSpace:"nowrap"}}>{prog.done}/{prog.total} etapas</span>
-                                {diasLL!==null&&<span style={{fontSize:11,color:diasLL<0?"#c0392b":"#c47830",whiteSpace:"nowrap",marginLeft:8}}>{diasLL>0?`🚢 ${diasLL}d`:diasLL===0?"¡Llega hoy!":`⚠️ ${Math.abs(diasLL)}d atraso`}</span>}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <div style={{background:"#f1f5f9",borderRadius:10,padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
-                        <span style={{color:"#64748b",fontSize:13,fontWeight:600}}>TOTALES — {impsCliente.length} importación{impsCliente.length!==1?"es":""} · {fmtN(totUnidades)} unidades</span>
-                        <div style={{textAlign:"right"}}>
-                          <div style={{color:"#64748b",fontSize:11}}>1er pago: <span style={{color:"#1aa358",fontWeight:700}}>{fmt(tot1er)}</span> · 2do pago: <span style={{color:"#334155",fontWeight:700}}>{fmt(tot2do)}</span></div>
-                          <div style={{color:"#334155",fontSize:18,fontWeight:800,marginTop:2}}>Total: {fmt(totPagado)}</div>
-                        </div>
-                      </div>
-                      <div style={{marginTop:12,fontSize:10,color:"#64748b",textAlign:"center"}}>Generado por ZAGA IMP · {todayStr()}</div>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
