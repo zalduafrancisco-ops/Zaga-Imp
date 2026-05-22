@@ -429,7 +429,28 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
   const cdaCompleto = Number(calc.cda) || 0;
   const cdaReal     = cdaCompleto * share;
   const ivaAgenteAer = (calc.aer?.ivaAgente || 0) * share;
-  const ivaAduanaAer = (calc.aer?.ivaAduanaReal || 0) * share;
+
+  // IVA aduana = 19% × (CIF + arancel). Cuando hay consolidado, calcular
+  // CIF total OP desde mercancía RMB de TODAS las cots y prorratear por share.
+  // Esto evita que cots sin precio_china legacy reciban IVA aduana 0 mientras
+  // la cot con precio_china legacy se lleve todo el IVA.
+  let ivaAduanaAer = 0;
+  if (op && cotsEnOp && cotsEnOp.length > 1) {
+    const arancelPctOp = Number(calc.aer?.arancelPct) || 0;
+    const cifOpRMB = cotsEnOp.reduce((s, c) =>
+      s + (Number(c.precio_china_rmb) || 0) * (Number(c.unidades) || 0), 0);
+    if (cifOpRMB > 0) {
+      const cifOpCLP = (cifOpRMB / TC_RMB_USD) * tc;
+      const arancelOpCLP = cifOpCLP * arancelPctOp;
+      const ivaAduanaOpCLP = (cifOpCLP + arancelOpCLP) * 0.19;
+      ivaAduanaAer = ivaAduanaOpCLP * share;
+    } else {
+      // Fallback: usar el calc.aer individual (cot legacy con precio_china CLP)
+      ivaAduanaAer = (calc.aer?.ivaAduanaReal || 0) * share;
+    }
+  } else {
+    ivaAduanaAer = (calc.aer?.ivaAduanaReal || 0) * share;
+  }
   const ivaChinaCLP  = Number(calc.ivaChina) || 0; // China IVA es por cot (no compartido)
   // Costo Chile neto que ZAGA absorbe (sin servicio FF que es ingreso, sin IVAs recuperables)
   const totalChileCLP = cdaReal;
@@ -5673,57 +5694,53 @@ Número de seguimiento: ${c.nro}`;
                                       Costo CLP/und (s/IVA) = lo que ZAGA absorbe · Costo CLP/und (c/IVA) = lo que sale de caja al despacho (IVA aduana se recupera por F29) · Edita "% util" para ajustar precio al cliente por cot.
                                     </div>
                                     <div style={{overflowX:"auto"}}>
-                                      <table style={{width:"100%",fontSize:11,borderCollapse:"collapse",minWidth:1100}}>
+                                      <table style={{width:"100%",fontSize:10.5,borderCollapse:"collapse",minWidth:980}}>
                                         <thead>
                                           <tr style={{background:"#040c18",color:"#94a3b8"}}>
-                                            <th style={{padding:"6px 6px",textAlign:"left",fontWeight:700}}>Cot</th>
-                                            <th style={{padding:"6px 6px",textAlign:"right",fontWeight:700}}>Und</th>
-                                            <th style={{padding:"6px 6px",textAlign:"right",fontWeight:700}}>China CLP</th>
-                                            <th style={{padding:"6px 6px",textAlign:"right",fontWeight:700}}>Aduana CL</th>
-                                            <th style={{padding:"6px 6px",textAlign:"right",fontWeight:700}}>IVA aduana</th>
-                                            <th style={{padding:"6px 6px",textAlign:"right",fontWeight:700,color:"#c9a055"}}>Costo /und</th>
-                                            <th style={{padding:"6px 6px",textAlign:"right",fontWeight:700,color:"#fbbf24"}}>Costo /und c/IVA</th>
-                                            <th style={{padding:"6px 6px",textAlign:"center",fontWeight:700,color:"#06b6d4"}}>% util</th>
-                                            <th style={{padding:"6px 6px",textAlign:"right",fontWeight:700}}>Precio /und c/IVA</th>
-                                            <th style={{padding:"6px 6px",textAlign:"right",fontWeight:700}}>Total cliente c/IVA</th>
-                                            <th style={{padding:"6px 6px",textAlign:"right",fontWeight:700,color:"#10b981"}}>Ganancia</th>
-                                            <th style={{padding:"6px 6px",textAlign:"right",fontWeight:700}}>Margen</th>
+                                            <th style={{padding:"6px 5px",textAlign:"left",fontWeight:700}}>Cot</th>
+                                            <th style={{padding:"6px 5px",textAlign:"right",fontWeight:700}}>Und</th>
+                                            <th style={{padding:"6px 5px",textAlign:"right",fontWeight:700}}>China</th>
+                                            <th style={{padding:"6px 5px",textAlign:"right",fontWeight:700}}>Aduana</th>
+                                            <th style={{padding:"6px 5px",textAlign:"right",fontWeight:700,fontStyle:"italic"}}>IVA ad.</th>
+                                            <th style={{padding:"6px 5px",textAlign:"right",fontWeight:700,color:"#c9a055"}}>Costo/und</th>
+                                            <th style={{padding:"6px 5px",textAlign:"right",fontWeight:700,color:"#fbbf24"}}>c/IVA</th>
+                                            <th style={{padding:"6px 4px",textAlign:"center",fontWeight:700,color:"#06b6d4"}}>% util</th>
+                                            <th style={{padding:"6px 5px",textAlign:"right",fontWeight:700}}>Precio/und</th>
+                                            <th style={{padding:"6px 5px",textAlign:"right",fontWeight:700}}>Total c/IVA</th>
+                                            <th style={{padding:"6px 5px",textAlign:"right",fontWeight:700,color:"#10b981"}}>Ganancia</th>
                                           </tr>
                                         </thead>
                                         <tbody>
                                           {detalles.map((d) => (
                                             <tr key={d.cot.id} style={{borderTop:"1px solid #1a2740"}}>
-                                              <td style={{padding:"6px 6px",color:"#fff",fontWeight:700}}>{d.cot.nro}<div style={{fontSize:9,color:"#94a3b8",fontWeight:400}}>{(d.cot.cliente||"-").slice(0,12)}</div></td>
-                                              <td style={{padding:"6px 6px",textAlign:"right",color:"#cbd5e1"}}>{fmtN(d.und)}</td>
-                                              <td style={{padding:"6px 6px",textAlign:"right",color:"#cbd5e1"}}>{fmt(d.chinaCLP)}</td>
-                                              <td style={{padding:"6px 6px",textAlign:"right",color:"#cbd5e1"}}>{fmt(d.chileCLP)}</td>
-                                              <td style={{padding:"6px 6px",textAlign:"right",color:"#94a3b8",fontStyle:"italic"}}>{fmt(d.ivaAduanaCLP)}</td>
-                                              <td style={{padding:"6px 6px",textAlign:"right",color:"#c9a055",fontWeight:700}}>{fmt(d.costoUnd)}</td>
-                                              <td style={{padding:"6px 6px",textAlign:"right",color:"#fbbf24",fontWeight:700}}>{fmt(d.costoUndCIva)}</td>
-                                              <td style={{padding:"6px 4px",textAlign:"center"}}>
+                                              <td style={{padding:"5px",color:"#fff",fontWeight:700}}>{d.cot.nro}<div style={{fontSize:9,color:"#94a3b8",fontWeight:400}}>{(d.cot.cliente||"-").slice(0,10)}</div></td>
+                                              <td style={{padding:"5px",textAlign:"right",color:"#cbd5e1"}}>{fmtN(d.und)}</td>
+                                              <td style={{padding:"5px",textAlign:"right",color:"#cbd5e1"}}>{fmt(d.chinaCLP)}</td>
+                                              <td style={{padding:"5px",textAlign:"right",color:"#cbd5e1"}}>{fmt(d.chileCLP)}</td>
+                                              <td style={{padding:"5px",textAlign:"right",color:"#94a3b8",fontStyle:"italic"}}>{fmt(d.ivaAduanaCLP)}</td>
+                                              <td style={{padding:"5px",textAlign:"right",color:"#c9a055",fontWeight:700}}>{fmt(d.costoUnd)}</td>
+                                              <td style={{padding:"5px",textAlign:"right",color:"#fbbf24",fontWeight:700}}>{fmt(d.costoUndCIva)}</td>
+                                              <td style={{padding:"5px 3px",textAlign:"center"}}>
                                                 <input type="number" step="1" min="0" max="100" value={d.margenPct}
                                                   onChange={e=>setMargenesPorCot(prev=>({...prev,[d.cot.id]:Number(e.target.value)||0}))}
-                                                  style={{width:50,padding:"3px 5px",border:"1px solid #06b6d4",borderRadius:5,fontSize:11,textAlign:"right",background:"#06b6d422",color:"#fff",fontFamily:"inherit"}}/>
-                                                <span style={{fontSize:10,color:"#06b6d4",marginLeft:2}}>%</span>
+                                                  style={{width:42,padding:"3px 4px",border:"1px solid #06b6d4",borderRadius:5,fontSize:11,textAlign:"right",background:"#06b6d422",color:"#fff",fontFamily:"inherit"}}/>
                                               </td>
-                                              <td style={{padding:"6px 6px",textAlign:"right",color:"#fff",fontWeight:700}}>{fmt(d.precioIvaUnd)}</td>
-                                              <td style={{padding:"6px 6px",textAlign:"right",color:"#fff",fontWeight:800}}>{fmt(d.totalIvaCliente)}</td>
-                                              <td style={{padding:"6px 6px",textAlign:"right",color:d.ganancia>=0?"#22c55e":"#fca5a5",fontWeight:700}}>{fmt(d.ganancia)}</td>
-                                              <td style={{padding:"6px 6px",textAlign:"right",color:"#22c55e"}}>{fmtP(d.margenPct)}</td>
+                                              <td style={{padding:"5px",textAlign:"right",color:"#fff",fontWeight:700}}>{fmt(d.precioIvaUnd)}</td>
+                                              <td style={{padding:"5px",textAlign:"right",color:"#fff",fontWeight:800}}>{fmt(d.totalIvaCliente)}</td>
+                                              <td style={{padding:"5px",textAlign:"right",color:d.ganancia>=0?"#22c55e":"#fca5a5",fontWeight:700}}>{fmt(d.ganancia)}</td>
                                             </tr>
                                           ))}
                                           <tr style={{borderTop:"2px solid #c9a055",background:"#1a2740"}}>
-                                            <td style={{padding:"8px 6px",fontSize:11,fontWeight:800,color:"#c9a055"}}>TOTAL OP</td>
-                                            <td style={{padding:"8px 6px",textAlign:"right",fontWeight:800,color:"#fff"}}>{fmtN(totUnd)}</td>
-                                            <td style={{padding:"8px 6px",textAlign:"right",fontWeight:800,color:"#fff"}}>{fmt(totChinaCLP)}</td>
-                                            <td style={{padding:"8px 6px",textAlign:"right",fontWeight:800,color:"#fff"}}>{fmt(totChileCLP)}</td>
-                                            <td style={{padding:"8px 6px",textAlign:"right",fontWeight:800,color:"#fbbf24",fontStyle:"italic"}}>{fmt(totIvaAduana)}</td>
-                                            <td colSpan={2} style={{padding:"8px 6px",textAlign:"right",fontSize:10,color:"#94a3b8",fontStyle:"italic"}}>(promedios →)</td>
-                                            <td style={{padding:"8px 6px",textAlign:"center",fontWeight:800,color:"#06b6d4"}}>{fmtP(margenOp)}</td>
-                                            <td style={{padding:"8px 6px",textAlign:"right",fontSize:10,color:"#94a3b8",fontStyle:"italic"}}>—</td>
-                                            <td style={{padding:"8px 6px",textAlign:"right",fontWeight:800,color:"#fff",fontSize:13}}>{fmt(totVentaIva)}</td>
-                                            <td style={{padding:"8px 6px",textAlign:"right",fontWeight:800,color:totGanancia>=0?"#22c55e":"#fca5a5",fontSize:13}}>{fmt(totGanancia)}</td>
-                                            <td style={{padding:"8px 6px",textAlign:"right",fontWeight:800,color:margenOp>=0?"#22c55e":"#fca5a5"}}>{fmtP(margenOp)}</td>
+                                            <td style={{padding:"7px 5px",fontSize:10.5,fontWeight:800,color:"#c9a055"}}>TOTAL</td>
+                                            <td style={{padding:"7px 5px",textAlign:"right",fontWeight:800,color:"#fff"}}>{fmtN(totUnd)}</td>
+                                            <td style={{padding:"7px 5px",textAlign:"right",fontWeight:800,color:"#fff"}}>{fmt(totChinaCLP)}</td>
+                                            <td style={{padding:"7px 5px",textAlign:"right",fontWeight:800,color:"#fff"}}>{fmt(totChileCLP)}</td>
+                                            <td style={{padding:"7px 5px",textAlign:"right",fontWeight:800,color:"#fbbf24",fontStyle:"italic"}}>{fmt(totIvaAduana)}</td>
+                                            <td colSpan={2} style={{padding:"7px 5px",textAlign:"right",fontSize:9,color:"#94a3b8",fontStyle:"italic"}}>(prom.)</td>
+                                            <td style={{padding:"7px 4px",textAlign:"center",fontWeight:800,color:"#06b6d4"}}>{margenOp.toFixed(0)}%</td>
+                                            <td style={{padding:"7px 5px",textAlign:"right",fontSize:9,color:"#94a3b8",fontStyle:"italic"}}>—</td>
+                                            <td style={{padding:"7px 5px",textAlign:"right",fontWeight:800,color:"#fff",fontSize:12}}>{fmt(totVentaIva)}</td>
+                                            <td style={{padding:"7px 5px",textAlign:"right",fontWeight:800,color:totGanancia>=0?"#22c55e":"#fca5a5",fontSize:12}}>{fmt(totGanancia)}</td>
                                           </tr>
                                         </tbody>
                                       </table>
