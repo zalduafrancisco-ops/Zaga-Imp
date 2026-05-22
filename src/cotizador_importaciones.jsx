@@ -1229,6 +1229,7 @@ export default function App({ supabase, usuario, onLogout }){
   const [openId,setOpenId]               = useState(null);
   const [filterEstado,setFilterEstado]   = useState("todos");
   const [filterCliente,setFilterCliente] = useState("todos");
+  const [filtroClienteCalc,setFiltroClienteCalc] = useState("");
   const [filterGestor,setFilterGestor]   = useState("todos");
   const [filterTransporte,setFilterTransporte] = useState("todos");
   const [mostrarOtrosClientes,setMostrarOtrosClientes] = useState(false);
@@ -2983,9 +2984,9 @@ Número de seguimiento: ${c.nro}`;
                       </div>
                     ))}
                   </div>
-                  {(p.fulfillment_cliente||p.sku_china||p.sku_bodega)&&(
+                  {(p.sku_china||p.sku_bodega||p.dim_largo||p.dim_ancho||p.dim_alto)&&(
                     <div style={{background:"#f8fafc",borderRadius:10,padding:14,border:"1px solid #e2e8f0"}}>
-                      <div style={{fontSize:10,color:"#c47830",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:10}}>📦 Bodega & Fulfillment</div>
+                      <div style={{fontSize:10,color:"#c47830",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:10}}>📦 Bodega</div>
                       {p.sku_china&&<div style={{fontSize:12,color:"#b8922e",marginBottom:4}}>🏷 SKU China: <b>{p.sku_china}</b></div>}
                       {p.sku_bodega&&<div style={{fontSize:12,color:"#3d7fc4",marginBottom:4}}>📦 SKU Bodega: <b>{p.sku_bodega}</b></div>}
                       {(p.dim_largo||p.dim_ancho||p.dim_alto)&&(
@@ -3000,9 +3001,6 @@ Número de seguimiento: ${c.nro}`;
                           {p.dim_tipo==="unidad"&&p.dim_m3&&p.unidades&&<span style={{marginLeft:8,color:"#1aa358",fontWeight:800}}>· Total: {(Number(p.dim_m3)*Number(p.unidades)).toFixed(2)} m³</span>}
                         </div>
                       )}
-                      {p.fulfillment_cliente&&<div style={{fontSize:12,color:"#2a8aaa",marginBottom:4}}>🚚 Cliente con fulfillment ZAGA</div>}
-                      {p.fulfillment_costo_real&&<div style={{fontSize:12,color:"#0f172a",marginBottom:4}}>💵 Costo fulfillment: <b>{fmt(p.fulfillment_costo_real)}</b></div>}
-                      {p.fulfillment_notas&&<div style={{fontSize:11,color:"#666",marginTop:6,fontStyle:"italic"}}>📝 {p.fulfillment_notas}</div>}
                     </div>
                   )}
                   {p.notas&&<div style={{background:"#f8fafc",borderRadius:8,padding:12,border:"1px solid #e2e8f0"}}><div style={{fontSize:10,color:"#64748b",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Notas cotización</div><div style={{fontSize:12,color:"#64748b"}}>{p.notas}</div></div>}
@@ -3232,23 +3230,44 @@ Número de seguimiento: ${c.nro}`;
                   {form.tipo==="cliente"&&(
                     <div style={{marginBottom:12}}>
                       <label style={{display:"block",fontSize:10,color:"#777",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Cliente</label>
-                      {clientesUnicos.length>0&&(
+                      {clientesUnicos.length>0&&(()=>{
+                        const filtroLow = filtroClienteCalc.trim().toLowerCase();
+                        const clientesFiltrados = filtroLow
+                          ? clientesUnicos.filter(cl => cl.toLowerCase().includes(filtroLow))
+                          : clientesUnicos;
+                        return (
                         <div style={{marginBottom:8}}>
-                          <div style={{fontSize:11,color:"#64748b",marginBottom:6}}>Clientes anteriores:</div>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,gap:8,flexWrap:"wrap"}}>
+                            <div style={{fontSize:11,color:"#64748b"}}>Clientes anteriores ({clientesUnicos.length}):</div>
+                            {clientesUnicos.length>=5 && (
+                              <div style={{position:"relative",flex:"0 0 auto"}}>
+                                <input type="text" placeholder="🔍 Buscar cliente..." value={filtroClienteCalc}
+                                  onChange={e=>setFiltroClienteCalc(e.target.value)}
+                                  style={{padding:"4px 28px 4px 10px",border:"1px solid #e2e8f0",borderRadius:8,fontSize:11,outline:"none",width:170,fontFamily:"inherit"}}/>
+                                {filtroClienteCalc && (
+                                  <button onClick={()=>setFiltroClienteCalc("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"#f1f5f9",border:"none",color:"#64748b",borderRadius:4,padding:"1px 5px",fontSize:10,cursor:"pointer"}}>✕</button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                            {clientesUnicos.map(cl=>(
+                            {clientesFiltrados.map(cl=>(
                               <button key={cl} onClick={()=>setForm(p=>({...p,cliente:cl,categoria_cliente:cotizaciones.filter(c=>c.cliente===cl).slice(-1)[0]?.categoria_cliente||p.categoria_cliente}))}
                                 style={{background:form.cliente===cl?"#f0fdf4":"#f8fafc",color:form.cliente===cl?"#1aa358":"#64748b",border:`1px solid ${form.cliente===cl?"#22c55e66":"#e2e8f0"}`,borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontWeight:form.cliente===cl?700:400}}>
                                 {cl}
                               </button>
                             ))}
+                            {clientesFiltrados.length===0 && filtroLow && (
+                              <span style={{fontSize:11,color:"#94a3b8",fontStyle:"italic",padding:"4px 8px"}}>Sin resultados para "{filtroClienteCalc}"</span>
+                            )}
                             <button onClick={()=>setForm(p=>({...p,cliente:""}))}
                               style={{background:(!form.cliente||!clientesUnicos.includes(form.cliente))?"#eff6ff":"#f8fafc",color:(!form.cliente||!clientesUnicos.includes(form.cliente))?"#3d7fc4":"#64748b",border:`1px solid ${(!form.cliente||!clientesUnicos.includes(form.cliente))?"#3d7fc455":"#e2e8f0"}`,borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontWeight:(!form.cliente||!clientesUnicos.includes(form.cliente))?700:400}}>
                               ✦ Nuevo cliente
                             </button>
                           </div>
                         </div>
-                      )}
+                        );
+                      })()}
                       <input value={form.cliente||""} onChange={e=>setForm(p=>({...p,cliente:e.target.value}))} placeholder={clientesUnicos.length>0?"Elige arriba o escribe un cliente nuevo":"Nombre del cliente"} style={{width:"100%",background:"#f8fafc",border:`1px solid ${form.cliente&&clientesUnicos.includes(form.cliente)?"#22c55e66":"#e2e8f0"}`,borderRadius:8,color:form.cliente&&clientesUnicos.includes(form.cliente)?"#1aa358":"#0f172a",padding:"9px 12px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
                     </div>
                   )}
@@ -3706,8 +3725,6 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
                       <NInput label="% Servicio al cliente" field="pct_servicio" form={form} setForm={setForm} color="#1aa358" note="Ej: 4 = 4%"/>
                       <NInput label="% Comisión préstamo" field="pct_com_prestamo" form={form} setForm={setForm} color="#b8922e" note="Por defecto 6.5%"/>
-                      <NInput label="Fulfillment $ / Unidad" field="fulfillment_und" form={form} setForm={setForm} note="Base $1.200"/>
-                      <NInput label="% Devolución estimada" field="pct_devolucion" form={form} setForm={setForm} note="Ej: 20 = 20%"/>
                     </div>
                     <div style={{borderTop:"1px solid #e2e8f0",paddingTop:12}}>
                       <div style={{fontSize:11,color:"#c47830",marginBottom:8,fontWeight:600}}>📋 Certificado especial (CDA u otro)</div>
@@ -3934,18 +3951,8 @@ Número de seguimiento: ${c.nro}`;
                       <METRIC label="ROI sobre costo neto" value={fmtP(calcActual.roi)} color="#1aa358"/>
                       <METRIC label="Multiplicador" value={isNaN(calcActual.mult)||!calcActual.mult?"—":`${calcActual.mult.toFixed(2)}×`} color="#1aa358"/>
                     </div>
-                    <div style={{background:"#fefce8",borderRadius:9,padding:"12px 14px",marginBottom:14,border:"1px dashed #fde047"}}>
-                      <div style={{fontSize:11,color:"#64748b",marginBottom:8,fontWeight:600}}>📦 Estimativo Fulfillment</div>
-                      <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#64748b"}}>
-                        <span>{fmtN(form.unidades||0)} base + {form.pct_devolucion}% dev = {fmtN(calcActual.uFull||0)} und × {fmt(form.fulfillment_und)}</span>
-                        <span style={{color:"#c9a055",fontWeight:700}}>{fmt(calcActual.ganFull)}</span>
-                      </div>
-                      <div style={{fontSize:10,color:"#64748b",marginTop:4}}>* Solo estimativo</div>
-                    </div>
                     <div style={{background:"#040c18",borderRadius:10,padding:"16px 18px",border:"none"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:13,color:"#94a3b8"}}>Importación</span><span style={{fontSize:15,fontWeight:700,color:"#c9a055"}}>{fmt(calcActual.ganImp)}</span></div>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{fontSize:13,color:"#94a3b8"}}>Fulfillment (estimado)</span><span style={{fontSize:15,fontWeight:700,color:"#c9a055"}}>{fmt(calcActual.ganFull)}</span></div>
-                      <div style={{borderTop:"1px solid #f5c84444",paddingTop:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:14,color:"#e2e8f0",fontWeight:600}}>GANANCIA TOTAL ESTIMADA</span><span style={{fontSize:26,fontWeight:800,color:"#c9a055"}}>{fmt(calcActual.ganTot)}</span></div>
+                      <div style={{borderTop:"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:14,color:"#e2e8f0",fontWeight:600}}>GANANCIA TOTAL ESTIMADA</span><span style={{fontSize:26,fontWeight:800,color:"#c9a055"}}>{fmt(calcActual.ganImp)}</span></div>
                     </div>
                   </div>
                 )}
@@ -5310,11 +5317,11 @@ Número de seguimiento: ${c.nro}`;
 
                           </div>
 
-                          {/* ── SKU + FULFILLMENT ── */}
+                          {/* ── SKU + DIMENSIONES (post-pago, bodega) ── */}
                           {(c.checklist?.pago_china||c.sku_china)&&(
                             <div style={{marginTop:18,borderTop:"1px solid #e2e8f0",paddingTop:18}}>
-                              <div style={{fontSize:10,color:"#c47830",marginBottom:12,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>📦 Post-pago — Bodega & Fulfillment</div>
-                              <div className="ff-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                              <div style={{fontSize:10,color:"#c47830",marginBottom:12,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>📦 Post-pago — Bodega</div>
+                              <div className="ff-grid" style={{display:"grid",gridTemplateColumns:"1fr",gap:16}}>
                                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
                                   <div>
                                     <div style={{fontSize:10,color:"#b8922e",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>🏷 SKU China</div>
@@ -5403,25 +5410,6 @@ Número de seguimiento: ${c.nro}`;
                                     </div>
                                     );
                                   })()}
-                                </div>
-                                <div style={{background:"#f8fafc",borderRadius:10,padding:14,border:"1px solid #e2e8f0"}}>
-                                  <div style={{fontSize:10,color:"#2a8aaa",marginBottom:10,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>🚚 Fulfillment</div>
-                                  <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:12,color:"#0f172a",marginBottom:10}}>
-                                    <input type="checkbox" checked={c.fulfillment_cliente!==false} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,fulfillment_cliente:e.target.checked}:x));}} style={{cursor:"pointer",width:15,height:15}}/>
-                                    Con fulfillment <span style={{fontSize:10,color:"#64748b",marginLeft:4}}>(desmarcar si esta importación no aplica)</span>
-                                  </label>
-                                  {c.fulfillment_cliente!==false&&(
-                                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                                      <div>
-                                        <div style={{fontSize:10,color:"#64748b",marginBottom:3}}>Costo real fulfillment $</div>
-                                        <input type="number" value={c.fulfillment_costo_real||""} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,fulfillment_costo_real:e.target.value}:x));}} placeholder="0" style={{width:"100%",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:6,color:"#0f172a",padding:"6px 9px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
-                                      </div>
-                                      <div>
-                                        <div style={{fontSize:10,color:"#64748b",marginBottom:3}}>Notas fulfillment</div>
-                                        <textarea value={c.fulfillment_notas||""} rows={2} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,fulfillment_notas:e.target.value}:x));}} placeholder="Instrucciones, detalles..." style={{width:"100%",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:6,color:"#0f172a",padding:"6px 9px",fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box"}}/>
-                                      </div>
-                                    </div>
-                                  )}
                                 </div>
                               </div>
                             </div>
