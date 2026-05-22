@@ -2905,13 +2905,37 @@ Número de seguimiento: ${c.nro}`;
                     </div>
                   </div>
                   {!isPropia&&(()=>{
-                    const _c = p.calc || calcCliente(p);
-                    if(!_c) return null;
+                    // Si la cot pertenece a una OP consolidada, calcular ganancia con
+                    // calcCostoRealZaga (respeta el reparto consolidado de aduana y extras).
+                    // Sino, usar calcCliente standalone.
+                    const opVincP = p.operacion_id ? operaciones.find(o => o.id === p.operacion_id) : null;
+                    let ganImpC, gan1C, gan2C, margenC, markupC;
+                    let esConsolidado = false;
+                    if (opVincP) {
+                      const cotsOpVincP = cotizaciones.filter(x => (opVincP.cotizaciones||[]).includes(x.id));
+                      try {
+                        const cz = calcCostoRealZaga(p, opVincP, cotsOpVincP);
+                        ganImpC = cz.ganRealNeto || 0;
+                        if (p.transporte === "aereo") { gan1C = ganImpC; gan2C = 0; }
+                        else { gan1C = ganImpC * 0.3; gan2C = ganImpC * 0.7; }
+                        margenC = cz.margenRealPct || 0;
+                        markupC = (cz.costoZAGAReal||0) > 0 ? (((cz.precioClienteNeto||0) - (cz.costoZAGAReal||0)) / cz.costoZAGAReal) * 100 : 0;
+                        esConsolidado = true;
+                      } catch(_){}
+                    }
+                    if (!esConsolidado) {
+                      const _c = p.calc || calcCliente(p);
+                      if(!_c) return null;
+                      ganImpC = _c.ganImp; gan1C = _c.gan1; gan2C = _c.gan2;
+                      margenC = _c.roi; markupC = _c.markup;
+                    }
                     return (
                     <div>
-                      <div style={{fontSize:10,color:"#475569",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:10}}>⭐ Ganancias</div>
+                      <div style={{fontSize:10,color:"#475569",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:10}}>
+                        ⭐ Ganancias {esConsolidado && <span style={{color:"#c9a055",fontWeight:600,fontSize:9,marginLeft:6}}>(consolidado · {opVincP.nro})</span>}
+                      </div>
                       <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                        {[["1er pago",fmt(_c.gan1)],["2do pago",fmt(_c.gan2)],["Total importación",fmt(_c.ganImp)],["ROI",fmtP(_c.roi)],["Markup",fmtP(_c.markup)]].map(([l,v])=>(
+                        {[["1er pago",fmt(gan1C)],["2do pago",fmt(gan2C)],["Total importación",fmt(ganImpC)],["Margen",fmtP(margenC)],["Markup",fmtP(markupC)]].map(([l,v])=>(
                           <div key={l} style={{display:"flex",justifyContent:"space-between",background:"#f8fafc",borderRadius:7,padding:"8px 12px"}}>
                             <span style={{fontSize:12,color:"#64748b"}}>{l}</span>
                             <span style={{fontSize:13,fontWeight:700,color:"#c9a055"}}>{v}</span>
