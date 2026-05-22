@@ -1293,7 +1293,17 @@ export default function App({ supabase, usuario, onLogout }){
         .order("created_at",{ascending:false});
       if(error) throw error;
       if(data&&data.length>0){
-        const lista=data.map(r=>Object.assign({},r.datos,{id:r.id}));
+        const lista=data.map(r=>{
+          const c = Object.assign({},r.datos,{id:r.id});
+          // Regenerar calc on-the-fly si esta vacio (algunas cots viejas
+          // o migradas pueden tener calc:null y romper paneles de ganancia)
+          if (!c.calc && c.tipo !== "propia") {
+            try { c.calc = calcCliente(c); } catch(_){}
+          } else if (!c.calc && c.tipo === "propia") {
+            try { c.calc = calcPropia(c); } catch(_){}
+          }
+          return c;
+        });
         cotizacionesRef.current=lista;
         setCotizaciones(lista);
       } else {
@@ -2894,11 +2904,14 @@ Número de seguimiento: ${c.nro}`;
                       </div>
                     </div>
                   </div>
-                  {!isPropia&&p.calc&&(
+                  {!isPropia&&(()=>{
+                    const _c = p.calc || calcCliente(p);
+                    if(!_c) return null;
+                    return (
                     <div>
                       <div style={{fontSize:10,color:"#475569",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:10}}>⭐ Ganancias</div>
                       <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                        {[["1er pago",fmt(p.calc.gan1)],["2do pago",fmt(p.calc.gan2)],["Total importación",fmt(p.calc.ganImp)],["ROI",fmtP(p.calc.roi)],["Markup",fmtP(p.calc.markup)]].map(([l,v])=>(
+                        {[["1er pago",fmt(_c.gan1)],["2do pago",fmt(_c.gan2)],["Total importación",fmt(_c.ganImp)],["ROI",fmtP(_c.roi)],["Markup",fmtP(_c.markup)]].map(([l,v])=>(
                           <div key={l} style={{display:"flex",justifyContent:"space-between",background:"#f8fafc",borderRadius:7,padding:"8px 12px"}}>
                             <span style={{fontSize:12,color:"#64748b"}}>{l}</span>
                             <span style={{fontSize:13,fontWeight:700,color:"#c9a055"}}>{v}</span>
@@ -2906,7 +2919,8 @@ Número de seguimiento: ${c.nro}`;
                         ))}
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
                   {isPropia&&p.calc&&(
                     <div>
                       <div style={{fontSize:10,color:"#3d7fc4",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:10}}>📈 Proyección Venta</div>
