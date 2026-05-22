@@ -1869,14 +1869,13 @@ Número de seguimiento: ${c.nro}`;
               const cotsCliente = cotsOp.filter(c => (c.cliente||"").trim() === vistaOpClienteT && !["no_prospero"].includes(c.estado));
               if (cotsCliente.length === 0) return null;
               const aplicado = op.consolidado_aplicado_cliente === true;
-              // Override de precio: si en el panel admin hay un % util editado para esta cot,
-              // recalcular el totClIva con ese margen (preview sin guardar nada al cot).
-              // Esto permite ver la vista cliente sin necesidad de aplicar el consolidado.
+              // Vista cliente SIEMPRE refleja el panel admin (consolidado, no precio individual).
+              // Si hay margen del panel en state, recalcula on-the-fly desde costo neto.
+              // Esto override CUALQUIER precio_final_acordado_und guardado.
               const consolidados = cotsCliente.map(c => {
                 const calcStandard = calcConsolidado(c, op, cotsOp);
-                const margenPanel = margenesPorCot[c.id];
-                if (margenPanel != null && margenPanel > 0 && !c.precio_final_acordado_und) {
-                  // Recalcular con margen del panel
+                const margenPanel = margenesPorCot[c.id] ?? c.margen_objetivo_pct;
+                if (margenPanel != null && margenPanel > 0) {
                   const cz = calcCostoRealZaga(c, op, cotsOp);
                   const costoNeto = (cz.totalChinaCLP || 0) + (cz.totalChileCLP || 0) + (cz.ivaAgenteAer || 0);
                   const und = Number(c.unidades) || 0;
@@ -5845,19 +5844,45 @@ Número de seguimiento: ${c.nro}`;
                                   📢 {op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny?"Esperando Sunny...":"Notificar Sunny para recotizar"}
                                 </button>
                                 <button onClick={async()=>{
-                                  if(!confirm(`✅ Aplicar precios consolidados a los clientes de OP ${op.nro}?\n\nLos clientes verán en su portal el nuevo precio (más bajo) y el ahorro. Esto NO cambia el estado de las cotizaciones.`))return;
+                                  // Construir precios finales por cot desde margenesPorCot del panel
+                                  const preciosPorCot = {};
+                                  const cotsActivasApl = cots.filter(c => !["no_prospero"].includes(c.estado));
+                                  for (const c of cotsActivasApl) {
+                                    const margenPanel = margenesPorCot[c.id] ?? c.margen_objetivo_pct ?? 30;
+                                    const cz = calcCostoRealZaga(c, op, cots);
+                                    const costoNeto = (cz.totalChinaCLP || 0) + (cz.totalChileCLP || 0) + (cz.ivaAgenteAer || 0);
+                                    const und = Number(c.unidades) || 0;
+                                    if (und > 0 && costoNeto > 0) {
+                                      const precioNetoUnd = (costoNeto / und) / (1 - margenPanel/100);
+                                      preciosPorCot[c.id] = { precio: Math.round(precioNetoUnd), margen: margenPanel };
+                                    }
+                                  }
+                                  const previewLines = Object.entries(preciosPorCot).map(([id,v]) => {
+                                    const c = cotsActivasApl.find(x => x.id===id);
+                                    return `  ${c?.nro || id}: ${v.margen}% → $${v.precio.toLocaleString("es-CL")}/und`;
+                                  }).join("\n");
+                                  if(!confirm(`✅ Aplicar consolidado al cliente — OP ${op.nro}?\n\nSe guardarán estos precios y el cliente los verá en su portal:\n\n${previewLines}\n\nMargen actual en el panel:`))return;
                                   try{
                                     const newOp = {...op, consolidado_aplicado_cliente:true, fecha_aplicacion_cliente: new Date().toISOString()};
                                     delete newOp.id;
                                     await supabase.from("operaciones").update({datos:newOp,updated_at:new Date().toISOString()}).eq("id",op.id);
                                     await Promise.all(cots.map(async c=>{
                                       const newCot={...c, consolidado_aplicado_cliente:true};
+                                      const pv = preciosPorCot[c.id];
+                                      if (pv) {
+                                        newCot.precio_final_acordado_und = pv.precio;
+                                        newCot.margen_objetivo_pct = pv.margen;
+                                      }
                                       delete newCot.id; delete newCot._id; delete newCot._updated;
                                       await supabase.from("cotizaciones").update({datos:newCot}).eq("id",c.id);
                                     }));
                                     setOperaciones(prev=>prev.map(o=>o.id===op.id?{...newOp,id:op.id}:o));
-                                    setCotizaciones(prev=>prev.map(c=>cots.find(x=>x.id===c.id)?{...c,consolidado_aplicado_cliente:true}:c));
-                                    showToast("✅ Consolidado aplicado a clientes");
+                                    setCotizaciones(prev=>prev.map(c=>{
+                                      const pv = preciosPorCot[c.id];
+                                      if (cots.find(x=>x.id===c.id)) return { ...c, consolidado_aplicado_cliente:true, ...(pv ? { precio_final_acordado_und: pv.precio, margen_objetivo_pct: pv.margen } : {}) };
+                                      return c;
+                                    }));
+                                    showToast("✅ Consolidado aplicado — precios guardados");
                                   }catch(e){showToast("Error: "+e.message,"err");}
                                 }} disabled={op.consolidado_aplicado_cliente || (op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)} style={{background:op.consolidado_aplicado_cliente?"#f0fdf4":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#e2e8f0":"#1aa358"),color:op.consolidado_aplicado_cliente?"#1aa358":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#94a3b8":"#fff"),border:`1px solid ${op.consolidado_aplicado_cliente?"#bbf7d0":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"#cbd5e1":"#1aa358")}`,borderRadius:7,padding:"8px 14px",fontSize:12,cursor:(!op.consolidado_aplicado_cliente && !(op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny))?"pointer":"not-allowed",fontWeight:700}}>
                                   ✅ {op.consolidado_aplicado_cliente?"Ya aplicado a clientes":((op.recotizacion_pendiente_sunny && !op.recotizacion_completada_sunny)?"Esperando respuesta Sunny...":"Aplicar consolidado al cliente")}
