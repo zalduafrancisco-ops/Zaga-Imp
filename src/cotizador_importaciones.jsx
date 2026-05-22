@@ -6306,27 +6306,41 @@ Número de seguimiento: ${c.nro}`;
                                   📢 {op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny?"Esperando Sunny...":"Notificar Sunny para recotizar"}
                                 </button>
                                 <button onClick={async()=>{
-                                  // Construir precios finales por cot desde margenesPorCot del panel.
-                                  // precio_final_acordado_und se guarda CON IVA (asi lo interpreta el cliente
-                                  // y el resto del cotizador).
-                                  const preciosPorCot = {};
+                                  // Si la OP YA está aplicada al cliente Y todas las cots tienen precio guardado,
+                                  // RE-APLICAR significa: mantener precios + recalcular margen real solamente.
+                                  // Si NO está aplicada o faltan precios: generar precios desde margen del panel.
                                   const cotsActivasApl = cots.filter(c => !["no_prospero"].includes(c.estado));
+                                  const yaAplicado = op.consolidado_aplicado_cliente === true;
+                                  const todasTienenPrecio = cotsActivasApl.every(c => Number(c.precio_final_acordado_und) > 0);
+                                  const modoRecalcMargen = yaAplicado && todasTienenPrecio;
+                                  const preciosPorCot = {};
                                   for (const c of cotsActivasApl) {
-                                    const margenPanel = margenesPorCot[c.id] ?? c.margen_objetivo_pct ?? 30;
                                     const cz = calcCostoRealZaga(c, op, cots);
-                                    const costoNeto = (cz.totalChinaCLP || 0) + (cz.totalChileCLP || 0) + (cz.ivaAgenteAer || 0);
+                                    const costoNeto = (cz.totalChinaCLP || 0) + (cz.totalChileCLP || 0);
                                     const und = Number(c.unidades) || 0;
-                                    if (und > 0 && costoNeto > 0) {
+                                    if (und <= 0 || costoNeto <= 0) continue;
+                                    if (modoRecalcMargen) {
+                                      // Modo respetar precio: precio existente manda → margen es el resultado
+                                      const precioIvaUnd = Number(c.precio_final_acordado_und) || 0;
+                                      const precioNetoUnd = precioIvaUnd / 1.19;
+                                      const margenReal = precioNetoUnd > 0 ? ((precioNetoUnd - costoNeto/und) / precioNetoUnd) * 100 : 0;
+                                      preciosPorCot[c.id] = { precio: precioIvaUnd, margen: Math.round(margenReal * 10) / 10 };
+                                    } else {
+                                      // Modo generar precio: margen del panel → precio
+                                      const margenPanel = margenesPorCot[c.id] ?? c.margen_objetivo_pct ?? 30;
                                       const precioNetoUnd = (costoNeto / und) / (1 - margenPanel/100);
-                                      const precioIvaUnd = precioNetoUnd * 1.19; // ← CON IVA
+                                      const precioIvaUnd = precioNetoUnd * 1.19;
                                       preciosPorCot[c.id] = { precio: Math.round(precioIvaUnd), margen: margenPanel };
                                     }
                                   }
                                   const previewLines = Object.entries(preciosPorCot).map(([id,v]) => {
                                     const c = cotsActivasApl.find(x => x.id===id);
-                                    return `  ${c?.nro || id}: ${v.margen}% → $${v.precio.toLocaleString("es-CL")}/und c/IVA`;
+                                    return `  ${c?.nro || id}: $${v.precio.toLocaleString("es-CL")}/und c/IVA (margen ${v.margen}%)`;
                                   }).join("\n");
-                                  if(!confirm(`✅ Aplicar consolidado al cliente — OP ${op.nro}?\n\nSe guardarán estos precios CON IVA y el cliente los verá en su portal:\n\n${previewLines}`))return;
+                                  const titulo = modoRecalcMargen
+                                    ? `🔄 RE-APLICAR consolidado — OP ${op.nro}\n\nSe MANTIENEN los precios al cliente (ya enviados).\nSe RECALCULA el margen real con los costos actualizados:`
+                                    : `✅ Aplicar consolidado al cliente — OP ${op.nro}\n\nSe guardarán estos precios CON IVA y el cliente los verá en su portal:`;
+                                  if(!confirm(`${titulo}\n\n${previewLines}`))return;
                                   try{
                                     const newOp = {...op, consolidado_aplicado_cliente:true, fecha_aplicacion_cliente: new Date().toISOString()};
                                     delete newOp.id;
