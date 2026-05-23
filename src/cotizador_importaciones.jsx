@@ -175,7 +175,9 @@ function calcCliente(d) {
   // ── Lado Cliente ──
   const pCUnd=pCh+mar, tCl=pCUnd*u;
   const dCl=pago100?0:tCl*pDep, prCl=pago100?0:tCl*(1-pDep);
-  const comCl=pago100?0:prCl*((Number(d.pct_com_prestamo)||6.5)/100), serv=tCl*pServ;
+  // Comisión al cliente = comisión real de la app (manual), no calculada como % del saldo.
+  // ZAGA traslada el costo real sin margen. La ganancia queda en mar/serv, no en comisión.
+  const comCl=pago100?0:comREff, serv=tCl*pServ;
   // IVA cliente: en aéreo se aplica IVA 19% a TODOS los netos (mercadería + gestión aduanera + servicio),
   // como factura normal. cdaCl ahora es solo neto (sin IVA dentro), entonces se trata igual que marítimo.
   const ivaCliente = isAereo
@@ -2260,7 +2262,7 @@ Número de seguimiento: ${c.nro}`;
                               <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#22c55e",marginBottom:8}}>{fmt(p1)}</div>
                               <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.6,borderTop:"1px solid #1a2740",paddingTop:6}}>
                                 <div style={{display:"flex",justifyContent:"space-between"}}><span>Depósito {pctDep}%</span><b style={{color:"#cbd5e1"}}>{fmt(depMonto)}</b></div>
-                                {comMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Comisión {pctCom}%</span><b style={{color:"#cbd5e1"}}>{fmt(comMonto)}</b></div>}
+                                {comMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Comisión préstamo</span><b style={{color:"#cbd5e1"}}>{fmt(comMonto)}</b></div>}
                                 {cdaMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Gestión aduana</span><b style={{color:"#cbd5e1"}}>{fmt(cdaMonto)}</b></div>}
                               </div>
                             </div>
@@ -3217,7 +3219,7 @@ Número de seguimiento: ${c.nro}`;
                         <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#22c55e",marginBottom:8}}>{fmt(p1)}</div>
                         <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.6,borderTop:"1px solid #1a2740",paddingTop:6}}>
                           <div style={{display:"flex",justifyContent:"space-between"}}><span>Depósito {pctDep}%</span><b style={{color:"#cbd5e1"}}>{fmt(depMonto)}</b></div>
-                          {comMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Comisión {pctCom}%</span><b style={{color:"#cbd5e1"}}>{fmt(comMonto)}</b></div>}
+                          {comMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Comisión préstamo</span><b style={{color:"#cbd5e1"}}>{fmt(comMonto)}</b></div>}
                           {cdaMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Gestión aduana</span><b style={{color:"#cbd5e1"}}>{fmt(cdaMonto)}</b></div>}
                         </div>
                       </div>
