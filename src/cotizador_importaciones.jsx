@@ -2126,12 +2126,15 @@ Número de seguimiento: ${c.nro}`;
               // Vista cliente individual — limpia, estilo OP cliente
               const cot = vistaData;
               const u = Number(cot.unidades) || 0;
-              // Precio: usar validado si existe, sino calculado
-              const precioAcordadoUnd = Number(cot.precio_final_acordado_und) || 0;
-              const totClIvaCalc = Number(cot.calc?.totClIva) || (Number(cot.calc?.totCl)*1.19) || 0;
-              const precioFinalUnd = precioAcordadoUnd > 0 ? precioAcordadoUnd : (u > 0 ? totClIvaCalc / u : 0);
-              const totalIva = precioFinalUnd * u;
               const isAereo = cot.transporte === "aereo";
+              // IVA: aéreo siempre lleva IVA; marítimo respeta flag con_iva del form
+              const conIva = isAereo || !!cot.con_iva;
+              // Precio: usar acordado si existe, sino calcular según conIva
+              const precioAcordadoUnd = Number(cot.precio_final_acordado_und) || 0;
+              const totClConIva = Number(cot.calc?.totClIvaFinal) || Number(cot.calc?.totClIva) || (Number(cot.calc?.totCl)||0)*1.19 || 0;
+              const totClSinIva = Number(cot.calc?.totCl) || 0;
+              const totalFinal = precioAcordadoUnd > 0 ? precioAcordadoUnd * u : (conIva ? totClConIva : totClSinIva);
+              const precioFinalUnd = u > 0 ? totalFinal / u : 0;
               // Llegada esti.: aérea 25d, marítima 90d desde pago1 o solicitud
               const calcLlegada = () => {
                 if (cot.fecha_llegada_real) return cot.fecha_llegada_real;
@@ -2149,10 +2152,20 @@ Número de seguimiento: ${c.nro}`;
               };
               const fechaLlegada = calcLlegada();
               const diasLlegada = fechaLlegada ? Math.ceil((new Date(fechaLlegada) - new Date()) / (1000*60*60*24)) : null;
-              // Pagos: aéreo 100%, marítimo split (default 30/70 o flag pago_100)
+              // Pagos: usar p1/p2 ya calculados (respetan pct_deposito del form). Si pago100, p1=total.
               const tienePago100 = !!cot.pago_100 || isAereo;
-              const p1 = tienePago100 ? totalIva : totalIva * 0.5;
-              const p2 = tienePago100 ? 0 : totalIva * 0.5;
+              const p1Calc = conIva ? (Number(cot.calc?.p1ClIva)||0) : (Number(cot.calc?.p1Cl)||0);
+              const p2Calc = conIva ? (Number(cot.calc?.p2ClIva)||0) : (Number(cot.calc?.p2Cl)||0);
+              const sumCalc = p1Calc + p2Calc;
+              // Si hubo ajuste (precio acordado), reescalar p1/p2 proporcionalmente al nuevo total
+              const factor = sumCalc > 0 && totalFinal > 0 ? totalFinal / sumCalc : 1;
+              let p1 = tienePago100 ? totalFinal : p1Calc * factor;
+              let p2 = tienePago100 ? 0 : p2Calc * factor;
+              if (!tienePago100 && sumCalc === 0) { p1 = totalFinal*0.5; p2 = totalFinal*0.5; }
+              const pct1 = totalFinal > 0 ? Math.round((p1/totalFinal)*100) : (tienePago100?100:50);
+              const pct2 = tienePago100 ? 0 : 100 - pct1;
+              const sufIva = conIva ? "c/IVA" : "sin IVA";
+              const lblTotal = conIva ? "TOTAL CON IVA" : "TOTAL SIN IVA";
               return (
                 <div ref={vistaClienteRef} className="opvc-wrap">
                   <div className="opvc-header" style={{background:"#f1f5f9",padding:"24px 32px",display:"flex",justifyContent:"space-between",alignItems:"center",borderRadius:"12px 12px 0 0"}}>
@@ -2173,7 +2186,7 @@ Número de seguimiento: ${c.nro}`;
                     <div className="opvc-banner" style={{padding:"18px 32px",background:"#040c18",color:"#fff",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
                       <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Unidades</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#fff"}}>{fmtN(u)}</div></div>
                       <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Precio / und</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#c9a055"}}>{fmt(precioFinalUnd)}</div></div>
-                      <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Total c/IVA</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(totalIva)}</div></div>
+                      <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Total {sufIva}</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(totalFinal)}</div></div>
                       <div className="opvc-kpi-hide-mob">
                         <div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Transporte</div>
                         <div className="opvc-kpi-val" style={{fontSize:14,fontWeight:700,color:"#c47830"}}>{isAereo?"✈️ Aéreo":"🚢 Marítimo"}</div>
@@ -2200,8 +2213,8 @@ Número de seguimiento: ${c.nro}`;
                               <div style={{fontSize:9,color:"#c47830",fontStyle:"italic",marginTop:2}}>📦 ajustada (pediste {cot.unidades_originales})</div>
                             )}
                           </div>
-                          <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>$/und c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmt(precioFinalUnd)}</div></div>
-                          <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Total c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:800,color:"#1aa358"}}>{fmt(totalIva)}</div></div>
+                          <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>$/und {sufIva}</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmt(precioFinalUnd)}</div></div>
+                          <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Total {sufIva}</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:800,color:"#1aa358"}}>{fmt(totalFinal)}</div></div>
                           <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Llegada esti.</div><div className="opvc-cell-val" style={{fontSize:12,fontWeight:700,color:"#c47830",fontStyle:"italic"}}>≈ {fechaLlegada||"—"}</div></div>
                         </div>
                         {/* Versión móvil compacta */}
@@ -2211,7 +2224,7 @@ Número de seguimiento: ${c.nro}`;
                               <span className="nro-chip">{cot.nro}</span>
                               <span className="prod">{cot.producto}</span>
                             </div>
-                            <span className="tot">{fmt(totalIva)}</span>
+                            <span className="tot">{fmt(totalFinal)}</span>
                           </div>
                           <div className="row2">
                             <span>{fmtN(u)} und × {fmt(precioFinalUnd)}</span>
@@ -2234,20 +2247,20 @@ Número de seguimiento: ${c.nro}`;
                         ) : (
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                             <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
-                              <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>1er pago (50%)</div>
+                              <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>1er pago ({pct1}%)</div>
                               <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Al confirmar</div>
                               <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
                             </div>
                             <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
-                              <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>2do pago (50%)</div>
+                              <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>2do pago ({pct2}%)</div>
                               <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Antes del despacho</div>
                               <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#fbbf24"}}>{fmt(p2)}</div>
                             </div>
                           </div>
                         )}
                         <div className="opvc-pay-total" style={{marginTop:14,paddingTop:12,borderTop:"1px solid #1a2740",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <span style={{fontSize:12,color:"#94a3b8"}}>TOTAL CON IVA</span>
-                          <span className="opvc-pay-total-val" style={{fontSize:22,fontWeight:800,color:"#c9a055"}}>{fmt(totalIva)}</span>
+                          <span style={{fontSize:12,color:"#94a3b8"}}>{lblTotal}</span>
+                          <span className="opvc-pay-total-val" style={{fontSize:22,fontWeight:800,color:"#c9a055"}}>{fmt(totalFinal)}</span>
                         </div>
                       </div>
 
@@ -3052,11 +3065,16 @@ Número de seguimiento: ${c.nro}`;
         // Vista cliente individual — limpia, estilo OP cliente
         const cot = vistaData;
         const u = Number(cot.unidades) || 0;
-        const precioAcordadoUnd = Number(cot.precio_final_acordado_und) || 0;
-        const totClIvaCalc = Number(cot.calc?.totClIva) || (Number(cot.calc?.totCl)*1.19) || 0;
-        const precioFinalUnd = precioAcordadoUnd > 0 ? precioAcordadoUnd : (u > 0 ? totClIvaCalc / u : 0);
-        const totalIva = precioFinalUnd * u;
         const isAereo = cot.transporte === "aereo";
+        // IVA: aéreo siempre lleva IVA; marítimo respeta flag con_iva
+        const conIva = isAereo || !!cot.con_iva;
+        const precioAcordadoUnd = Number(cot.precio_final_acordado_und) || 0;
+        const totClConIva = Number(cot.calc?.totClIvaFinal) || Number(cot.calc?.totClIva) || (Number(cot.calc?.totCl)||0)*1.19 || 0;
+        const totClSinIva = Number(cot.calc?.totCl) || 0;
+        const totalFinal = precioAcordadoUnd > 0 ? precioAcordadoUnd * u : (conIva ? totClConIva : totClSinIva);
+        const precioFinalUnd = u > 0 ? totalFinal / u : 0;
+        const sufIva = conIva ? "c/IVA" : "sin IVA";
+        const lblTotal = conIva ? "TOTAL CON IVA" : "TOTAL SIN IVA";
         const calcLlegadaInd = () => {
           if (cot.fecha_llegada_real) return cot.fecha_llegada_real;
           const dias = isAereo ? 25 : 90;
@@ -3074,8 +3092,15 @@ Número de seguimiento: ${c.nro}`;
         const fechaLlegada = calcLlegadaInd();
         const diasLlegada = fechaLlegada ? Math.ceil((new Date(fechaLlegada) - new Date()) / (1000*60*60*24)) : null;
         const tienePago100 = !!cot.pago_100 || isAereo;
-        const p1 = tienePago100 ? totalIva : totalIva * 0.5;
-        const p2 = tienePago100 ? 0 : totalIva * 0.5;
+        const p1Calc = conIva ? (Number(cot.calc?.p1ClIva)||0) : (Number(cot.calc?.p1Cl)||0);
+        const p2Calc = conIva ? (Number(cot.calc?.p2ClIva)||0) : (Number(cot.calc?.p2Cl)||0);
+        const sumCalc = p1Calc + p2Calc;
+        const factor = sumCalc > 0 && totalFinal > 0 ? totalFinal / sumCalc : 1;
+        let p1 = tienePago100 ? totalFinal : p1Calc * factor;
+        let p2 = tienePago100 ? 0 : p2Calc * factor;
+        if (!tienePago100 && sumCalc === 0) { p1 = totalFinal*0.5; p2 = totalFinal*0.5; }
+        const pct1 = totalFinal > 0 ? Math.round((p1/totalFinal)*100) : (tienePago100?100:50);
+        const pct2 = tienePago100 ? 0 : 100 - pct1;
         return (
         <div style={{position:"fixed",inset:0,background:"#000b",zIndex:900,overflowY:"auto",padding:"12px 8px"}} onClick={e=>e.target===e.currentTarget&&setVistaId(null)}>
           <div style={{maxWidth:820,margin:"0 auto"}}>
@@ -3103,7 +3128,7 @@ Número de seguimiento: ${c.nro}`;
               <div className="opvc-banner" style={{padding:"18px 32px",background:"#040c18",color:"#fff",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
                 <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Unidades</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#fff"}}>{fmtN(u)}</div></div>
                 <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Precio / und</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#c9a055"}}>{fmt(precioFinalUnd)}</div></div>
-                <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Total c/IVA</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(totalIva)}</div></div>
+                <div><div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Total {sufIva}</div><div className="opvc-kpi-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(totalFinal)}</div></div>
                 <div className="opvc-kpi-hide-mob">
                   <div className="opvc-kpi-lbl" style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Transporte</div>
                   <div className="opvc-kpi-val" style={{fontSize:14,fontWeight:700,color:"#c47830"}}>{isAereo?"✈️ Aéreo":"🚢 Marítimo"}</div>
@@ -3132,8 +3157,8 @@ Número de seguimiento: ${c.nro}`;
                         <div style={{fontSize:9,color:"#c47830",fontStyle:"italic",marginTop:2}}>📦 ajustada (pediste {cot.unidades_originales})</div>
                       )}
                     </div>
-                    <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>$/und c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmt(precioFinalUnd)}</div></div>
-                    <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Total c/IVA</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:800,color:"#1aa358"}}>{fmt(totalIva)}</div></div>
+                    <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>$/und {sufIva}</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:700,color:"#222"}}>{fmt(precioFinalUnd)}</div></div>
+                    <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Total {sufIva}</div><div className="opvc-cell-val" style={{fontSize:13,fontWeight:800,color:"#1aa358"}}>{fmt(totalFinal)}</div></div>
                     <div><div className="opvc-cell-lbl" style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Llegada esti.</div><div className="opvc-cell-val" style={{fontSize:12,fontWeight:700,color:"#c47830",fontStyle:"italic"}}>≈ {fechaLlegada||"—"}</div></div>
                   </div>
                   {/* Versión móvil compacta */}
@@ -3143,7 +3168,7 @@ Número de seguimiento: ${c.nro}`;
                         <span className="nro-chip">{cot.nro}</span>
                         <span className="prod">{cot.producto}</span>
                       </div>
-                      <span className="tot">{fmt(totalIva)}</span>
+                      <span className="tot">{fmt(totalFinal)}</span>
                     </div>
                     <div className="row2">
                       <span>{fmtN(u)} und × {fmt(precioFinalUnd)}</span>
@@ -3162,20 +3187,20 @@ Número de seguimiento: ${c.nro}`;
                   ) : (
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                       <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
-                        <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>1er pago (50%)</div>
+                        <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>1er pago ({pct1}%)</div>
                         <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Al confirmar</div>
                         <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
                       </div>
                       <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
-                        <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>2do pago (50%)</div>
+                        <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>2do pago ({pct2}%)</div>
                         <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Antes del despacho</div>
                         <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#fbbf24"}}>{fmt(p2)}</div>
                       </div>
                     </div>
                   )}
                   <div className="opvc-pay-total" style={{marginTop:14,paddingTop:12,borderTop:"1px solid #1a2740",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <span style={{fontSize:12,color:"#94a3b8"}}>TOTAL CON IVA</span>
-                    <span className="opvc-pay-total-val" style={{fontSize:22,fontWeight:800,color:"#c9a055"}}>{fmt(totalIva)}</span>
+                    <span style={{fontSize:12,color:"#94a3b8"}}>{lblTotal}</span>
+                    <span className="opvc-pay-total-val" style={{fontSize:22,fontWeight:800,color:"#c9a055"}}>{fmt(totalFinal)}</span>
                   </div>
                 </div>
 
