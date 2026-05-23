@@ -2162,11 +2162,16 @@ Número de seguimiento: ${c.nro}`;
               let p1 = tienePago100 ? totalFinal : p1Calc * factor;
               let p2 = tienePago100 ? 0 : p2Calc * factor;
               if (!tienePago100 && sumCalc === 0) { p1 = totalFinal*0.5; p2 = totalFinal*0.5; }
-              // % son del DEPÓSITO (parte del 1er pago) — no del 1er pago entero.
-              // El 1er pago incluye depósito + comisión, por eso suma >30% del total. Mostramos el % del form (30/70).
+              // Desglose de componentes (estilo COT-001: Depósito + Comisión / Saldo + Servicio)
+              const ivaMult = conIva ? 1.19 : 1;
               const pctDep = Number(cot.pct_deposito) || 30;
-              const pct1 = tienePago100 ? 100 : pctDep;
-              const pct2 = tienePago100 ? 0 : 100 - pctDep;
+              const pctServ = Number(cot.pct_servicio) || 4;
+              const pctCom = Number(cot.pct_com_prestamo) || 6.5;
+              const depMonto = (Number(cot.calc?.dCl)||0) * ivaMult * factor;
+              const comMonto = (Number(cot.calc?.comCl)||0) * ivaMult * factor;
+              const cdaMonto = (Number(cot.calc?.cdaCl)||0) * ivaMult * factor;
+              const saldoMonto = (Number(cot.calc?.prCl)||0) * ivaMult * factor;
+              const servMonto = (Number(cot.calc?.serv)||0) * ivaMult * factor;
               const sufIva = conIva ? "c/IVA" : "sin IVA";
               const lblTotal = conIva ? "TOTAL CON IVA" : "TOTAL SIN IVA";
               return (
@@ -2250,14 +2255,23 @@ Número de seguimiento: ${c.nro}`;
                         ) : (
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                             <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
-                              <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>1er pago ({pct1}%)</div>
-                              <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Al confirmar</div>
-                              <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
+                              <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>1er pago</div>
+                              <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:6}}>Al confirmar</div>
+                              <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#22c55e",marginBottom:8}}>{fmt(p1)}</div>
+                              <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.6,borderTop:"1px solid #1a2740",paddingTop:6}}>
+                                <div style={{display:"flex",justifyContent:"space-between"}}><span>Depósito {pctDep}%</span><b style={{color:"#cbd5e1"}}>{fmt(depMonto)}</b></div>
+                                {comMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Comisión {pctCom}%</span><b style={{color:"#cbd5e1"}}>{fmt(comMonto)}</b></div>}
+                                {cdaMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Gestión aduana</span><b style={{color:"#cbd5e1"}}>{fmt(cdaMonto)}</b></div>}
+                              </div>
                             </div>
                             <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
-                              <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>2do pago ({pct2}%)</div>
-                              <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Antes del despacho</div>
-                              <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#fbbf24"}}>{fmt(p2)}</div>
+                              <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>2do pago</div>
+                              <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:6}}>Antes del despacho</div>
+                              <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#fbbf24",marginBottom:8}}>{fmt(p2)}</div>
+                              <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.6,borderTop:"1px solid #1a2740",paddingTop:6}}>
+                                <div style={{display:"flex",justifyContent:"space-between"}}><span>Saldo {100-pctDep}%</span><b style={{color:"#cbd5e1"}}>{fmt(saldoMonto)}</b></div>
+                                {servMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Servicio {pctServ}%</span><b style={{color:"#cbd5e1"}}>{fmt(servMonto)}</b></div>}
+                              </div>
                             </div>
                           </div>
                         )}
@@ -3102,10 +3116,16 @@ Número de seguimiento: ${c.nro}`;
         let p1 = tienePago100 ? totalFinal : p1Calc * factor;
         let p2 = tienePago100 ? 0 : p2Calc * factor;
         if (!tienePago100 && sumCalc === 0) { p1 = totalFinal*0.5; p2 = totalFinal*0.5; }
-        // % son del DEPÓSITO (del form pct_deposito) — 1er pago = depósito + comisión, no es solo el %.
+        // Desglose (estilo COT-001: Depósito + Comisión / Saldo + Servicio)
+        const ivaMult = conIva ? 1.19 : 1;
         const pctDep = Number(cot.pct_deposito) || 30;
-        const pct1 = tienePago100 ? 100 : pctDep;
-        const pct2 = tienePago100 ? 0 : 100 - pctDep;
+        const pctServ = Number(cot.pct_servicio) || 4;
+        const pctCom = Number(cot.pct_com_prestamo) || 6.5;
+        const depMonto = (Number(cot.calc?.dCl)||0) * ivaMult * factor;
+        const comMonto = (Number(cot.calc?.comCl)||0) * ivaMult * factor;
+        const cdaMonto = (Number(cot.calc?.cdaCl)||0) * ivaMult * factor;
+        const saldoMonto = (Number(cot.calc?.prCl)||0) * ivaMult * factor;
+        const servMonto = (Number(cot.calc?.serv)||0) * ivaMult * factor;
         return (
         <div style={{position:"fixed",inset:0,background:"#000b",zIndex:900,overflowY:"auto",padding:"12px 8px"}} onClick={e=>e.target===e.currentTarget&&setVistaId(null)}>
           <div style={{maxWidth:820,margin:"0 auto"}}>
@@ -3192,14 +3212,23 @@ Número de seguimiento: ${c.nro}`;
                   ) : (
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                       <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
-                        <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>1er pago ({pct1}%)</div>
-                        <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Al confirmar</div>
-                        <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#22c55e"}}>{fmt(p1)}</div>
+                        <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>1er pago</div>
+                        <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:6}}>Al confirmar</div>
+                        <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#22c55e",marginBottom:8}}>{fmt(p1)}</div>
+                        <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.6,borderTop:"1px solid #1a2740",paddingTop:6}}>
+                          <div style={{display:"flex",justifyContent:"space-between"}}><span>Depósito {pctDep}%</span><b style={{color:"#cbd5e1"}}>{fmt(depMonto)}</b></div>
+                          {comMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Comisión {pctCom}%</span><b style={{color:"#cbd5e1"}}>{fmt(comMonto)}</b></div>}
+                          {cdaMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Gestión aduana</span><b style={{color:"#cbd5e1"}}>{fmt(cdaMonto)}</b></div>}
+                        </div>
                       </div>
                       <div className="opvc-pay-box" style={{background:"#0f1e30",borderRadius:8,padding:"12px 16px"}}>
-                        <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>2do pago ({pct2}%)</div>
-                        <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:4}}>Antes del despacho</div>
-                        <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#fbbf24"}}>{fmt(p2)}</div>
+                        <div className="opvc-pay-box-lbl" style={{fontSize:11,color:"#94a3b8"}}>2do pago</div>
+                        <div className="opvc-pay-box-sub" style={{fontSize:9,color:"#64748b",marginTop:2,marginBottom:6}}>Antes del despacho</div>
+                        <div className="opvc-pay-box-val" style={{fontSize:18,fontWeight:800,color:"#fbbf24",marginBottom:8}}>{fmt(p2)}</div>
+                        <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.6,borderTop:"1px solid #1a2740",paddingTop:6}}>
+                          <div style={{display:"flex",justifyContent:"space-between"}}><span>Saldo {100-pctDep}%</span><b style={{color:"#cbd5e1"}}>{fmt(saldoMonto)}</b></div>
+                          {servMonto>0 && <div style={{display:"flex",justifyContent:"space-between"}}><span>Servicio {pctServ}%</span><b style={{color:"#cbd5e1"}}>{fmt(servMonto)}</b></div>}
+                        </div>
                       </div>
                     </div>
                   )}
