@@ -1748,9 +1748,13 @@ export default function App({ supabase, usuario, onLogout }){
   const cerrarPrint=()=>{ setPrintModal(null); setVistaOpId(null); setVistaOpCliente(null); };
 
   const _vistaRaw=vistaId?cotizaciones.find(c=>c.id===vistaId):null;
-  // Recalcular calc al renderizar la vista — evita que cotizaciones guardadas con cálculos viejos
-  // (pre-fix de IVA aéreo, etc.) muestren números obsoletos. El calc del storage queda solo como caché.
-  const vistaData=_vistaRaw?{..._vistaRaw,calc:_vistaRaw.tipo==="propia"?calcPropia(_vistaRaw):calcCliente(_vistaRaw)}:null;
+  // CRÍTICO: usar el calc HISTÓRICO de Supabase si existe (los montos cobrados al cliente
+  // quedan CONGELADOS). Solo recalcular si calc está vacío (cots viejas sin calc o que el
+  // admin borró manualmente para forzar recálculo con fórmula nueva).
+  // No hacer recálculo on-the-fly de cots ya guardadas: el cliente pagó exactamente esos montos.
+  const vistaData=_vistaRaw
+    ? {..._vistaRaw, calc: _vistaRaw.calc || (_vistaRaw.tipo==="propia"?calcPropia(_vistaRaw):calcCliente(_vistaRaw))}
+    : null;
 
   // ── Dashboard data ────────────────────────────────────────────
   const dashBase=cotizaciones.filter(c=>dashTipo==="clientes"?c.tipo!=="propia":c.tipo==="propia");
