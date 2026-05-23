@@ -2162,8 +2162,11 @@ Número de seguimiento: ${c.nro}`;
               let p1 = tienePago100 ? totalFinal : p1Calc * factor;
               let p2 = tienePago100 ? 0 : p2Calc * factor;
               if (!tienePago100 && sumCalc === 0) { p1 = totalFinal*0.5; p2 = totalFinal*0.5; }
-              const pct1 = totalFinal > 0 ? Math.round((p1/totalFinal)*100) : (tienePago100?100:50);
-              const pct2 = tienePago100 ? 0 : 100 - pct1;
+              // % son del DEPÓSITO (parte del 1er pago) — no del 1er pago entero.
+              // El 1er pago incluye depósito + comisión, por eso suma >30% del total. Mostramos el % del form (30/70).
+              const pctDep = Number(cot.pct_deposito) || 30;
+              const pct1 = tienePago100 ? 100 : pctDep;
+              const pct2 = tienePago100 ? 0 : 100 - pctDep;
               const sufIva = conIva ? "c/IVA" : "sin IVA";
               const lblTotal = conIva ? "TOTAL CON IVA" : "TOTAL SIN IVA";
               return (
@@ -3099,8 +3102,10 @@ Número de seguimiento: ${c.nro}`;
         let p1 = tienePago100 ? totalFinal : p1Calc * factor;
         let p2 = tienePago100 ? 0 : p2Calc * factor;
         if (!tienePago100 && sumCalc === 0) { p1 = totalFinal*0.5; p2 = totalFinal*0.5; }
-        const pct1 = totalFinal > 0 ? Math.round((p1/totalFinal)*100) : (tienePago100?100:50);
-        const pct2 = tienePago100 ? 0 : 100 - pct1;
+        // % son del DEPÓSITO (del form pct_deposito) — 1er pago = depósito + comisión, no es solo el %.
+        const pctDep = Number(cot.pct_deposito) || 30;
+        const pct1 = tienePago100 ? 100 : pctDep;
+        const pct2 = tienePago100 ? 0 : 100 - pctDep;
         return (
         <div style={{position:"fixed",inset:0,background:"#000b",zIndex:900,overflowY:"auto",padding:"12px 8px"}} onClick={e=>e.target===e.currentTarget&&setVistaId(null)}>
           <div style={{maxWidth:820,margin:"0 auto"}}>
