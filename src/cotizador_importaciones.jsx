@@ -1556,7 +1556,11 @@ export default function App({ supabase, usuario, onLogout }){
       delete base.unidades_aereo; // no se persiste, es solo input del form
       const baseChecklist = Object.fromEntries(checklDef.map(c=>[c.key,false]));
       const now = Date.now();
-      const nroBase = cotizaciones.length;
+      // Usar MAX(nro_numero) + 1 en lugar de length+1 — evita duplicados si se borraron cots
+      const nroBase = cotizaciones.reduce((m,c)=>{
+        const n = parseInt(String(c.nro||"").replace(/^COT-/, ""), 10);
+        return isNaN(n) ? m : Math.max(m, n);
+      }, 0);
       // Cot marítima
       const cotMar = {
         ...base, transporte:"maritimo", unidades: undMar,
@@ -1584,7 +1588,15 @@ export default function App({ supabase, usuario, onLogout }){
     // ── MODO NORMAL: una sola cot ──
     const id=editId||Date.now().toString();
     const prev=editId?cotizaciones.find(c=>c.id===editId):null;
-    const nro=prev?.nro||`COT-${String(cotizaciones.length+1).padStart(3,"0")}`;
+    // Usar MAX(nro)+1 en lugar de length+1 — evita duplicados si se borraron cots
+    const nextNro = (() => {
+      const max = cotizaciones.reduce((m,c)=>{
+        const n = parseInt(String(c.nro||"").replace(/^COT-/, ""), 10);
+        return isNaN(n) ? m : Math.max(m, n);
+      }, 0);
+      return `COT-${String(max+1).padStart(3,"0")}`;
+    })();
+    const nro=prev?.nro||nextNro;
     const entry={...form,id,nro,calc:calcActual,
       estado:prev?.estado||"solicitud",
       fecha_llegada_est:prev?.fecha_llegada_est||"",
@@ -1758,7 +1770,15 @@ export default function App({ supabase, usuario, onLogout }){
     if(form.tipo==="cliente"&&!form.cliente){ showToast("Ingresa el nombre del cliente","err"); return; }
     const id=editId||Date.now().toString();
     const prev=editId?cotizaciones.find(c=>c.id===editId):null;
-    const nro=prev?.nro||`COT-${String(cotizaciones.length+1).padStart(3,"0")}`;
+    // Usar MAX(nro)+1 en lugar de length+1 — evita duplicados si se borraron cots
+    const nextNroSol = (() => {
+      const max = cotizaciones.reduce((m,c)=>{
+        const n = parseInt(String(c.nro||"").replace(/^COT-/, ""), 10);
+        return isNaN(n) ? m : Math.max(m, n);
+      }, 0);
+      return `COT-${String(max+1).padStart(3,"0")}`;
+    })();
+    const nro=prev?.nro||nextNroSol;
     const checklDef=form.tipo==="propia"?CHECKLIST_PROPIA:CHECKLIST_CLIENTE;
     const entry={...form,id,nro,calc:null,
       estado:prev?.estado||"solicitud",
