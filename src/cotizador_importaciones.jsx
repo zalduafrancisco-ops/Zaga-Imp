@@ -3513,6 +3513,14 @@ Número de seguimiento: ${c.nro}`;
                   </div>
                 ) : (
                   <BLOCK title="🇨🇳 Cotización China" accent="#2d78c8">
+                    {(()=>{
+                      const esMaritimoV2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !form.pago_100;
+                      return esMaritimoV2 && (
+                        <div style={{fontSize:11,color:"#5b21b6",background:"#faf5ff",borderRadius:8,padding:"8px 12px",border:"1px solid #e9d5ff",marginBottom:10}}>
+                          ✨ <b>Modelo marítimo v2:</b> margen 15% sugerido al ingresar precio China · comisión 6.5% calculada automática · sin ítem servicio.
+                        </div>
+                      );
+                    })()}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
                       {form.transporte==="ambos" ? (
                         <>
@@ -3525,7 +3533,10 @@ Número de seguimiento: ${c.nro}`;
                       <NInput label="Precio China / Unid $" field="precio_china" form={form} setForm={setForm} placeholder="0"/>
                       {form.transporte!=="aereo"&&<>
                         <NInput label="% Depósito" field="pct_deposito" form={form} setForm={setForm} note="Ej: 30 = 30%"/>
-                        <NInput label="⚡ Comisión real APP $" field="comision_real" form={form} setForm={setForm} color="#b8922e" placeholder="0" note="Copia de la app"/>
+                        {/* V1 only: en v2 la comisión se calcula automáticamente (6.5% × 70% precio China) */}
+                        {form.modelo_v2 !== true && (
+                          <NInput label="⚡ Comisión real APP $" field="comision_real" form={form} setForm={setForm} color="#b8922e" placeholder="0" note="Copia de la app"/>
+                        )}
                       </>}
                     </div>
                     {form.transporte==="aereo"&&(
@@ -3886,10 +3897,17 @@ Número de seguimiento: ${c.nro}`;
                       );
                     })()}
 
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-                      <NInput label="% Servicio al cliente" field="pct_servicio" form={form} setForm={setForm} color="#1aa358" note="Ej: 4 = 4%"/>
-                      <NInput label="% Comisión préstamo" field="pct_com_prestamo" form={form} setForm={setForm} color="#b8922e" note="Por defecto 6.5%"/>
-                    </div>
+                    {(()=>{
+                      const esMaritimoV2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !form.pago_100;
+                      // V2: ocultar % servicio (eliminado) y % comisión préstamo (fijo 6.5%)
+                      if (esMaritimoV2) return null;
+                      return (
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+                          <NInput label="% Servicio al cliente" field="pct_servicio" form={form} setForm={setForm} color="#1aa358" note="Ej: 4 = 4%"/>
+                          <NInput label="% Comisión préstamo" field="pct_com_prestamo" form={form} setForm={setForm} color="#b8922e" note="Por defecto 6.5%"/>
+                        </div>
+                      );
+                    })()}
                     <div style={{borderTop:"1px solid #e2e8f0",paddingTop:12}}>
                       <div style={{fontSize:11,color:"#c47830",marginBottom:8,fontWeight:600}}>📋 Certificado especial (CDA u otro)</div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:8}}>
