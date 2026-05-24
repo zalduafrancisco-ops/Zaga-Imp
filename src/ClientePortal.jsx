@@ -263,6 +263,13 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
           var d = typeof r.datos==='string'?JSON.parse(r.datos):r.datos
           return Object.assign({}, d, { id: r.id })
         })
+        // FILTRO MARITIMO v2: ocultar cots que Lenlen ya cotizó pero el admin
+        // aún no validó. Cliente NO debe ver precios provisorios sin aprobación.
+        // Cots viejas sin cotizada_china siguen visibles como siempre.
+        lista = lista.filter(function(c){
+          if(c && c.cotizada_china===true && c.validada_admin!==true) return false
+          return true
+        })
         // Detectar cambios vs ultima visita
         var anteriores = leerEstadosGuardados()
         if(Object.keys(anteriores).length > 0){

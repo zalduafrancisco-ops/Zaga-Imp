@@ -784,6 +784,11 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
           background:"#fafbfc",
         }}>
 
+          {/* FORMULARIO DE COTIZACIÓN — visible cuando Lenlen aún no cotizó (estado solicitud, marítimo) */}
+          {est === "solicitud" && (c.transporte === "maritimo" || c.transporte === "ambos") && (
+            <FormCotChina c={c} supabase={supabase} recargar={recargar} />
+          )}
+
           {/* Link Alibaba */}
           <Campo es="阿里巴巴链接" zh="Link de Alibaba">
             {c.link_alibaba ? (
@@ -1077,6 +1082,199 @@ function Campo({ es, zh, children }) {
         <span style={{ fontSize:10, color:"#94a3b8" }}>/ {zh}</span>
       </div>
       {children}
+    </div>
+  )
+}
+
+// ─── FORMULARIO COTIZACIÓN — solo Lenlen (agente marítima) ─────────────────
+// Editable cuando cot está en "solicitud" + transporte marítimo o ambos.
+// Al guardar: persiste campos + estado → "cotizada" + cotizada_china=true.
+// Cliente NO ve nada hasta que admin marque validada_admin=true (botón en tracker).
+function FormCotChina({ c, supabase, recargar }) {
+  const unidadesTotal = Number(c.unidades) || 0
+  const [sku,        setSku]        = useState(c.sku_china || "")
+  const [undCaja,    setUndCaja]    = useState(c.dim_und_caja || "")
+  const [largo,      setLargo]      = useState(c.dim_largo || "")
+  const [ancho,      setAncho]      = useState(c.dim_ancho || "")
+  const [alto,       setAlto]       = useState(c.dim_alto || "")
+  const [peso,       setPeso]       = useState(c.peso_kg || "")
+  const [material,   setMaterial]   = useState(c.material_china || c.material || "")
+  const [imagenes,   setImagenes]   = useState(c.imagenes_china || "")
+  const [precioClp,  setPrecioClp]  = useState(c.precio_china || "")
+  const [notas,      setNotas]      = useState(c.notas_china || "")
+  const [guardando,  setGuardando]  = useState(false)
+  const [errorMsg,   setErrorMsg]   = useState("")
+  const [okMsg,      setOkMsg]      = useState("")
+
+  // Cálculos auto
+  const nCajas       = (Number(undCaja) || 0) > 0 ? Math.ceil(unidadesTotal / Number(undCaja)) : 0
+  const m3PorCaja    = (Number(largo)||0) * (Number(ancho)||0) * (Number(alto)||0) / 1_000_000
+  const m3Total      = m3PorCaja * nCajas
+  const precioTotal  = (Number(precioClp) || 0) * unidadesTotal
+
+  const inp = {
+    width:"100%", background:"#fff",
+    border:"1px solid #e2e8f0", borderRadius:6,
+    padding:"8px 10px", fontSize:13, color:"#0f172a",
+    outline:"none", boxSizing:"border-box", fontFamily:"inherit",
+  }
+  const lbl = { display:"block", fontSize:10, fontWeight:700, color:"#475569", marginBottom:4, textTransform:"uppercase", letterSpacing:0.3 }
+  const lblZh = { fontSize:10, color:"#94a3b8", marginLeft:4, fontWeight:400 }
+
+  async function handleGuardarCot() {
+    setErrorMsg("")
+    setOkMsg("")
+    if (!Number(precioClp) || Number(precioClp) <= 0) { setErrorMsg("⚠️ 必填价格 / Precio CLP es obligatorio"); return }
+    if (!Number(undCaja) || Number(undCaja) <= 0)     { setErrorMsg("⚠️ 必填每箱单位 / Unidades por caja obligatorio"); return }
+    setGuardando(true)
+    try {
+      // Leer datos frescos para no pisar cambios del admin
+      const { data: fresh, error: fetchErr } = await supabase
+        .from("cotizaciones").select("datos").eq("id", c._id).single()
+      if (fetchErr || !fresh) throw new Error("No se pudo leer cotización: " + (fetchErr?.message||""))
+      const newDatos = {
+        ...fresh.datos,
+        sku_china: sku,
+        dim_und_caja: undCaja,
+        dim_largo: largo, dim_ancho: ancho, dim_alto: alto,
+        dim_m3: m3Total,
+        peso_kg: peso,
+        material_china: material,
+        imagenes_china: imagenes,
+        precio_china: precioClp,
+        notas_china: notas,
+        estado: "cotizada",
+        cotizada_china: true,
+        fecha_cotizada_china: new Date().toISOString(),
+        // validada_admin NO se setea aquí — admin debe aprobar antes que cliente vea
+      }
+      const { data: filas, error } = await supabase
+        .from("cotizaciones")
+        .update({ datos: newDatos, estado: "cotizada", updated_at: new Date().toISOString() })
+        .eq("id", c._id)
+        .select("id")
+      if (error) throw new Error("Supabase: " + (error.message||""))
+      if (!filas || filas.length === 0) throw new Error("SIN_PERMISOS")
+      setOkMsg("✅ 已发送 / Cotización guardada — esperando validación admin")
+      setTimeout(() => { recargar(); }, 1200)
+    } catch(e) {
+      const esSinPermisos = (e?.message||"").includes("SIN_PERMISOS")
+      setErrorMsg(esSinPermisos
+        ? "⚠️ 无权限 / Sin permisos. Avisa al administrador."
+        : "❌ " + (e?.message||"Error guardando"))
+    }
+    setGuardando(false)
+  }
+
+  return (
+    <div style={{
+      background:"#fffbeb", border:"2px solid #c9a05544", borderRadius:10,
+      padding:"14px 16px", marginBottom:14,
+    }}>
+      <div style={{ fontSize:13, fontWeight:800, color:"#92400e", marginBottom:10, display:"flex", alignItems:"center", gap:8 }}>
+        📝 报价单 / Formulario de cotización
+        <span style={{ fontSize:10, color:"#b45309", fontWeight:500, fontStyle:"italic", marginLeft:"auto" }}>
+          {unidadesTotal} und totales solicitadas
+        </span>
+      </div>
+
+      {/* Grid principal */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+        <div>
+          <label style={lbl}>SKU 产品编号<span style={lblZh}>/ SKU China</span></label>
+          <input type="text" value={sku} onChange={e=>setSku(e.target.value)} placeholder="Ej: CN-203" style={inp}/>
+        </div>
+        <div>
+          <label style={lbl}>每箱单位 <span style={lblZh}>/ Unidades por caja</span></label>
+          <input type="number" value={undCaja} onChange={e=>setUndCaja(e.target.value)} placeholder="Ej: 12" style={inp}/>
+        </div>
+      </div>
+
+      <div style={{ marginBottom:10 }}>
+        <label style={lbl}>箱尺寸 cm <span style={lblZh}>/ Dimensiones caja (largo × ancho × alto)</span></label>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6 }}>
+          <input type="number" value={largo} onChange={e=>setLargo(e.target.value)} placeholder="Largo" style={inp}/>
+          <input type="number" value={ancho} onChange={e=>setAncho(e.target.value)} placeholder="Ancho" style={inp}/>
+          <input type="number" value={alto}  onChange={e=>setAlto(e.target.value)}  placeholder="Alto"  style={inp}/>
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+        <div>
+          <label style={lbl}>总重量 kg <span style={lblZh}>/ Peso total</span></label>
+          <input type="number" value={peso} onChange={e=>setPeso(e.target.value)} placeholder="Ej: 350" style={inp}/>
+        </div>
+        <div>
+          <label style={lbl}>材料 <span style={lblZh}>/ Material</span></label>
+          <input type="text" value={material} onChange={e=>setMaterial(e.target.value)} placeholder="Ej: Plástico ABS" style={inp}/>
+        </div>
+      </div>
+
+      <div style={{ marginBottom:10 }}>
+        <label style={lbl}>图片链接 <span style={lblZh}>/ Imágenes URL (una por línea)</span></label>
+        <textarea value={imagenes} onChange={e=>setImagenes(e.target.value)} rows={3}
+          placeholder={"https://...\nhttps://..."}
+          style={{...inp, resize:"vertical", fontFamily:"monospace", fontSize:12}}/>
+      </div>
+
+      <div style={{ marginBottom:10 }}>
+        <label style={lbl} >🔥 价格 CLP / 单位 <span style={lblZh}>/ Precio CLP por unidad (puerta a puerta)</span></label>
+        <input type="number" value={precioClp} onChange={e=>setPrecioClp(e.target.value)}
+          placeholder="Ej: 850"
+          style={{...inp, fontSize:16, fontWeight:800, color:"#92400e", border:"2px solid #c9a055", background:"#fff"}}/>
+      </div>
+
+      <div style={{ marginBottom:10 }}>
+        <label style={lbl}>备注 <span style={lblZh}>/ Notas / Observaciones</span></label>
+        <textarea value={notas} onChange={e=>setNotas(e.target.value)} rows={2}
+          placeholder="Comentarios adicionales..." style={{...inp, resize:"vertical"}}/>
+      </div>
+
+      {/* TABLA RESUMEN */}
+      <div style={{
+        background:"#fff", border:"1px solid #c9a05533", borderRadius:8,
+        padding:"10px 12px", marginBottom:12,
+      }}>
+        <div style={{ fontSize:11, fontWeight:700, color:"#92400e", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5 }}>
+          📊 总结 / Resumen totales
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:8 }}>
+          <ResumenCelda zh="箱数" es="Cajas" val={nCajas} />
+          <ResumenCelda zh="单位" es="Unidades" val={unidadesTotal.toLocaleString("es-CL")} />
+          <ResumenCelda zh="重量" es="Peso" val={peso ? `${Number(peso).toLocaleString("es-CL")} kg` : "—"} />
+          <ResumenCelda zh="体积" es="m³ total" val={m3Total > 0 ? m3Total.toFixed(3) : "—"} />
+          <ResumenCelda zh="价格" es="Total CLP" val={precioTotal > 0 ? "$" + precioTotal.toLocaleString("es-CL") : "—"} highlight />
+        </div>
+      </div>
+
+      {errorMsg && (
+        <div style={{ background:"#fef2f2", border:"1px solid #ef444444", borderRadius:6, padding:"8px 12px", marginBottom:8, fontSize:12, color:"#c0392b" }}>
+          {errorMsg}
+        </div>
+      )}
+      {okMsg && (
+        <div style={{ background:"#f0fdf4", border:"1px solid #22c55e44", borderRadius:6, padding:"8px 12px", marginBottom:8, fontSize:12, color:"#15803d", fontWeight:700 }}>
+          {okMsg}
+        </div>
+      )}
+
+      <button disabled={guardando} onClick={handleGuardarCot} style={{
+        width:"100%", background: guardando ? "#94a3b8" : "#040c18",
+        color:"#c9a055", border:"none", borderRadius:8,
+        padding:"12px 20px", fontSize:14, fontWeight:800, cursor: guardando ? "default" : "pointer",
+        fontFamily:"inherit",
+      }}>
+        {guardando ? "保存中... / Guardando..." : "💾 保存并发送给管理员 / Guardar y enviar al admin"}
+      </button>
+    </div>
+  )
+}
+
+function ResumenCelda({ zh, es, val, highlight }) {
+  return (
+    <div style={{ textAlign:"center", padding:"6px 4px", background: highlight ? "#fef3c7" : "#f8fafc", borderRadius:6, border:`1px solid ${highlight ? "#fbbf24" : "#e2e8f0"}` }}>
+      <div style={{ fontSize:9, color:"#94a3b8", marginBottom:2 }}>{zh} / {es}</div>
+      <div style={{ fontSize:13, fontWeight:800, color: highlight ? "#92400e" : "#0f172a" }}>{val}</div>
     </div>
   )
 }

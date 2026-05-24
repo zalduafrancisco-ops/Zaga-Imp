@@ -4714,6 +4714,31 @@ Número de seguimiento: ${c.nro}`;
                             return txt&&<div style={{color:"#2a8aaa",fontSize:11,marginTop:2}}>📌 {txt.length>80?txt.substring(0,80)+"…":txt}</div>
                           })()}
                           {c.link_alibaba&&<a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" style={{color:"#2d78c8",fontSize:11}}>🔗 Referencia</a>}
+                          {/* Banner: Lenlen cotizó, falta validar admin antes que cliente vea */}
+                          {c.cotizada_china===true && c.validada_admin!==true && (c.transporte==="maritimo"||c.transporte==="ambos") && c.estado==="cotizada" && (
+                            <div style={{background:"#fffbeb",border:"2px solid #c9a05566",borderRadius:8,padding:"8px 12px",marginTop:8,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                              <span style={{fontSize:11,color:"#92400e",fontWeight:700}}>🇨🇳 Lenlen cotizó esta importación · cliente aún no la ve</span>
+                              <button onClick={async(e)=>{
+                                e.stopPropagation();
+                                if(!confirm(`✅ Validar y enviar al cliente?\n\nLa cotización ${c.nro} pasará a ser visible en el portal del cliente con los datos que ingresó Lenlen.\n\nAntes de validar, asegúrate de revisar precio, margen y datos.`)) return;
+                                try {
+                                  const { id, ...rest } = c;
+                                  const newDatos = {...rest, validada_admin:true, fecha_validacion_admin:new Date().toISOString()};
+                                  await supabase.from("cotizaciones").update({datos:newDatos, updated_at:new Date().toISOString()}).eq("id", c.id);
+                                  setCotizaciones(prev => prev.map(x => x.id===c.id ? {...x, validada_admin:true, fecha_validacion_admin:newDatos.fecha_validacion_admin} : x));
+                                  showToast(`✅ ${c.nro} validada — cliente ya la ve`);
+                                } catch(err) {
+                                  showToast("Error: "+(err.message||""),"err");
+                                }
+                              }} style={{background:"#1aa358",color:"#fff",border:"none",borderRadius:6,padding:"6px 14px",fontSize:11,cursor:"pointer",fontWeight:700,marginLeft:"auto"}}>
+                                ✅ Validar y enviar al cliente
+                              </button>
+                            </div>
+                          )}
+                          {/* Marca de validada para info */}
+                          {c.validada_admin===true && (c.transporte==="maritimo"||c.transporte==="ambos") && c.estado==="cotizada" && (
+                            <div style={{fontSize:11,color:"#0d9870",marginTop:6,fontWeight:600}}>✅ Validada · cliente la ve {c.fecha_validacion_admin?`(${fmtFechaCorta(c.fecha_validacion_admin)})`:""}</div>
+                          )}
                           {diasEnTransito!==null&&<div style={{fontSize:11,color:"#b8922e",marginTop:2}}>⏱ En tránsito: {diasEnTransito}d</div>}
                           {c.fecha_llegada_real&&<div style={{fontSize:11,color:"#0d9870",marginTop:2}}>✅ Llegó a bodega: {c.fecha_llegada_real}{tiempoRealTransito!==null?` · ${tiempoRealTransito}d de tránsito`:""}</div>}
                           <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
