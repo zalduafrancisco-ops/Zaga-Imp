@@ -1169,7 +1169,11 @@ function FormCotChina({ c, supabase, recargar }) {
         cotizada_china: true,
         ...(subirAEstadoCotizada
           ? { estado: "cotizada", fecha_cotizada_china: new Date().toISOString() }
-          : {}),
+          : {
+              // Edición posterior: marcar flag para que admin sepa que hay cambios
+              cambio_china_pendiente: true,
+              fecha_cambio_china: new Date().toISOString(),
+            }),
       }
       const updates = { datos: newDatos, updated_at: new Date().toISOString() }
       if (subirAEstadoCotizada) updates.estado = "cotizada"

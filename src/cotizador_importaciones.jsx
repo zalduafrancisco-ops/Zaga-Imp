@@ -4595,6 +4595,12 @@ Número de seguimiento: ${c.nro}`;
                   alertas.push({nivel:"critico",ico:"🇨🇳",titulo:`${c.nro} — ${c.producto}`,msg:`El agente China dejó una nota: "${preview}"`,id:c.id,accion:"gestionar",alertKey:`${c.id}_china_nota`});
                 }
 
+                // 8b. Agente china actualizó datos de cot ya cotizada/pagada — admin debe revisar
+                if(c.cambio_china_pendiente===true){
+                  const fecha = c.fecha_cambio_china ? new Date(c.fecha_cambio_china).toLocaleDateString("es-CL",{day:"2-digit",month:"short"}) : "";
+                  alertas.push({nivel:"critico",ico:"🔄",titulo:`${c.nro} — ${c.cliente||c.producto}`,msg:`Agente China actualizó datos${fecha?` el ${fecha}`:""} — revisa precio, peso, dimensiones`,id:c.id,accion:"gestionar",alertKey:`${c.id}_china_cambio`});
+                }
+
                 // 9. Cliente dejó notas sin leer por admin
                 const notasCliArr=Array.isArray(c.notas_cliente_historial)?c.notas_cliente_historial:[];
                 const noLeidasCli=notasCliArr.filter(n=>n.autor==="cliente"&&!n.leida_por_admin);
@@ -4753,6 +4759,27 @@ Número de seguimiento: ${c.nro}`;
                             return txt&&<div style={{color:"#2a8aaa",fontSize:11,marginTop:2}}>📌 {txt.length>80?txt.substring(0,80)+"…":txt}</div>
                           })()}
                           {c.link_alibaba&&<a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" style={{color:"#2d78c8",fontSize:11}}>🔗 Referencia</a>}
+                          {/* Banner: agente china (Sunny/Lenlen) actualizó la cot, admin debe revisar */}
+                          {c.cambio_china_pendiente===true && (
+                            <div style={{background:"#fff7ed",border:"2px solid #c4783066",borderRadius:8,padding:"8px 12px",marginTop:8,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                              <span style={{fontSize:11,color:"#92400e",fontWeight:700}}>🇨🇳 Agente china actualizó datos {c.fecha_cambio_china?`(${fmtFechaCorta(c.fecha_cambio_china)})`:""} — revisa precio/peso/dim</span>
+                              <button onClick={async(e)=>{
+                                e.stopPropagation();
+                                try {
+                                  const { id, ...rest } = c;
+                                  const newDatos = {...rest, cambio_china_pendiente:false, fecha_revision_admin:new Date().toISOString()};
+                                  delete newDatos.cambio_china_pendiente; // borra el flag
+                                  await supabase.from("cotizaciones").update({datos:{...newDatos, fecha_revision_admin:new Date().toISOString()}, updated_at:new Date().toISOString()}).eq("id", c.id);
+                                  setCotizaciones(prev => prev.map(x => x.id===c.id ? {...x, cambio_china_pendiente:false, fecha_revision_admin:new Date().toISOString()} : x));
+                                  showToast(`✓ ${c.nro} marcada como revisada`);
+                                } catch(err) {
+                                  showToast("Error: "+(err.message||""),"err");
+                                }
+                              }} style={{background:"#c47830",color:"#fff",border:"none",borderRadius:6,padding:"6px 14px",fontSize:11,cursor:"pointer",fontWeight:700,marginLeft:"auto"}}>
+                                ✓ Visto
+                              </button>
+                            </div>
+                          )}
                           {/* Banner: Lenlen cotizó, falta validar admin antes que cliente vea */}
                           {c.cotizada_china===true && c.validada_admin!==true && (c.transporte==="maritimo"||c.transporte==="ambos") && c.estado==="cotizada" && (()=>{
                             // Precio actual c/IVA por unidad (lo que el cliente verá y pagará)

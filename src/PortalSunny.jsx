@@ -724,8 +724,11 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
         if (c.estado === "solicitud") {
           datosMerged.estado = "cotizada"
           datosMerged.fecha_respuesta_china = new Date().toISOString().split("T")[0]
+        } else {
+          // Edición posterior: marcar flag de "Sunny actualizó datos, admin debe revisar"
+          datosMerged.cambio_china_pendiente = true
+          datosMerged.fecha_cambio_china = new Date().toISOString()
         }
-        // En estados posteriores: mantiene estado, solo persiste cambios de costos/peso/dim
       }
       // 6) UPDATE
       const { error: errSave } = await supabase
