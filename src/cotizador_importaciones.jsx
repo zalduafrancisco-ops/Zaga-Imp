@@ -1229,6 +1229,15 @@ export default function App({ supabase, usuario, onLogout }){
   const defaultForm = makeDefaultForm(usuario);
   const [tab2,setTab]=useState("calc");
   const [form,setForm]                   = useState(defaultForm);
+  const [cotizaciones,setCotizaciones]   = useState([]);
+  const cotizacionesRef = useRef([]);
+  // Operaciones consolidadas (aéreas)
+  const [operaciones, setOperaciones] = useState([]);
+  const [opEditId, setOpEditId] = useState(null);          // operación en edición
+  const [opOpenId, setOpOpenId] = useState(null);          // operación expandida en lista
+  const [opForm, setOpForm] = useState(null);              // formulario operación
+  const [opDistribucion, setOpDistribucion] = useState("cbm"); // cbm | unidades
+  const [editId,setEditId]               = useState(null);
   // Autocompletar margen 15% del precio China en marítimo v2, solo si está vacío y crea nueva cot.
   useEffect(()=>{
     if(editId) return;
@@ -1241,15 +1250,6 @@ export default function App({ supabase, usuario, onLogout }){
     const sugerido = Math.round(pCh * 0.15);
     setForm(p => ({...p, margen_und: sugerido}));
   }, [form.precio_china, form.transporte, form.modelo_v2, editId]);
-  const [cotizaciones,setCotizaciones]   = useState([]);
-  const cotizacionesRef = useRef([]);
-  // Operaciones consolidadas (aéreas)
-  const [operaciones, setOperaciones] = useState([]);
-  const [opEditId, setOpEditId] = useState(null);          // operación en edición
-  const [opOpenId, setOpOpenId] = useState(null);          // operación expandida en lista
-  const [opForm, setOpForm] = useState(null);              // formulario operación
-  const [opDistribucion, setOpDistribucion] = useState("cbm"); // cbm | unidades
-  const [editId,setEditId]               = useState(null);
   const [openId,setOpenId]               = useState(null);
   const [filterEstado,setFilterEstado]   = useState("todos");
   const [filterCliente,setFilterCliente] = useState("todos");
