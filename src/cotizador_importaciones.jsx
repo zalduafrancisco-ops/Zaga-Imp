@@ -85,6 +85,12 @@ const makeDefaultForm = (usuario) => ({
   pct_deposito:30, margen_und:"", pct_servicio:4, pct_com_prestamo:6.5, precio_venta_cliente:"",
   fulfillment_und:1200, pct_devolucion:20,
   cda:0, cda_cl:0, cda_descripcion:"", con_iva:false, pago_100:false, notas:"", requiere_factura:false,
+  // Modelo marítimo v2 (default para cots NUEVAS desde 2026-05-24):
+  // - margen default 15% sobre precio China
+  // - sin % servicio al cliente
+  // - comisión 6.5% calculada (cliente sobre 70% precio cliente, china sobre 70% precio china)
+  // Cots viejas no tienen este flag → siguen usando fórmula vieja con servicio + comR manual.
+  modelo_v2:true,
   // Aéreo — costos aduaneros (editables, prefijados según agente)
   form_f_incluido:true, incluir_aforo:true,
   aer_honorarios:150000, aer_edi:15000, aer_despacho:50000, aer_aeropuerto:68000, aer_aforo:48000,
@@ -120,7 +126,10 @@ function calcCliente(d) {
   const pServ=(Number(d.pct_servicio)||pctServDefault)/100, fUnd=Number(d.fulfillment_und)||1200;
   const pDev=(Number(d.pct_devolucion)||20)/100;
   const conFact=!!d.requiere_factura, conIva = isAereo ? true : !!d.con_iva, pago100 = isAereo ? true : !!d.pago_100;
-  const comREff=pago100?0:comR;
+  // Modelo marítimo v2: cots NUEVAS (desde 2026-05-24) → comisión calculada 6.5% sobre china,
+  // no se ingresa manual. Cots viejas (sin modelo_v2) → comR manual como siempre.
+  const esV2Mar = !isAereo && !pago100 && d.modelo_v2 === true;
+  const comREff = pago100 ? 0 : (esV2Mar ? (pCh * u * (1-pDep) * 0.065) : comR);
 
   // ── CDA aéreo: solo NETOS que se trasladan al cliente como ítem en factura ──
   // El IVA aduana (19% × CIF) NO se cobra al cliente como ítem — ZAGA lo paga en el despacho
@@ -175,9 +184,10 @@ function calcCliente(d) {
   // ── Lado Cliente ──
   const pCUnd=pCh+mar, tCl=pCUnd*u;
   const dCl=pago100?0:tCl*pDep, prCl=pago100?0:tCl*(1-pDep);
-  // Comisión al cliente = comisión real de la app (manual), no calculada como % del saldo.
-  // ZAGA traslada el costo real sin margen. La ganancia queda en mar/serv, no en comisión.
-  const comCl=pago100?0:comREff, serv=tCl*pServ;
+  // V2: comisión cliente = 6.5% × saldo cliente (calculada). V1: comCl = comR (manual app).
+  // V2: sin servicio. V1: serv = % sobre tCl.
+  const comCl = pago100 ? 0 : (esV2Mar ? prCl * 0.065 : comREff);
+  const serv = esV2Mar ? 0 : tCl * pServ;
   // IVA cliente: en aéreo se aplica IVA 19% a TODOS los netos (mercadería + gestión aduanera + servicio),
   // como factura normal. cdaCl ahora es solo neto (sin IVA dentro), entonces se trata igual que marítimo.
   const ivaCliente = isAereo
@@ -1219,6 +1229,18 @@ export default function App({ supabase, usuario, onLogout }){
   const defaultForm = makeDefaultForm(usuario);
   const [tab2,setTab]=useState("calc");
   const [form,setForm]                   = useState(defaultForm);
+  // Autocompletar margen 15% del precio China en marítimo v2, solo si está vacío y crea nueva cot.
+  useEffect(()=>{
+    if(editId) return;
+    if(!form.modelo_v2) return;
+    const transMar = form.transporte === "maritimo" || form.transporte === "ambos";
+    if(!transMar) return;
+    const pCh = Number(form.precio_china)||0;
+    if(pCh <= 0) return;
+    if(form.margen_und !== "" && Number(form.margen_und) > 0) return;
+    const sugerido = Math.round(pCh * 0.15);
+    setForm(p => ({...p, margen_und: sugerido}));
+  }, [form.precio_china, form.transporte, form.modelo_v2, editId]);
   const [cotizaciones,setCotizaciones]   = useState([]);
   const cotizacionesRef = useRef([]);
   // Operaciones consolidadas (aéreas)
@@ -1489,16 +1511,55 @@ export default function App({ supabase, usuario, onLogout }){
   const handleSave=async()=>{
     if(!form.producto){ showToast("Ingresa el producto","err"); return; }
     if(form.tipo==="cliente"&&!form.cliente){ showToast("Ingresa el nombre del cliente","err"); return; }
+    const checklDef=form.tipo==="propia"?CHECKLIST_PROPIA:CHECKLIST_CLIENTE;
+
+    // ── MODO AMBOS: crear 2 cots independientes (marítima + aérea) con la misma info base ──
+    // Solo aplica al CREAR (no al editar). Cada cot tendrá su propio nro consecutivo,
+    // su propio transporte y sus unidades específicas. El resto de campos se comparten.
+    if(!editId && form.transporte === "ambos"){
+      const undMar = Number(form.unidades)||0;
+      const undAer = Number(form.unidades_aereo)||0;
+      if(undMar<=0 || undAer<=0){ showToast("Ingresa unidades para marítimo y aéreo","err"); return; }
+      const base = {...form};
+      delete base.unidades_aereo; // no se persiste, es solo input del form
+      const baseChecklist = Object.fromEntries(checklDef.map(c=>[c.key,false]));
+      const now = Date.now();
+      const nroBase = cotizaciones.length;
+      // Cot marítima
+      const cotMar = {
+        ...base, transporte:"maritimo", unidades: undMar,
+        id: now.toString(), nro:`COT-${String(nroBase+1).padStart(3,"0")}`,
+        estado:"solicitud", fecha_llegada_est:"", motivo_no_procesada:"",
+        checklist:{...baseChecklist},
+      };
+      cotMar.calc = calcCliente(cotMar);
+      // Cot aérea (hereda flags aéreos)
+      const cotAer = {
+        ...base, transporte:"aereo", unidades: undAer,
+        pago_100:true, con_iva:true, requiere_factura:true,
+        pct_servicio: (!base.pct_servicio||Number(base.pct_servicio)===4) ? 6 : base.pct_servicio,
+        id: (now+1).toString(), nro:`COT-${String(nroBase+2).padStart(3,"0")}`,
+        estado:"solicitud", fecha_llegada_est:"", motivo_no_procesada:"",
+        checklist:{...baseChecklist},
+      };
+      cotAer.calc = calcCliente(cotAer);
+      await persist([cotAer, cotMar, ...cotizaciones]);
+      showToast(`✓ Creadas ${cotMar.nro} (🚢) y ${cotAer.nro} (✈️)`);
+      setEditId(null); setForm(defaultForm); setTab("tracker");
+      return;
+    }
+
+    // ── MODO NORMAL: una sola cot ──
     const id=editId||Date.now().toString();
     const prev=editId?cotizaciones.find(c=>c.id===editId):null;
     const nro=prev?.nro||`COT-${String(cotizaciones.length+1).padStart(3,"0")}`;
-    const checklDef=form.tipo==="propia"?CHECKLIST_PROPIA:CHECKLIST_CLIENTE;
     const entry={...form,id,nro,calc:calcActual,
       estado:prev?.estado||"solicitud",
       fecha_llegada_est:prev?.fecha_llegada_est||"",
       motivo_no_procesada:prev?.motivo_no_procesada||"",
       checklist:prev?.checklist||Object.fromEntries(checklDef.map(c=>[c.key,false])),
     };
+    delete entry.unidades_aereo; // limpieza por si quedó del form
     if(editId) await persist(cotizaciones.map(c=>c.id===editId?{...entry,historial:c.historial}:c));
     else await persist([entry,...cotizaciones]);
     showToast(editId?"Actualizada ✓":"Guardada ✓");
@@ -3368,7 +3429,7 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{marginBottom:14}}>
                       <label style={{display:"block",fontSize:10,color:"#777",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Tipo de transporte a cotizar</label>
                       <div style={{display:"flex",gap:6}}>
-                        {[["maritimo","🚢 Marítimo","#2a8aaa"],["aereo","✈️ Aéreo","#c47830"]].map(([k,l,col])=>(
+                        {[["maritimo","🚢 Marítimo","#2a8aaa"],["aereo","✈️ Aéreo","#c47830"],["ambos","🔄 Ambos","#7c3aed"]].map(([k,l,col])=>(
                           <button key={k} onClick={()=>setForm(p=>{
                             const next={...p,transporte:k};
                             // Al elegir aéreo: forzar pago 100%, factura, IVA cliente, servicio 6%
@@ -3378,12 +3439,20 @@ Número de seguimiento: ${c.nro}`;
                               next.requiere_factura=true;
                               if(!p.pct_servicio||Number(p.pct_servicio)===4) next.pct_servicio=6;
                             }
+                            // Al volver a marítimo desde aéreo/ambos, devolver defaults marítimos
+                            if(k==="maritimo"){
+                              next.pago_100=false;
+                              if(!p.pct_servicio||Number(p.pct_servicio)===6) next.pct_servicio=4;
+                            }
                             return next;
                           })} style={{flex:1,background:form.transporte===k?col+"18":"#f8fafc",color:form.transporte===k?col:"#64748b",border:`1px solid ${form.transporte===k?col+"66":"#e2e8f0"}`,borderRadius:8,padding:"7px 6px",fontSize:11,cursor:"pointer",fontWeight:form.transporte===k?700:400,textAlign:"center"}}>
                             {l}
                           </button>
                         ))}
                       </div>
+                      {form.transporte==="ambos"&&(
+                        <div style={{fontSize:11,color:"#7c3aed",background:"#faf5ff",borderRadius:7,padding:"6px 10px",border:"1px solid #e9d5ff",marginTop:8}}>🔄 Se crearán <b>2 cotizaciones independientes</b> al guardar — una marítima y una aérea con los datos base que ingreses.</div>
+                      )}
                     </div>
                   )}
 
@@ -3430,7 +3499,14 @@ Número de seguimiento: ${c.nro}`;
                 {esPaso1 ? (
                   <div style={{background:"#f8fafc",borderRadius:12,padding:"14px 16px",marginBottom:12,border:"1px solid #e2e8f0"}}>
                     <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>📦 Unidades a cotizar</div>
-                    <NInput label="Unidades" field="unidades" form={form} setForm={setForm} placeholder="0"/>
+                    {form.transporte==="ambos" ? (
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                        <NInput label="🚢 Und. marítimas" field="unidades" form={form} setForm={setForm} placeholder="0"/>
+                        <NInput label="✈️ Und. aéreas" field="unidades_aereo" form={form} setForm={setForm} placeholder="0"/>
+                      </div>
+                    ) : (
+                      <NInput label="Unidades" field="unidades" form={form} setForm={setForm} placeholder="0"/>
+                    )}
                     <div style={{marginTop:10,fontSize:11,color:"#94a3b8",background:"#f1f5f9",borderRadius:8,padding:"8px 12px",border:"1px dashed #cbd5e1"}}>
                       💡 Cuando China responda, edita esta cotización desde el Tracker para ingresar el precio y calcular todo.
                     </div>
@@ -3438,7 +3514,14 @@ Número de seguimiento: ${c.nro}`;
                 ) : (
                   <BLOCK title="🇨🇳 Cotización China" accent="#2d78c8">
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
-                      <NInput label="Unidades" field="unidades" form={form} setForm={setForm} placeholder="0"/>
+                      {form.transporte==="ambos" ? (
+                        <>
+                          <NInput label="🚢 Und. marítimas" field="unidades" form={form} setForm={setForm} placeholder="0"/>
+                          <NInput label="✈️ Und. aéreas" field="unidades_aereo" form={form} setForm={setForm} placeholder="0"/>
+                        </>
+                      ) : (
+                        <NInput label="Unidades" field="unidades" form={form} setForm={setForm} placeholder="0"/>
+                      )}
                       <NInput label="Precio China / Unid $" field="precio_china" form={form} setForm={setForm} placeholder="0"/>
                       {form.transporte!=="aereo"&&<>
                         <NInput label="% Depósito" field="pct_deposito" form={form} setForm={setForm} note="Ej: 30 = 30%"/>

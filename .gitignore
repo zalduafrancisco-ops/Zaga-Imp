@@ -18,3 +18,6 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# Backups locales (contienen datos sensibles + service keys)
+backups/
