@@ -326,10 +326,9 @@ export default function PortalSunny({ supabase, onLogout }) {
               sueltas.push(c)
             }
           })
-          // Sunny puede editar en estados activos (no terminales) — variables del envío
-          // pueden cambiar levemente cuando se confirma con la transportadora.
-          // Solo no-editables: completadas y no_prospero (cerradas).
-          const TABS_EDITABLES = ["pend_cot","pend_cliente","confirmadas","camino"]
+          // Sunny puede editar solo antes que la carga zarpe: pend_cot, pend_cliente, confirmadas.
+          // En camino / completadas / no_prospero: read-only (la operación ya está en tránsito o cerrada).
+          const TABS_EDITABLES = ["pend_cot","pend_cliente","confirmadas"]
           const CardComp = TABS_EDITABLES.includes(tab) ? CotEditable : CotReadOnly
           const renderCard = (c) => (
             <CardComp key={c._id} c={c} supabase={supabase} ops={ops} isExpanded={editingId === c._id}

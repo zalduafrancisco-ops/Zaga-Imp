@@ -795,11 +795,12 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
           background:"#fafbfc",
         }}>
 
-          {/* FORMULARIO DE COTIZACIÓN — editable en estados activos (solicitud/cotizada/pagada/camino).
-              Lenlen puede ajustar costos/dim/peso si algo cambia con la transportadora.
-              Si admin ya validó precio al cliente (precio_final_acordado_und > 0), el precio del
-              cliente queda CONGELADO y los cambios solo ajustan el margen interno. */}
-          {["solicitud","cotizada","pagada","en_camino"].includes(est) && (c.transporte === "maritimo" || c.transporte === "ambos") && (
+          {/* FORMULARIO DE COTIZACIÓN — editable solo antes que la carga zarpe:
+              solicitud, cotizada, pagada. En en_camino/en_bodega/completada/no_prospero
+              queda read-only (operación en tránsito o cerrada).
+              Si admin ya validó precio al cliente (precio_final_acordado_und > 0), el precio
+              cliente queda CONGELADO y los cambios solo ajustan el margen interno ZAGA. */}
+          {["solicitud","cotizada","pagada"].includes(est) && (c.transporte === "maritimo" || c.transporte === "ambos") && (
             <FormCotChina c={c} supabase={supabase} recargar={recargar} />
           )}
 
