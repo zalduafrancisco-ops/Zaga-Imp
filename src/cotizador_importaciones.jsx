@@ -3998,21 +3998,24 @@ Número de seguimiento: ${c.nro}`;
                 </BLOCK>
 
                 {/* TABLA 2: según tipo */}
-                {form.tipo==="cliente"&&(
+                {form.tipo==="cliente"&&(()=>{
+                  const esMaritimoV2_T2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !form.pago_100 && !calcActual.isAereo;
+                  return (
                   <BLOCK title="📄 Tabla 2 — Cotización al Cliente" accent="#1aa358">
                     <ROW label="Precio por unidad (China + margen)" value={fmt(calcActual.pCUnd)} accent="#1aa358" big/>
                     <ROW label="Total importación" value={fmt(calcActual.tCl)}/>
                     {!form.pago_100&&<ROW label={`Depósito ${form.pct_deposito}%`} value={fmt(calcActual.dCl)} sub/>}
-                    {!form.pago_100&&<ROW label={`Comisión préstamo ${form.pct_com_prestamo||6.5}%`} value={fmt(calcActual.comCl)} accent="#b8922e"/>}
+                    {!form.pago_100&&<ROW label={`Comisión préstamo ${esMaritimoV2_T2 ? "6.5%" : (form.pct_com_prestamo||6.5)+"%"}`} value={fmt(calcActual.comCl)} accent="#b8922e"/>}
                     {(Number(form.cda_cl)||Number(form.cda))>0&&<ROW label={form.cda_descripcion||"Certificado especial"} value={fmt(calcActual.cdaCl)} accent="#c47830"/>}
-                    <ROW label={`Servicio ZAGA ${form.pct_servicio}%`} value={fmt(calcActual.serv)} accent="#1aa358" sub/>
+                    {/* V1: muestra servicio. V2: oculto */}
+                    {!esMaritimoV2_T2 && <ROW label={`Servicio ZAGA ${form.pct_servicio}%`} value={fmt(calcActual.serv)} accent="#1aa358" sub/>}
                     {form.con_iva&&<ROW label="IVA 19% (cobrado al cliente)" value={fmt(calcActual.ivaCliente)} accent="#1aa358" sub/>}
                     <div style={{height:6}}/>
                     {form.pago_100
-                      ? <PAYBOX label="💰 PAGO ÚNICO Cliente" color="#1aa358" amount={form.con_iva?`${fmt(calcActual.p1ClIva)} c/IVA`:fmt(calcActual.p1Cl)} detail={`Total ${fmt(calcActual.tCl)} + Servicio ZAGA ${fmt(calcActual.serv)}${(Number(form.cda_cl)||Number(form.cda))>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cdaCl)}`:""}`}/>
+                      ? <PAYBOX label="💰 PAGO ÚNICO Cliente" color="#1aa358" amount={form.con_iva?`${fmt(calcActual.p1ClIva)} c/IVA`:fmt(calcActual.p1Cl)} detail={`Total ${fmt(calcActual.tCl)}${calcActual.serv>0?` + Servicio ZAGA ${fmt(calcActual.serv)}`:""}${(Number(form.cda_cl)||Number(form.cda))>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cdaCl)}`:""}`}/>
                       : <>
                           <PAYBOX label="1er PAGO Cliente" color="#1aa358" amount={form.con_iva?`${fmt(calcActual.p1ClIva)} c/IVA`:fmt(calcActual.p1Cl)} detail={`Depósito ${fmt(calcActual.dCl)} + Comisión ${fmt(calcActual.comCl)}${(Number(form.cda_cl)||Number(form.cda))>0?` + ${form.cda_descripcion||"Certificado"} ${fmt(calcActual.cdaCl)}`:""}`}/>
-                          <PAYBOX label="2do PAGO Cliente" color="#1aa358" amount={form.con_iva?`${fmt(calcActual.p2ClIva)} c/IVA`:fmt(calcActual.p2Cl)} detail={`Saldo ${fmt(calcActual.prCl)} + Servicio ${fmt(calcActual.serv)}`}/>
+                          <PAYBOX label="2do PAGO Cliente" color="#1aa358" amount={form.con_iva?`${fmt(calcActual.p2ClIva)} c/IVA`:fmt(calcActual.p2Cl)} detail={esMaritimoV2_T2 ? `Saldo ${fmt(calcActual.prCl)}` : `Saldo ${fmt(calcActual.prCl)} + Servicio ${fmt(calcActual.serv)}`}/>
                         </>
                     }
                     <div style={{background:"#f0fdf4",borderRadius:9,padding:"12px 14px",marginTop:8,border:"1px solid #bbf7d0"}}>
@@ -4020,7 +4023,8 @@ Número de seguimiento: ${c.nro}`;
                       <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"#64748b"}}>Precio final / unidad (todo incluido)</span><span style={{fontSize:19,fontWeight:800,color:"#16a34a"}}>{form.con_iva?`${fmt(calcActual.pfUnd*1.19)} c/IVA`:fmt(calcActual.pfUnd)}</span></div>
                     </div>
                   </BLOCK>
-                )}
+                  );
+                })()}
 
                 {form.tipo==="propia"&&(
                   <div style={{background:"#f8fafc",borderRadius:12,padding:20,marginBottom:16,border:"1px solid #e2e8f0"}}>
@@ -4069,12 +4073,16 @@ Número de seguimiento: ${c.nro}`;
                 )}
 
                 {/* TABLA 3: GANANCIA */}
-                {form.tipo==="cliente"&&(
+                {form.tipo==="cliente"&&(()=>{
+                  const esMaritimoV2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !form.pago_100 && !calcActual.isAereo;
+                  return (
                   <div style={{background:"#fffbeb",borderRadius:12,padding:20,marginBottom:16,border:"1px solid #fde68a"}}>
                     <div style={{fontSize:11,color:"#c9a055",letterSpacing:2,fontWeight:700,marginBottom:14,textTransform:"uppercase"}}>⭐ Tabla 3 — Resumen Ganancia ZAGA</div>
                     <ROW label="Ganancia por margen de precio" value={fmt(calcActual.ganMar)} accent="#c9a055"/>
-                    <ROW label={`Servicio ZAGA ${form.pct_servicio}%`} value={fmt(calcActual.ganServ)} accent="#c9a055"/>
-                    {!form.pago_100&&!calcActual.isAereo&&<ROW label="Diferencia comisión (6.5% − real app)" value={fmt(calcActual.difCom)} accent="#aaa" sub/>}
+                    {/* V1: servicio ZAGA. V2: oculto (servicio eliminado) */}
+                    {!esMaritimoV2 && <ROW label={`Servicio ZAGA ${form.pct_servicio}%`} value={fmt(calcActual.ganServ)} accent="#c9a055"/>}
+                    {/* Diferencia comisión: label distinto en v2 (cliente 6.5% vs china 6.5%) */}
+                    {!form.pago_100&&!calcActual.isAereo&&<ROW label={esMaritimoV2 ? "Diferencia comisión (6.5% cliente − 6.5% china)" : "Diferencia comisión (6.5% − real app)"} value={fmt(calcActual.difCom)} accent="#aaa" sub/>}
                     {calcActual.isAereo&&calcActual.aer&&calcActual.aer.difArancel!==0&&(
                       <ROW label="Diferencia arancel (sin Form F · sobre venta − sobre costo)" value={fmt(calcActual.aer.difArancel)} accent={calcActual.aer.difArancel>=0?"#c9a055":"#c0392b"} sub/>
                     )}
@@ -4137,7 +4145,8 @@ Número de seguimiento: ${c.nro}`;
                       <div style={{borderTop:"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:14,color:"#e2e8f0",fontWeight:600}}>GANANCIA TOTAL ESTIMADA</span><span style={{fontSize:26,fontWeight:800,color:"#c9a055"}}>{fmt(calcActual.ganImp)}</span></div>
                     </div>
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* ── PANEL VERIFICACIÓN AÉREO — desglose paso a paso ── */}
                 {form.tipo==="cliente"&&calcActual.isAereo&&calcActual.aer&&(()=>{
