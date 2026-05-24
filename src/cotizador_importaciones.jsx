@@ -4715,18 +4715,35 @@ Número de seguimiento: ${c.nro}`;
                           })()}
                           {c.link_alibaba&&<a href={c.link_alibaba} target="_blank" rel="noopener noreferrer" style={{color:"#2d78c8",fontSize:11}}>🔗 Referencia</a>}
                           {/* Banner: Lenlen cotizó, falta validar admin antes que cliente vea */}
-                          {c.cotizada_china===true && c.validada_admin!==true && (c.transporte==="maritimo"||c.transporte==="ambos") && c.estado==="cotizada" && (
+                          {c.cotizada_china===true && c.validada_admin!==true && (c.transporte==="maritimo"||c.transporte==="ambos") && c.estado==="cotizada" && (()=>{
+                            // Precio actual c/IVA por unidad (lo que el cliente verá y pagará)
+                            const u = Number(c.unidades) || 0;
+                            const conIvaCot = !!c.con_iva;
+                            const totalCli = u > 0
+                              ? (conIvaCot
+                                  ? Number(c.calc?.totClIva || (c.calc?.totCl||0)*1.19)
+                                  : Number(c.calc?.totCl || 0))
+                              : 0;
+                            const precioUnd = u > 0 ? totalCli / u : 0;
+                            return (
                             <div style={{background:"#fffbeb",border:"2px solid #c9a05566",borderRadius:8,padding:"8px 12px",marginTop:8,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                              <span style={{fontSize:11,color:"#92400e",fontWeight:700}}>🇨🇳 Lenlen cotizó esta importación · cliente aún no la ve</span>
+                              <span style={{fontSize:11,color:"#92400e",fontWeight:700}}>🇨🇳 Lenlen cotizó · cliente aún no la ve · precio/und a fijar: <b>{fmt(precioUnd)}</b></span>
                               <button onClick={async(e)=>{
                                 e.stopPropagation();
-                                if(!confirm(`✅ Validar y enviar al cliente?\n\nLa cotización ${c.nro} pasará a ser visible en el portal del cliente con los datos que ingresó Lenlen.\n\nAntes de validar, asegúrate de revisar precio, margen y datos.`)) return;
+                                if(!confirm(`✅ Validar y enviar al cliente?\n\nLa cotización ${c.nro} pasará a ser visible en el portal del cliente.\n\nSe FIJARÁ el precio acordado en: $${Math.round(precioUnd).toLocaleString("es-CL")}/und (total ${u} und = $${Math.round(totalCli).toLocaleString("es-CL")} ${conIvaCot?"c/IVA":"sin IVA"}).\n\nA partir de este momento, si Lenlen edita costos, el precio al cliente NO cambia — solo se ajusta el margen ZAGA.`)) return;
                                 try {
                                   const { id, ...rest } = c;
-                                  const newDatos = {...rest, validada_admin:true, fecha_validacion_admin:new Date().toISOString()};
+                                  const newDatos = {
+                                    ...rest,
+                                    validada_admin:true,
+                                    fecha_validacion_admin:new Date().toISOString(),
+                                    // CONGELAR precio al cliente: persistir como override que sobreescribe totClIva
+                                    // Si Lenlen modifica costos, el precio_final_acordado_und manda y el ajuste va al margen
+                                    precio_final_acordado_und: Math.round(precioUnd),
+                                  };
                                   await supabase.from("cotizaciones").update({datos:newDatos, updated_at:new Date().toISOString()}).eq("id", c.id);
-                                  setCotizaciones(prev => prev.map(x => x.id===c.id ? {...x, validada_admin:true, fecha_validacion_admin:newDatos.fecha_validacion_admin} : x));
-                                  showToast(`✅ ${c.nro} validada — cliente ya la ve`);
+                                  setCotizaciones(prev => prev.map(x => x.id===c.id ? {...x, validada_admin:true, fecha_validacion_admin:newDatos.fecha_validacion_admin, precio_final_acordado_und: Math.round(precioUnd)} : x));
+                                  showToast(`✅ ${c.nro} validada — precio fijado $${Math.round(precioUnd).toLocaleString("es-CL")}/und`);
                                 } catch(err) {
                                   showToast("Error: "+(err.message||""),"err");
                                 }
@@ -4734,7 +4751,8 @@ Número de seguimiento: ${c.nro}`;
                                 ✅ Validar y enviar al cliente
                               </button>
                             </div>
-                          )}
+                            );
+                          })()}
                           {/* Marca de validada para info */}
                           {c.validada_admin===true && (c.transporte==="maritimo"||c.transporte==="ambos") && c.estado==="cotizada" && (
                             <div style={{fontSize:11,color:"#0d9870",marginTop:6,fontWeight:600}}>✅ Validada · cliente la ve {c.fecha_validacion_admin?`(${fmtFechaCorta(c.fecha_validacion_admin)})`:""}</div>

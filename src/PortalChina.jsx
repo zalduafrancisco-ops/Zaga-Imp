@@ -795,8 +795,11 @@ function CotCard({ c, expanded, onToggle, supabase, recargar }) {
           background:"#fafbfc",
         }}>
 
-          {/* FORMULARIO DE COTIZACIÓN — visible cuando Lenlen aún no cotizó (estado solicitud, marítimo) */}
-          {est === "solicitud" && (c.transporte === "maritimo" || c.transporte === "ambos") && (
+          {/* FORMULARIO DE COTIZACIÓN — editable en estados activos (solicitud/cotizada/pagada/camino).
+              Lenlen puede ajustar costos/dim/peso si algo cambia con la transportadora.
+              Si admin ya validó precio al cliente (precio_final_acordado_und > 0), el precio del
+              cliente queda CONGELADO y los cambios solo ajustan el margen interno. */}
+          {["solicitud","cotizada","pagada","en_camino"].includes(est) && (c.transporte === "maritimo" || c.transporte === "ambos") && (
             <FormCotChina c={c} supabase={supabase} recargar={recargar} />
           )}
 
@@ -1143,6 +1146,10 @@ function FormCotChina({ c, supabase, recargar }) {
       const { data: fresh, error: fetchErr } = await supabase
         .from("cotizaciones").select("datos").eq("id", c._id).single()
       if (fetchErr || !fresh) throw new Error("No se pudo leer cotización: " + (fetchErr?.message||""))
+      const estadoActual = fresh.datos.estado || c.estado
+      // Solo subir estado a "cotizada" si estaba en "solicitud" (primera cotización).
+      // En estados posteriores (cotizada/pagada/en_camino): solo persistir datos, no retroceder.
+      const subirAEstadoCotizada = estadoActual === "solicitud"
       const newDatos = {
         ...fresh.datos,
         sku_china: sku,
@@ -1154,19 +1161,23 @@ function FormCotChina({ c, supabase, recargar }) {
         imagenes_china: imagenes,
         precio_china: precioClp,
         notas_china: notas,
-        estado: "cotizada",
         cotizada_china: true,
-        fecha_cotizada_china: new Date().toISOString(),
-        // validada_admin NO se setea aquí — admin debe aprobar antes que cliente vea
+        ...(subirAEstadoCotizada
+          ? { estado: "cotizada", fecha_cotizada_china: new Date().toISOString() }
+          : {}),
       }
+      const updates = { datos: newDatos, updated_at: new Date().toISOString() }
+      if (subirAEstadoCotizada) updates.estado = "cotizada"
       const { data: filas, error } = await supabase
         .from("cotizaciones")
-        .update({ datos: newDatos, estado: "cotizada", updated_at: new Date().toISOString() })
+        .update(updates)
         .eq("id", c._id)
         .select("id")
       if (error) throw new Error("Supabase: " + (error.message||""))
       if (!filas || filas.length === 0) throw new Error("SIN_PERMISOS")
-      setOkMsg("✅ 已发送 / Cotización guardada — esperando validación admin")
+      setOkMsg(subirAEstadoCotizada
+        ? "✅ 已发送 / Cotización guardada — esperando validación admin"
+        : "✅ 已更新 / Datos actualizados (el precio al cliente no cambió)")
       setTimeout(() => { recargar(); }, 1200)
     } catch(e) {
       const esSinPermisos = (e?.message||"").includes("SIN_PERMISOS")
@@ -1177,17 +1188,28 @@ function FormCotChina({ c, supabase, recargar }) {
     setGuardando(false)
   }
 
+  const precioCongelado = Number(c.precio_final_acordado_und) > 0
+  const yaCotizada = c.cotizada_china === true
+  const esRevision = (c.estado === "cotizada" || c.estado === "pagada" || c.estado === "en_camino") && yaCotizada
   return (
     <div style={{
-      background:"#fffbeb", border:"2px solid #c9a05544", borderRadius:10,
+      background: esRevision ? "#eff6ff" : "#fffbeb",
+      border: `2px solid ${esRevision ? "#3d7fc444" : "#c9a05544"}`, borderRadius:10,
       padding:"14px 16px", marginBottom:14,
     }}>
-      <div style={{ fontSize:13, fontWeight:800, color:"#92400e", marginBottom:10, display:"flex", alignItems:"center", gap:8 }}>
-        📝 报价单 / Formulario de cotización
-        <span style={{ fontSize:10, color:"#b45309", fontWeight:500, fontStyle:"italic", marginLeft:"auto" }}>
+      <div style={{ fontSize:13, fontWeight:800, color: esRevision ? "#1d4ed8" : "#92400e", marginBottom:10, display:"flex", alignItems:"center", gap:8 }}>
+        📝 {esRevision ? "修改报价 / Editar cotización" : "报价单 / Formulario de cotización"}
+        <span style={{ fontSize:10, color: esRevision ? "#3d7fc4" : "#b45309", fontWeight:500, fontStyle:"italic", marginLeft:"auto" }}>
           {unidadesTotal} und totales solicitadas
         </span>
       </div>
+
+      {/* Banner: precio cliente congelado */}
+      {precioCongelado && (
+        <div style={{ background:"#fef3c7", border:"1px solid #fbbf24", borderRadius:8, padding:"8px 12px", marginBottom:10, fontSize:11, color:"#92400e", lineHeight:1.5 }}>
+          🔒 <b>客户价格已固定 / Precio al cliente fijado:</b> ${Number(c.precio_final_acordado_und).toLocaleString("es-CL")}/und · El cliente ya recibió la cotización. Tus cambios solo ajustan el margen interno ZAGA, no el precio al cliente.
+        </div>
+      )}
 
       {/* Grid principal */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>

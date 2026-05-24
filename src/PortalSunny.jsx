@@ -326,7 +326,11 @@ export default function PortalSunny({ supabase, onLogout }) {
               sueltas.push(c)
             }
           })
-          const CardComp = tab === "pend_cot" ? CotEditable : CotReadOnly
+          // Sunny puede editar en estados activos (no terminales) — variables del envío
+          // pueden cambiar levemente cuando se confirma con la transportadora.
+          // Solo no-editables: completadas y no_prospero (cerradas).
+          const TABS_EDITABLES = ["pend_cot","pend_cliente","confirmadas","camino"]
+          const CardComp = TABS_EDITABLES.includes(tab) ? CotEditable : CotReadOnly
           const renderCard = (c) => (
             <CardComp key={c._id} c={c} supabase={supabase} ops={ops} isExpanded={editingId === c._id}
               onExpand={() => setEditing(editingId === c._id ? null : c._id)} onSaved={loadData} />
@@ -704,10 +708,14 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
         datosMerged.notas_china_historial = hist
         datosMerged.nota_china_nueva = true
       }
-      // 5) Si se envía a admin, cambiar estado
+      // 5) Si se envía a admin, cambiar estado SOLO si está en "solicitud".
+      // No retroceder cots ya cotizadas/pagadas/en_camino — solo guardar los datos editados.
       if (enviarAdmin) {
-        datosMerged.estado = "cotizada"
-        datosMerged.fecha_respuesta_china = new Date().toISOString().split("T")[0]
+        if (c.estado === "solicitud") {
+          datosMerged.estado = "cotizada"
+          datosMerged.fecha_respuesta_china = new Date().toISOString().split("T")[0]
+        }
+        // En estados posteriores: mantiene estado, solo persiste cambios de costos/peso/dim
       }
       // 6) UPDATE
       const { error: errSave } = await supabase
