@@ -127,14 +127,22 @@ export default function PortalSunny({ supabase, onLogout }) {
         .map(r => ({ ...r.datos, _id: r.id, _updated: r.updated_at || r.created_at }))
         .filter(c => TODOS_ESTADOS.includes(c.estado))
         .filter(c => c.transporte === "aereo")
-        .sort((a, b) => new Date(b._updated) - new Date(a._updated))
+        .sort((a, b) => {
+          // Ordenar por correlativo de cot (COT-NNN), descendente (más nuevo primero)
+          const getN = c => parseInt(String(c.nro||"").replace(/^COT-/,""), 10) || 0
+          return getN(b) - getN(a)
+        })
       setCots(relevantes)
     }
     if (!opsRes.error && opsRes.data) {
       // Guardar TODAS las ops (para badge en cards + dropdown de "ya consolidadas")
       const todasOps = opsRes.data
         .map(r => ({ ...r.datos, _id: r.id, _updated: r.updated_at || r.created_at }))
-        .sort((a, b) => new Date(b._updated) - new Date(a._updated))
+        .sort((a, b) => {
+          // Ordenar por correlativo de cot (COT-NNN), descendente (más nuevo primero)
+          const getN = c => parseInt(String(c.nro||"").replace(/^COT-/,""), 10) || 0
+          return getN(b) - getN(a)
+        })
       setOps(todasOps)
     }
     setLoading(false)

@@ -117,7 +117,11 @@ export default function PortalChina({ supabase, onLogout }) {
       const relevantes = data
         .map(r => ({ ...r.datos, _id: r.id, _updated: r.updated_at || r.created_at }))
         .filter(c => TODOS_ESTADOS.includes(c.estado))
-        .sort((a, b) => new Date(b._updated) - new Date(a._updated))
+        .sort((a, b) => {
+          // Ordenar por correlativo COT-NNN descendente (más nuevo arriba)
+          const getN = c => parseInt(String(c.nro||"").replace(/^COT-/,""), 10) || 0
+          return getN(b) - getN(a)
+        })
       setCots(relevantes)
     }
     setLoading(false)
