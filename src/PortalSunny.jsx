@@ -1786,31 +1786,76 @@ function OpPagoCard({ op, cots }) {
   const cotsOp = cots.filter(c => c.operacion_id === op._id || (Array.isArray(op.cotizaciones) && op.cotizaciones.includes(c._id)))
   if (cotsOp.length === 0) return null
 
-  // Calcular total RMB acordado de la OP (suma de las cots)
+  // ── Detectar modelo: LEGACY (op.costos_china con todo) vs NUEVO (campos por cot) ──
+  const legacy = op.costos_china && (Number(op.costos_china.productos_rmb) > 0 || Number(op.costos_china.peso_kg) > 0)
+  const cc = op.costos_china || {}
+
+  // Calcular total RMB acordado de la OP
   let totalRMB = 0
   const desgloseRMB = []
-  for (const c of cotsOp) {
-    const u = Number(c.unidades) || 0
-    const merc = (Number(c.precio_china_rmb)||0) * u
-    const comPct = Number(c.comision_sunny_pct ?? op.comision_sunny_pct) || 0
-    const com = merc * comPct / 100
-    // Flete: usar tarifa RMB/kg si está, sino USD/kg
-    const tarifaRmbKg = Number(c.aer_tarifa_sunny_rmb_kg || op.flete_rmb_kg_consolidado) || 0
-    const tarifaUsdKg = Number(c.aer_tarifa_sunny_kg) || 0
-    const pesoKg = (Number(c.peso_kg)||0) * (Number(c.dim_und_caja)>0 ? Math.ceil(u/Number(c.dim_und_caja)) : 0)
-    const fleteRmb = tarifaRmbKg > 0 ? pesoKg * tarifaRmbKg : pesoKg * tarifaUsdKg * TC_RMB_USD
-    const certOrigen = Number(c.cost_cert_origen_rmb) || 0
-    const sub = merc + com + fleteRmb + certOrigen
-    desgloseRMB.push({ nro: c.nro, cliente: c.cliente, merc, com, fleteRmb, certOrigen, sub })
-    totalRMB += sub
+
+  if (legacy) {
+    // ── MODELO LEGACY (OP-001): todo en op.costos_china ──
+    const productosRmb  = Number(cc.productos_rmb) || 0
+    const comisionPct   = Number(cc.comision_pct) || 0
+    const comisionRmb   = productosRmb * comisionPct / 100
+    const pesoKg        = Number(cc.peso_kg) || 0
+    const fleteRmbKg    = Number(cc.flete_rmb_kg) || 0
+    const fleteUsdKg    = Number(cc.flete_usd_kg) || 0
+    const fleteRmb      = fleteRmbKg > 0 ? pesoKg * fleteRmbKg : pesoKg * fleteUsdKg * TC_RMB_USD
+    const logisticaRmb  = Number(cc.logistica_rmb) || 0
+    const formFRmb      = (Number(cc.form_f_rmb_por_producto) || 0) * cotsOp.length
+    const docsRmb       = Number(cc.docs_operacion_rmb) || 0
+    const comprarDocsRmb= Number(cc.compra_docs_rmb) || 0
+    const despachoRmb   = Number(cc.despacho_exportacion_rmb) || 0
+    const seguroPct     = Number(cc.seguro_pct) || 0
+    const seguroRmb     = productosRmb * (seguroPct / 100)
+    const otrosUsd      = Number(cc.otros_usd) || 0
+    const otrosRmb      = otrosUsd * TC_RMB_USD
+
+    desgloseRMB.push(
+      { lbl: "💰 货物 Mercancía",       val: productosRmb },
+      { lbl: `📊 佣金 Comisión ${comisionPct}%`, val: comisionRmb },
+      { lbl: `✈️ 运费 Flete (${pesoKg} kg × ¥${fleteRmbKg||fleteUsdKg*TC_RMB_USD.toFixed(2)}/kg)`, val: fleteRmb },
+      { lbl: "🚚 物流 Yiwu→Shanghai",   val: logisticaRmb },
+      { lbl: `📄 Form F × ${cotsOp.length} cots`, val: formFRmb },
+      { lbl: "📋 Docs operación",       val: docsRmb },
+      { lbl: "📋 Compra docs",          val: comprarDocsRmb },
+      { lbl: "🛃 Despacho exportación", val: despachoRmb },
+      { lbl: `🛡️ Seguro ${seguroPct}%`,  val: seguroRmb },
+      { lbl: "⚙️ Otros (USD → RMB)",     val: otrosRmb },
+    )
+    totalRMB = desgloseRMB.reduce((s,d) => s + (Number(d.val)||0), 0)
+  } else {
+    // ── MODELO NUEVO (OP-002+): campos por cot + extras top-level ──
+    for (const c of cotsOp) {
+      const u = Number(c.unidades) || 0
+      const merc = (Number(c.precio_china_rmb)||0) * u
+      const comPct = Number(c.comision_sunny_pct ?? op.comision_sunny_pct) || 0
+      const com = merc * comPct / 100
+      const tarifaRmbKg = Number(c.aer_tarifa_sunny_rmb_kg || op.flete_rmb_kg_consolidado) || 0
+      const tarifaUsdKg = Number(c.aer_tarifa_sunny_kg) || 0
+      const pesoKg = (Number(c.peso_kg)||0) * (Number(c.dim_und_caja)>0 ? Math.ceil(u/Number(c.dim_und_caja)) : 0)
+      const fleteRmb = tarifaRmbKg > 0 ? pesoKg * tarifaRmbKg : pesoKg * tarifaUsdKg * TC_RMB_USD
+      const certOrigen = Number(c.cost_cert_origen_rmb) || 0
+      const sub = merc + com + fleteRmb + certOrigen
+      desgloseRMB.push({
+        lbl: `📦 ${c.nro} (${c.cliente || "—"})`,
+        val: sub,
+        sub: `Merc ¥${fmtN(merc,0)} + Com ¥${fmtN(com,0)} + Flete ¥${fmtN(fleteRmb,0)} + Cert ¥${fmtN(certOrigen,0)}`,
+      })
+      totalRMB += sub
+    }
+    const extrasOpRMB =
+      (Number(op.cost_doc_operacion_rmb) || 0) +
+      (Number(op.cost_despacho_aduanero_rmb) || 0) +
+      (Number(op.cost_compra_docs_rmb) || 0) +
+      (Number(op.cost_transporte_interno_cn_rmb) || 0)
+    if (extrasOpRMB > 0) {
+      desgloseRMB.push({ lbl: "⚙️ Extras OP (docs+despacho+transporte interno)", val: extrasOpRMB })
+      totalRMB += extrasOpRMB
+    }
   }
-  // Extras OP (compartidos: docs, despacho, transporte interno, seguro)
-  const extrasOpRMB =
-    (Number(op.cost_doc_operacion_rmb) || 0) +
-    (Number(op.cost_despacho_aduanero_rmb) || 0) +
-    (Number(op.cost_compra_docs_rmb) || 0) +
-    (Number(op.cost_transporte_interno_cn_rmb) || 0)
-  totalRMB += extrasOpRMB
 
   // Pagos realizados
   const pagos = op.pagos_reales?.egresos || {}
@@ -1832,6 +1877,9 @@ function OpPagoCard({ op, cots }) {
     totalClpPagado += totalClp
     return { ...p, rmb, tc, clp, com, ivaCom, totalClp, fecha: e.fecha, nota: e.nota, pagado: rmb > 0 || clp > 0 }
   })
+  // "Pagado completo" = LOS 3 PAGOS están hechos (no por monto, que puede tener TC distinto)
+  const nPagados = pagosCalc.filter(p => p.pagado).length
+  const todosPagados = nPagados === 3
   const saldoRmb = totalRMB - totalRmbPagado
 
   return (
@@ -1841,14 +1889,14 @@ function OpPagoCard({ op, cots }) {
           <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:4 }}>
             <span style={{ background:"#040c18", color:"#c47830", borderRadius:5, padding:"3px 9px", fontSize:12, fontWeight:800 }}>✈️ {op.nro}</span>
             <span style={{ background:"#fff", color:"#854d0e", border:"1px solid #fde68a", borderRadius:5, padding:"2px 8px", fontSize:11 }}>{cotsOp.length} cot · {cotsOp.reduce((s,c)=>s+(Number(c.unidades)||0),0)} und</span>
-            <span style={{ background:saldoRmb<=0?"#dcfce7":"#fef3c7", color:saldoRmb<=0?"#15803d":"#92400e", border:`1px solid ${saldoRmb<=0?"#22c55e":"#fbbf24"}`, borderRadius:5, padding:"2px 8px", fontSize:11, fontWeight:700 }}>
-              {saldoRmb<=0 ? "✓ 已全部支付 Pagado completo" : `⏳ 待付款 / Saldo ¥${fmtN(saldoRmb,0)}`}
+            <span style={{ background:todosPagados?"#dcfce7":"#fef3c7", color:todosPagados?"#15803d":"#92400e", border:`1px solid ${todosPagados?"#22c55e":"#fbbf24"}`, borderRadius:5, padding:"2px 8px", fontSize:11, fontWeight:700 }}>
+              {todosPagados ? "✓ 3/3 已支付 Pagada completa" : `⏳ ${nPagados}/3 pagos · 待付款 / Falta ${3-nPagados}`}
             </span>
           </div>
           <div style={{ fontSize:12, color:"#854d0e", display:"flex", gap:12, flexWrap:"wrap" }}>
             <span>总额 / Total acordado: <b>¥{fmtN(totalRMB,2)}</b></span>
-            <span>已付 / Pagado: <b>¥{fmtN(totalRmbPagado,2)}</b></span>
-            <span>CLP pagado: <b>${fmtN(totalClpPagado,0)}</b></span>
+            {totalRmbPagado>0 && <span>已付 / Pagado: <b>¥{fmtN(totalRmbPagado,2)}</b></span>}
+            {totalClpPagado>0 && <span>CLP enviado: <b>${fmtN(totalClpPagado,0)}</b></span>}
           </div>
         </div>
         <div style={{ fontSize:22, color:"#854d0e" }}>{expanded ? "▾" : "▸"}</div>
@@ -1856,31 +1904,21 @@ function OpPagoCard({ op, cots }) {
 
       {expanded && (
         <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:14 }}>
-          {/* Desglose RMB por cot */}
+          {/* Desglose RMB */}
           <div>
             <div style={{ fontSize:11, fontWeight:700, color:"#475569", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5 }}>
-              📦 报价分解 / Desglose por cotización (RMB)
+              📋 报价分解 / Desglose total acordado (RMB)
             </div>
             <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, padding:"8px 10px" }}>
-              {desgloseRMB.map((d,i) => (
-                <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr auto auto auto auto auto", gap:8, padding:"5px 0", borderTop: i>0?"1px solid #e2e8f0":"none", fontSize:11 }}>
-                  <div>
-                    <div style={{ fontWeight:700, color:"#0f172a" }}>{d.nro}</div>
-                    <div style={{ fontSize:10, color:"#94a3b8" }}>{d.cliente || "—"}</div>
+              {desgloseRMB.filter(d => Number(d.val) > 0).map((d,i) => (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderTop: i>0?"1px solid #e2e8f0":"none", fontSize:11, alignItems:"center", gap:8 }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ color:"#0f172a", fontWeight:500 }}>{d.lbl}</div>
+                    {d.sub && <div style={{ fontSize:9, color:"#94a3b8", marginTop:2 }}>{d.sub}</div>}
                   </div>
-                  <span style={{ color:"#64748b" }}>货物 Merc: <b style={{ color:"#0f172a" }}>¥{fmtN(d.merc,0)}</b></span>
-                  <span style={{ color:"#64748b" }}>佣金 Com: <b style={{ color:"#0f172a" }}>¥{fmtN(d.com,0)}</b></span>
-                  <span style={{ color:"#64748b" }}>运费 Flete: <b style={{ color:"#0f172a" }}>¥{fmtN(d.fleteRmb,0)}</b></span>
-                  <span style={{ color:"#64748b" }}>原产地 Cert: <b style={{ color:"#0f172a" }}>¥{fmtN(d.certOrigen,0)}</b></span>
-                  <span style={{ color:"#0f172a", fontWeight:700 }}>= ¥{fmtN(d.sub,0)}</span>
+                  <span style={{ color:"#0f172a", fontWeight:700, whiteSpace:"nowrap" }}>¥{fmtN(d.val, 2)}</span>
                 </div>
               ))}
-              {extrasOpRMB > 0 && (
-                <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:8, padding:"7px 0", borderTop:"1px dashed #cbd5e1", fontSize:11, marginTop:4 }}>
-                  <span style={{ color:"#64748b" }}>⚙️ 其他费用 / Extras OP (docs, despacho, transporte interno)</span>
-                  <span style={{ color:"#0f172a", fontWeight:700 }}>¥{fmtN(extrasOpRMB,0)}</span>
-                </div>
-              )}
               <div style={{ display:"flex", justifyContent:"space-between", padding:"8px 0 2px", borderTop:"2px solid #c47830", marginTop:6, fontSize:12 }}>
                 <span style={{ color:"#92400e", fontWeight:800 }}>总金额 / TOTAL RMB acordado</span>
                 <span style={{ color:"#c47830", fontWeight:800, fontSize:14 }}>¥{fmtN(totalRMB,2)}</span>
@@ -1926,18 +1964,18 @@ function OpPagoCard({ op, cots }) {
           </div>
 
           {/* Resumen final */}
-          <div style={{ background: saldoRmb<=0 ? "#dcfce7" : "#fffbeb", border:`2px solid ${saldoRmb<=0 ? "#22c55e" : "#fbbf24"}`, borderRadius:8, padding:"10px 14px" }}>
+          <div style={{ background: todosPagados ? "#dcfce7" : "#fffbeb", border:`2px solid ${todosPagados ? "#22c55e" : "#fbbf24"}`, borderRadius:8, padding:"10px 14px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <div>
-                <div style={{ fontSize:11, color: saldoRmb<=0 ? "#15803d" : "#92400e", fontWeight:700 }}>
-                  {saldoRmb<=0 ? "✅ 已全部支付 / Totalmente pagada" : "⏳ Saldo pendiente / 待付款"}
+                <div style={{ fontSize:11, color: todosPagados ? "#15803d" : "#92400e", fontWeight:700 }}>
+                  {todosPagados ? "✅ 3/3 已支付 / Totalmente pagada" : `⏳ ${nPagados}/3 pagos · Falta ${3-nPagados}`}
                 </div>
                 <div style={{ fontSize:10, color:"#64748b", marginTop:2 }}>
-                  Pagado ¥{fmtN(totalRmbPagado, 0)} de ¥{fmtN(totalRMB, 0)}
+                  Pagado ¥{fmtN(totalRmbPagado, 0)} de ¥{fmtN(totalRMB, 0)} acordados
                 </div>
               </div>
-              <div style={{ fontSize:18, fontWeight:800, color: saldoRmb<=0 ? "#15803d" : "#92400e" }}>
-                {saldoRmb<=0 ? "✓" : `¥${fmtN(saldoRmb, 0)}`}
+              <div style={{ fontSize:18, fontWeight:800, color: todosPagados ? "#15803d" : "#92400e" }}>
+                {todosPagados ? "✓" : `${nPagados}/3`}
               </div>
             </div>
           </div>
