@@ -930,20 +930,39 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
   }
 
   // Inputs con formato $ (CLP) / ¥ (RMB) — separadores de miles
-  const moneyInput = (val, onChange, currency="$", w=130, ph) => {
+  // allowDec=true: permite decimales con coma o punto (para RMB que puede tener centavos)
+  const moneyInput = (val, onChange, currency="$", w=130, ph, allowDec=false) => {
     const n = Number(val) || 0;
-    const display = n > 0 ? currency + n.toLocaleString("es-CL") : "";
+    const display = n > 0 ? currency + n.toLocaleString("es-CL", allowDec ? { maximumFractionDigits: 2 } : { maximumFractionDigits: 0 }) : "";
     return (
       <input type="text" value={display} placeholder={ph || (currency+"0")}
         onChange={e => {
-          const raw = e.target.value.replace(/[^\d]/g, "");
-          onChange(Number(raw) || 0);
+          let raw = e.target.value.replace(currency, "").trim();
+          if (allowDec) {
+            // Acepta '.' o ',' como decimal. Remueve separadores de miles.
+            // Lógica: si tiene coma Y punto, asume formato es-CL (puntos miles, coma decimal).
+            // Si solo coma, es decimal. Si solo punto, depende — preferimos decimal si hay 1 sólo y va seguido de 1-2 dígitos.
+            const tieneComa = raw.includes(",");
+            const tienePunto = raw.includes(".");
+            if (tieneComa && tienePunto) raw = raw.replace(/\./g, "").replace(",", ".");
+            else if (tieneComa) raw = raw.replace(",", ".");
+            // si solo punto, lo dejamos como decimal (ej: 34492.71)
+            raw = raw.replace(/[^\d.]/g, "");
+            // Si hay múltiples puntos, conservar solo el último como decimal
+            const partes = raw.split(".");
+            if (partes.length > 2) raw = partes.slice(0,-1).join("") + "." + partes[partes.length-1];
+            onChange(Number(raw) || 0);
+          } else {
+            raw = raw.replace(/[^\d]/g, "");
+            onChange(Number(raw) || 0);
+          }
         }}
         style={{width:w,padding:"5px 7px",border:"1px solid #cbd5e1",borderRadius:6,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fff"}}/>
     );
   };
   const numInput = (val, onChange, w=130, ph) => moneyInput(val, onChange, "$", w, ph);
-  const rmbInput = (val, onChange, w=120) => moneyInput(val, onChange, "¥", w, "¥0");
+  // RMB sí permite decimales (Sunny envía montos con centavos, ej 34.492,71)
+  const rmbInput = (val, onChange, w=120) => moneyInput(val, onChange, "¥", w, "¥0", true);
   const decInput = (val, onChange, w=80, step="0.01", ph="0,00") => (
     <input type="number" step={step} min="0" value={val||""} placeholder={ph}
       onChange={e=>onChange(Number(e.target.value)||0)}

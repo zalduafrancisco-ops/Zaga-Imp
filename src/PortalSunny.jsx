@@ -1786,76 +1786,81 @@ function OpPagoCard({ op, cots }) {
   const cotsOp = cots.filter(c => c.operacion_id === op._id || (Array.isArray(op.cotizaciones) && op.cotizaciones.includes(c._id)))
   if (cotsOp.length === 0) return null
 
-  // ── Detectar modelo: LEGACY (op.costos_china con todo) vs NUEVO (campos por cot) ──
-  const legacy = op.costos_china && (Number(op.costos_china.productos_rmb) > 0 || Number(op.costos_china.peso_kg) > 0)
+  // ────────────────────────────────────────────────────────────────────
+  // CÁLCULO RMB — Replica exacta del panel "Comparativo RMB" del admin
+  // (cotizador_importaciones.jsx línea ~6263). No reinventar, copiar literal.
+  // ────────────────────────────────────────────────────────────────────
+  const cotsActivas = cotsOp.filter(c => !["no_prospero"].includes(c.estado))
   const cc = op.costos_china || {}
+  const comPct      = Number(op.comision_sunny_pct ?? cc.comision_pct) || 0
+  const segPctRaw   = Number(op.seguro_pct ?? cc.seguro_pct) || 0
+  const segPct      = segPctRaw > 1 ? segPctRaw/100 : segPctRaw
+  const segMin      = Number(op.seguro_min_rmb) || 0
+  const certOri     = Number(op.cost_cert_origen_rmb) || 0
+  const docOpV      = Number(op.cost_doc_operacion_rmb) || 0
+  const despV       = Number(op.cost_despacho_aduanero_rmb) || 0
+  const compraDV    = Number(op.cost_compra_docs_rmb) || 0
+  const transpV     = Number(op.cost_transporte_interno_cn_rmb) || 0
+  const fleteRmbKg  = Number(op.flete_rmb_kg_consolidado ?? cc.flete_rmb_kg) || 0
+  const otrosUSDLeg = Number(cc.otros_usd) || 0
+  const formFUSDLeg = (Number(cc.form_f_usd_por_producto)||0) * cotsActivas.length
+  const logisticaLeg= Number(cc.logistica_rmb) || 0
 
-  // Calcular total RMB acordado de la OP
-  let totalRMB = 0
-  const desgloseRMB = []
+  // Por cot: peso real / volumétrico / cobrable + mercancía + flete
+  const detallesCot = cotsActivas.map(c => {
+    const u = Number(c.unidades) || 0
+    const undCaja = Number(c.dim_und_caja) || 0
+    const esCaja  = c.dim_tipo === "caja"
+    const nCajas  = esCaja && undCaja > 0 ? Math.ceil(u/undCaja) : 0
+    const pesoReal = esCaja && undCaja > 0 ? (Number(c.peso_kg)||0)*nCajas : (Number(c.peso_kg)||0)*u
+    const cbm     = esCaja && undCaja > 0 ? (Number(c.dim_m3)||0)*nCajas : (Number(c.dim_m3)||0)*u
+    const pesoVol = cbm * 167   // estándar aéreo: 1 m³ = 167 kg vol
+    const pesoCobr= Math.max(pesoReal, pesoVol)
+    const mercanciaRMB = (Number(c.precio_china_rmb)||0) * u
+    const fleteRMB     = pesoCobr * fleteRmbKg
+    return { c, u, pesoReal, pesoVol, pesoCobr, cbm, mercanciaRMB, fleteRMB }
+  })
+  // LEGACY (OP-001): productos_rmb es el total directo si no hay precio_china_rmb por cot
+  const mercOpCalc = detallesCot.reduce((s,d) => s + d.mercanciaRMB, 0)
+  const mercOp     = mercOpCalc > 0 ? mercOpCalc : (Number(cc.productos_rmb) || 0)
+  // LEGACY: si no hay flete por cot, usar peso_kg total × flete_rmb_kg
+  const pesoCobrTotal  = detallesCot.reduce((s,d) => s + d.pesoCobr, 0)
+  const fleteOpCalc    = detallesCot.reduce((s,d) => s + d.fleteRMB, 0)
+  const fleteOp        = fleteOpCalc > 0 ? fleteOpCalc : ((Number(cc.peso_kg)||0) * fleteRmbKg)
+  const comisionOp     = mercOp * comPct / 100
+  const certOpRMB      = certOri * cotsActivas.length
+  const seguroOp       = Math.max(segMin, mercOp * segPct)
+  const logisticaEff   = transpV > 0 ? 0 : logisticaLeg
+  // Extras legacy: form F en RMB (OP-001 usa form_f_rmb_por_producto)
+  const formFLegRMB    = (Number(cc.form_f_rmb_por_producto)||0) * cotsActivas.length
+  const despachoLegRMB = Number(cc.despacho_exportacion_rmb) || 0
+  const docsLegRMB     = Number(cc.docs_operacion_rmb) || 0
+  const compraDocsLegRMB = Number(cc.compra_docs_rmb) || 0
+  // Usar nuevos si están, sino legacy
+  const docFinal       = docOpV    > 0 ? docOpV    : docsLegRMB
+  const despFinal      = despV     > 0 ? despV     : despachoLegRMB
+  const compraDocsFinal= compraDV  > 0 ? compraDV  : compraDocsLegRMB
+  const otrosOpRMB     = docFinal + despFinal + compraDocsFinal + transpV + logisticaEff + seguroOp + formFLegRMB
+  const totalRMBCore   = mercOp + comisionOp + fleteOp + certOpRMB + otrosOpRMB
+  // Extras USD legacy se convierten a RMB para sumar al total (matching admin)
+  const totalUSDExtra  = otrosUSDLeg + formFUSDLeg
+  const totalRMB       = totalRMBCore + totalUSDExtra * TC_RMB_USD
 
-  if (legacy) {
-    // ── MODELO LEGACY (OP-001): todo en op.costos_china ──
-    const productosRmb  = Number(cc.productos_rmb) || 0
-    const comisionPct   = Number(cc.comision_pct) || 0
-    const comisionRmb   = productosRmb * comisionPct / 100
-    const pesoKg        = Number(cc.peso_kg) || 0
-    const fleteRmbKg    = Number(cc.flete_rmb_kg) || 0
-    const fleteUsdKg    = Number(cc.flete_usd_kg) || 0
-    const fleteRmb      = fleteRmbKg > 0 ? pesoKg * fleteRmbKg : pesoKg * fleteUsdKg * TC_RMB_USD
-    const logisticaRmb  = Number(cc.logistica_rmb) || 0
-    const formFRmb      = (Number(cc.form_f_rmb_por_producto) || 0) * cotsOp.length
-    const docsRmb       = Number(cc.docs_operacion_rmb) || 0
-    const comprarDocsRmb= Number(cc.compra_docs_rmb) || 0
-    const despachoRmb   = Number(cc.despacho_exportacion_rmb) || 0
-    const seguroPct     = Number(cc.seguro_pct) || 0
-    const seguroRmb     = productosRmb * (seguroPct / 100)
-    const otrosUsd      = Number(cc.otros_usd) || 0
-    const otrosRmb      = otrosUsd * TC_RMB_USD
-
-    desgloseRMB.push(
-      { lbl: "💰 货物 Mercancía",       val: productosRmb },
-      { lbl: `📊 佣金 Comisión ${comisionPct}%`, val: comisionRmb },
-      { lbl: `✈️ 运费 Flete (${pesoKg} kg × ¥${fleteRmbKg||fleteUsdKg*TC_RMB_USD.toFixed(2)}/kg)`, val: fleteRmb },
-      { lbl: "🚚 物流 Yiwu→Shanghai",   val: logisticaRmb },
-      { lbl: `📄 Form F × ${cotsOp.length} cots`, val: formFRmb },
-      { lbl: "📋 Docs operación",       val: docsRmb },
-      { lbl: "📋 Compra docs",          val: comprarDocsRmb },
-      { lbl: "🛃 Despacho exportación", val: despachoRmb },
-      { lbl: `🛡️ Seguro ${seguroPct}%`,  val: seguroRmb },
-      { lbl: "⚙️ Otros (USD → RMB)",     val: otrosRmb },
-    )
-    totalRMB = desgloseRMB.reduce((s,d) => s + (Number(d.val)||0), 0)
-  } else {
-    // ── MODELO NUEVO (OP-002+): campos por cot + extras top-level ──
-    for (const c of cotsOp) {
-      const u = Number(c.unidades) || 0
-      const merc = (Number(c.precio_china_rmb)||0) * u
-      const comPct = Number(c.comision_sunny_pct ?? op.comision_sunny_pct) || 0
-      const com = merc * comPct / 100
-      const tarifaRmbKg = Number(c.aer_tarifa_sunny_rmb_kg || op.flete_rmb_kg_consolidado) || 0
-      const tarifaUsdKg = Number(c.aer_tarifa_sunny_kg) || 0
-      const pesoKg = (Number(c.peso_kg)||0) * (Number(c.dim_und_caja)>0 ? Math.ceil(u/Number(c.dim_und_caja)) : 0)
-      const fleteRmb = tarifaRmbKg > 0 ? pesoKg * tarifaRmbKg : pesoKg * tarifaUsdKg * TC_RMB_USD
-      const certOrigen = Number(c.cost_cert_origen_rmb) || 0
-      const sub = merc + com + fleteRmb + certOrigen
-      desgloseRMB.push({
-        lbl: `📦 ${c.nro} (${c.cliente || "—"})`,
-        val: sub,
-        sub: `Merc ¥${fmtN(merc,0)} + Com ¥${fmtN(com,0)} + Flete ¥${fmtN(fleteRmb,0)} + Cert ¥${fmtN(certOrigen,0)}`,
-      })
-      totalRMB += sub
-    }
-    const extrasOpRMB =
-      (Number(op.cost_doc_operacion_rmb) || 0) +
-      (Number(op.cost_despacho_aduanero_rmb) || 0) +
-      (Number(op.cost_compra_docs_rmb) || 0) +
-      (Number(op.cost_transporte_interno_cn_rmb) || 0)
-    if (extrasOpRMB > 0) {
-      desgloseRMB.push({ lbl: "⚙️ Extras OP (docs+despacho+transporte interno)", val: extrasOpRMB })
-      totalRMB += extrasOpRMB
-    }
-  }
+  // Desglose lineal
+  const desgloseRMB = [
+    { lbl: "📦 Mercancía total 货物", val: mercOp, sub: `${cotsActivas.length} cots · ${fmtN(detallesCot.reduce((s,d)=>s+d.u,0))} und` },
+    { lbl: `💼 Comisión Sunny ${comPct}% 佣金`, val: comisionOp, sub: "Sobre mercancía total" },
+    { lbl: "✈️ Flete aéreo 运费", val: fleteOp, sub: pesoCobrTotal > 0 ? `${fmtN(pesoCobrTotal,1)} kg × ¥${fmtN(fleteRmbKg,2)}/kg` : `${cc.peso_kg||0} kg × ¥${fleteRmbKg}/kg` },
+    { lbl: `📜 Cert. origen × ${cotsActivas.length}`, val: certOpRMB, sub: `¥${certOri}/cot` },
+    { lbl: "📄 Doc. operación CN", val: docFinal },
+    { lbl: "🛃 Despacho aduanero CN", val: despFinal },
+    { lbl: "📑 Compra docs", val: compraDocsFinal },
+    { lbl: "🚚 Transporte interno CN", val: transpV },
+    { lbl: "🛣️ Logística Yiwu→SH (legacy)", val: logisticaEff },
+    { lbl: `📄 Form F (legacy RMB) × ${cotsActivas.length}`, val: formFLegRMB },
+    { lbl: `🛡️ Seguro (${(segPct*100).toFixed(2)}% sobre merc., mín ¥${segMin})`, val: seguroOp },
+    { lbl: "⚙️ Extras USD legacy → RMB", val: totalUSDExtra * TC_RMB_USD, sub: totalUSDExtra > 0 ? `$${fmtN(totalUSDExtra,2)} USD × TC ${TC_RMB_USD}` : null },
+  ]
 
   // Pagos realizados
   const pagos = op.pagos_reales?.egresos || {}
