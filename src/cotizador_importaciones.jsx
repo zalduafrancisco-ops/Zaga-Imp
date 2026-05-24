@@ -3452,10 +3452,10 @@ Número de seguimiento: ${c.nro}`;
                               next.requiere_factura=true;
                               if(!p.pct_servicio||Number(p.pct_servicio)===4) next.pct_servicio=6;
                             }
-                            // Al volver a marítimo desde aéreo/ambos, devolver defaults marítimos
+                            // Al volver a marítimo desde aéreo/ambos: solo destildar pago_100
+                            // (no tocar pct_servicio para no pisar valores históricos al editar)
                             if(k==="maritimo"){
                               next.pago_100=false;
-                              if(!p.pct_servicio||Number(p.pct_servicio)===6) next.pct_servicio=4;
                             }
                             return next;
                           })} style={{flex:1,background:form.transporte===k?col+"18":"#f8fafc",color:form.transporte===k?col:"#64748b",border:`1px solid ${form.transporte===k?col+"66":"#e2e8f0"}`,borderRadius:8,padding:"7px 6px",fontSize:11,cursor:"pointer",fontWeight:form.transporte===k?700:400,textAlign:"center"}}>
