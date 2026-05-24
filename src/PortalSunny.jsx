@@ -197,6 +197,7 @@ export default function PortalSunny({ supabase, onLogout }) {
     { id:"camino",       label:"运输中 En camino",      count: camino.length,      urgent: false },
     { id:"completadas",  label:"已完成 Completadas",    count: completadas.length, urgent: false },
     { id:"no_prospero",  label:"未成交 No prosperaron", count: noProspero.length,  urgent: false },
+    { id:"mis_pagos",    label:"💰 我的付款 Mis pagos", count: null,               urgent: false },
     { id:"dashboard",    label:"📊 数据",               count: null,               urgent: false },
   ]
 
@@ -296,6 +297,8 @@ export default function PortalSunny({ supabase, onLogout }) {
       <div style={{ maxWidth:920, margin:"0 auto", padding:"20px 16px 48px" }}>
         {tab === "dashboard" ? (
           <Dashboard cots={cots} pendCot={pendCot} confirmadas={confirmadas} camino={camino} completadas={completadas} />
+        ) : tab === "mis_pagos" ? (
+          <MisPagosTab ops={ops} cots={cots} />
         ) : tab === "recotizar" ? (
           loading ? <Empty zh="加载中" es="Cargando..." emoji="⏳" /> :
           opsPendientes.length === 0 ? <Empty zh="暂无重新报价请求" es="No hay operaciones esperando recotización" emoji="🔄" /> :
@@ -1746,4 +1749,200 @@ const inp = {
 const btn = {
   padding:"10px 18px", fontSize:13, fontWeight:700, cursor:"pointer",
   borderRadius:8, fontFamily:"inherit", transition:"all 0.15s",
+}
+
+// ─── TAB MIS PAGOS — Sunny ve cuánto le debe ZAGA por OP y cuánto ya recibió ─
+// Read-only. Si admin actualiza pagos_reales, se refleja por realtime (postgres_changes).
+function MisPagosTab({ ops, cots }) {
+  // OPs con al menos 1 cot aérea — excluye OPs en estado "completada" totalmente cerradas
+  const opsActivas = (Array.isArray(ops) ? ops : [])
+    .filter(o => o && o._id)
+    .filter(o => {
+      const cotsOp = cots.filter(c => c.operacion_id === o._id || (Array.isArray(o.cotizaciones) && o.cotizaciones.includes(c._id)))
+      return cotsOp.length > 0
+    })
+    .sort((a, b) => new Date(b._updated || 0) - new Date(a._updated || 0))
+
+  if (opsActivas.length === 0) {
+    return <Empty zh="暂无操作" es="No hay operaciones con pagos para mostrar" emoji="💰" />
+  }
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+      <div style={{ background:"#040c18", borderRadius:12, padding:"14px 18px", color:"#fff" }}>
+        <div style={{ fontSize:14, fontWeight:800, color:"#c47830", marginBottom:4 }}>💰 我的付款 / Mis pagos</div>
+        <div style={{ fontSize:12, color:"#94a3b8", lineHeight:1.5 }}>
+          每个操作的总成本 RMB + ZAGA 已支付的 3 笔款 (实时同步)
+          <br/>Costo total por OP en RMB y los 3 pagos que ZAGA realizó. Se sincroniza automáticamente.
+        </div>
+      </div>
+      {opsActivas.map(op => <OpPagoCard key={op._id} op={op} cots={cots} />)}
+    </div>
+  )
+}
+
+function OpPagoCard({ op, cots }) {
+  const [expanded, setExpanded] = useState(true)
+  const cotsOp = cots.filter(c => c.operacion_id === op._id || (Array.isArray(op.cotizaciones) && op.cotizaciones.includes(c._id)))
+  if (cotsOp.length === 0) return null
+
+  // Calcular total RMB acordado de la OP (suma de las cots)
+  let totalRMB = 0
+  const desgloseRMB = []
+  for (const c of cotsOp) {
+    const u = Number(c.unidades) || 0
+    const merc = (Number(c.precio_china_rmb)||0) * u
+    const comPct = Number(c.comision_sunny_pct ?? op.comision_sunny_pct) || 0
+    const com = merc * comPct / 100
+    // Flete: usar tarifa RMB/kg si está, sino USD/kg
+    const tarifaRmbKg = Number(c.aer_tarifa_sunny_rmb_kg || op.flete_rmb_kg_consolidado) || 0
+    const tarifaUsdKg = Number(c.aer_tarifa_sunny_kg) || 0
+    const pesoKg = (Number(c.peso_kg)||0) * (Number(c.dim_und_caja)>0 ? Math.ceil(u/Number(c.dim_und_caja)) : 0)
+    const fleteRmb = tarifaRmbKg > 0 ? pesoKg * tarifaRmbKg : pesoKg * tarifaUsdKg * TC_RMB_USD
+    const certOrigen = Number(c.cost_cert_origen_rmb) || 0
+    const sub = merc + com + fleteRmb + certOrigen
+    desgloseRMB.push({ nro: c.nro, cliente: c.cliente, merc, com, fleteRmb, certOrigen, sub })
+    totalRMB += sub
+  }
+  // Extras OP (compartidos: docs, despacho, transporte interno, seguro)
+  const extrasOpRMB =
+    (Number(op.cost_doc_operacion_rmb) || 0) +
+    (Number(op.cost_despacho_aduanero_rmb) || 0) +
+    (Number(op.cost_compra_docs_rmb) || 0) +
+    (Number(op.cost_transporte_interno_cn_rmb) || 0)
+  totalRMB += extrasOpRMB
+
+  // Pagos realizados
+  const pagos = op.pagos_reales?.egresos || {}
+  const pagoDefs = [
+    { key:"pago1_sunny", lbl:"1er pago 第1次付款" },
+    { key:"pago2_sunny", lbl:"2do pago 第2次付款" },
+    { key:"pago3_sunny", lbl:"3er pago 第3次付款" },
+  ]
+  let totalRmbPagado = 0, totalClpPagado = 0
+  const pagosCalc = pagoDefs.map(p => {
+    const e = pagos[p.key] || {}
+    const rmb = Number(e.rmb) || 0
+    const tc = Number(e.tc_wu) || 0
+    const clp = Number(e.clp_enviado) || 0
+    const com = Number(e.comision) || 0
+    const ivaCom = e.iva_comision != null && e.iva_comision !== "" ? Number(e.iva_comision) : com * 0.19
+    const totalClp = clp + com + ivaCom
+    totalRmbPagado += rmb
+    totalClpPagado += totalClp
+    return { ...p, rmb, tc, clp, com, ivaCom, totalClp, fecha: e.fecha, nota: e.nota, pagado: rmb > 0 || clp > 0 }
+  })
+  const saldoRmb = totalRMB - totalRmbPagado
+
+  return (
+    <div style={{ background:"#fff", border:"2px solid #fde68a", borderRadius:12, overflow:"hidden" }}>
+      <div onClick={()=>setExpanded(!expanded)} style={{ padding:"12px 16px", cursor:"pointer", background:"#fef3c7", display:"flex", alignItems:"center", gap:12 }}>
+        <div style={{ flex:1 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:4 }}>
+            <span style={{ background:"#040c18", color:"#c47830", borderRadius:5, padding:"3px 9px", fontSize:12, fontWeight:800 }}>✈️ {op.nro}</span>
+            <span style={{ background:"#fff", color:"#854d0e", border:"1px solid #fde68a", borderRadius:5, padding:"2px 8px", fontSize:11 }}>{cotsOp.length} cot · {cotsOp.reduce((s,c)=>s+(Number(c.unidades)||0),0)} und</span>
+            <span style={{ background:saldoRmb<=0?"#dcfce7":"#fef3c7", color:saldoRmb<=0?"#15803d":"#92400e", border:`1px solid ${saldoRmb<=0?"#22c55e":"#fbbf24"}`, borderRadius:5, padding:"2px 8px", fontSize:11, fontWeight:700 }}>
+              {saldoRmb<=0 ? "✓ 已全部支付 Pagado completo" : `⏳ 待付款 / Saldo ¥${fmtN(saldoRmb,0)}`}
+            </span>
+          </div>
+          <div style={{ fontSize:12, color:"#854d0e", display:"flex", gap:12, flexWrap:"wrap" }}>
+            <span>总额 / Total acordado: <b>¥{fmtN(totalRMB,2)}</b></span>
+            <span>已付 / Pagado: <b>¥{fmtN(totalRmbPagado,2)}</b></span>
+            <span>CLP pagado: <b>${fmtN(totalClpPagado,0)}</b></span>
+          </div>
+        </div>
+        <div style={{ fontSize:22, color:"#854d0e" }}>{expanded ? "▾" : "▸"}</div>
+      </div>
+
+      {expanded && (
+        <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:14 }}>
+          {/* Desglose RMB por cot */}
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:"#475569", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5 }}>
+              📦 报价分解 / Desglose por cotización (RMB)
+            </div>
+            <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, padding:"8px 10px" }}>
+              {desgloseRMB.map((d,i) => (
+                <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr auto auto auto auto auto", gap:8, padding:"5px 0", borderTop: i>0?"1px solid #e2e8f0":"none", fontSize:11 }}>
+                  <div>
+                    <div style={{ fontWeight:700, color:"#0f172a" }}>{d.nro}</div>
+                    <div style={{ fontSize:10, color:"#94a3b8" }}>{d.cliente || "—"}</div>
+                  </div>
+                  <span style={{ color:"#64748b" }}>货物 Merc: <b style={{ color:"#0f172a" }}>¥{fmtN(d.merc,0)}</b></span>
+                  <span style={{ color:"#64748b" }}>佣金 Com: <b style={{ color:"#0f172a" }}>¥{fmtN(d.com,0)}</b></span>
+                  <span style={{ color:"#64748b" }}>运费 Flete: <b style={{ color:"#0f172a" }}>¥{fmtN(d.fleteRmb,0)}</b></span>
+                  <span style={{ color:"#64748b" }}>原产地 Cert: <b style={{ color:"#0f172a" }}>¥{fmtN(d.certOrigen,0)}</b></span>
+                  <span style={{ color:"#0f172a", fontWeight:700 }}>= ¥{fmtN(d.sub,0)}</span>
+                </div>
+              ))}
+              {extrasOpRMB > 0 && (
+                <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:8, padding:"7px 0", borderTop:"1px dashed #cbd5e1", fontSize:11, marginTop:4 }}>
+                  <span style={{ color:"#64748b" }}>⚙️ 其他费用 / Extras OP (docs, despacho, transporte interno)</span>
+                  <span style={{ color:"#0f172a", fontWeight:700 }}>¥{fmtN(extrasOpRMB,0)}</span>
+                </div>
+              )}
+              <div style={{ display:"flex", justifyContent:"space-between", padding:"8px 0 2px", borderTop:"2px solid #c47830", marginTop:6, fontSize:12 }}>
+                <span style={{ color:"#92400e", fontWeight:800 }}>总金额 / TOTAL RMB acordado</span>
+                <span style={{ color:"#c47830", fontWeight:800, fontSize:14 }}>¥{fmtN(totalRMB,2)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3 pagos */}
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:"#475569", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5 }}>
+              💸 3 笔付款 / Los 3 pagos a ti
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:8 }}>
+              {pagosCalc.map(p => (
+                <div key={p.key} style={{
+                  background: p.pagado ? "#f0fdf4" : "#f8fafc",
+                  border: `2px solid ${p.pagado ? "#22c55e44" : "#e2e8f0"}`,
+                  borderRadius:8, padding:"10px 12px",
+                }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+                    <span style={{ fontSize:11, fontWeight:700, color: p.pagado ? "#15803d" : "#64748b" }}>{p.lbl}</span>
+                    {p.pagado ? <span style={{ fontSize:9, background:"#16a34a", color:"#fff", borderRadius:5, padding:"1px 6px" }}>✓ 已付</span>
+                              : <span style={{ fontSize:9, background:"#e2e8f0", color:"#64748b", borderRadius:5, padding:"1px 6px" }}>⏳ Pendiente</span>}
+                  </div>
+                  <div style={{ fontSize:16, fontWeight:800, color: p.pagado ? "#15803d" : "#94a3b8", marginBottom:2 }}>
+                    ¥{fmtN(p.rmb, 0)}
+                  </div>
+                  {p.pagado && (
+                    <>
+                      <div style={{ fontSize:10, color:"#64748b" }}>TC: <b style={{ color:"#0f172a" }}>{fmtN(p.tc, 2)}</b></div>
+                      <div style={{ fontSize:10, color:"#64748b" }}>CLP: <b style={{ color:"#0f172a" }}>${fmtN(p.clp, 0)}</b></div>
+                      {p.com > 0 && <div style={{ fontSize:10, color:"#64748b" }}>Com WU: <b style={{ color:"#0f172a" }}>${fmtN(p.com, 0)}</b></div>}
+                      <div style={{ fontSize:10, color:"#92400e", marginTop:3, paddingTop:3, borderTop:"1px dashed #e2e8f0" }}>
+                        Total: <b>${fmtN(p.totalClp, 0)}</b>
+                      </div>
+                      {p.fecha && <div style={{ fontSize:10, color:"#3d7fc4", marginTop:2 }}>📅 {fmtDate(p.fecha)}</div>}
+                      {p.nota && <div style={{ fontSize:10, color:"#475569", marginTop:2, fontStyle:"italic" }}>"{p.nota}"</div>}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Resumen final */}
+          <div style={{ background: saldoRmb<=0 ? "#dcfce7" : "#fffbeb", border:`2px solid ${saldoRmb<=0 ? "#22c55e" : "#fbbf24"}`, borderRadius:8, padding:"10px 14px" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontSize:11, color: saldoRmb<=0 ? "#15803d" : "#92400e", fontWeight:700 }}>
+                  {saldoRmb<=0 ? "✅ 已全部支付 / Totalmente pagada" : "⏳ Saldo pendiente / 待付款"}
+                </div>
+                <div style={{ fontSize:10, color:"#64748b", marginTop:2 }}>
+                  Pagado ¥{fmtN(totalRmbPagado, 0)} de ¥{fmtN(totalRMB, 0)}
+                </div>
+              </div>
+              <div style={{ fontSize:18, fontWeight:800, color: saldoRmb<=0 ? "#15803d" : "#92400e" }}>
+                {saldoRmb<=0 ? "✓" : `¥${fmtN(saldoRmb, 0)}`}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
