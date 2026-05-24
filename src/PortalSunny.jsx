@@ -22,9 +22,11 @@ const ESTADOS_PEND_CLIENTE = ["cotizada"]
 const ESTADOS_CONFIRMADAS  = ["pagada"]
 const ESTADOS_CAMINO       = ["en_camino"]
 const ESTADOS_COMPLETADAS  = ["completada"]
+const ESTADOS_NO_PROSPERO  = ["no_prospero"]
 const TODOS_ESTADOS = [
   ...ESTADOS_PEND_COT, ...ESTADOS_PEND_CLIENTE,
   ...ESTADOS_CONFIRMADAS, ...ESTADOS_CAMINO, ...ESTADOS_COMPLETADAS,
+  ...ESTADOS_NO_PROSPERO,
 ]
 
 // ─── Estilos chino/español ──────────────────────────────────────────────────
@@ -172,6 +174,7 @@ export default function PortalSunny({ supabase, onLogout }) {
   const confirmadas = cots.filter(c => ESTADOS_CONFIRMADAS.includes(c.estado))
   const camino      = cots.filter(c => ESTADOS_CAMINO.includes(c.estado))
   const completadas = cots.filter(c => ESTADOS_COMPLETADAS.includes(c.estado))
+  const noProspero  = cots.filter(c => ESTADOS_NO_PROSPERO.includes(c.estado))
 
   const tabMap = {
     pend_cot:     pendCot,
@@ -179,6 +182,7 @@ export default function PortalSunny({ supabase, onLogout }) {
     confirmadas:  confirmadas,
     camino:       camino,
     completadas:  completadas,
+    no_prospero:  noProspero,
     dashboard:    [],
   }
   const shown = tabMap[tab] || []
@@ -192,6 +196,7 @@ export default function PortalSunny({ supabase, onLogout }) {
     { id:"confirmadas",  label:"已确认 Confirmadas",    count: confirmadas.length, urgent: false },
     { id:"camino",       label:"运输中 En camino",      count: camino.length,      urgent: false },
     { id:"completadas",  label:"已完成 Completadas",    count: completadas.length, urgent: false },
+    { id:"no_prospero",  label:"未成交 No prosperaron", count: noProspero.length,  urgent: false },
     { id:"dashboard",    label:"📊 数据",               count: null,               urgent: false },
   ]
 
@@ -201,6 +206,7 @@ export default function PortalSunny({ supabase, onLogout }) {
     confirmadas:  { zh:"暂无确认订单",         es:"No hay órdenes confirmadas" },
     camino:       { zh:"暂无运输中货物",        es:"No hay envíos en camino" },
     completadas:  { zh:"暂无已完成记录",        es:"No hay completadas" },
+    no_prospero:  { zh:"暂无未成交记录",        es:"No hay cotizaciones que no prosperaron" },
   }
 
   return (

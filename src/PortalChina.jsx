@@ -11,10 +11,12 @@ const ESTADOS_PEND_CLIENTE  = ["cotizada"]
 const ESTADOS_CONFIRMADAS   = ["pagada"]
 const ESTADOS_CAMINO        = ["en_camino"]
 const ESTADOS_COMPLETADAS   = ["completada"]
+const ESTADOS_NO_PROSPERO   = ["no_prospero"]
 
 const TODOS_ESTADOS = [
   ...ESTADOS_PEND_COT, ...ESTADOS_PEND_CLIENTE,
   ...ESTADOS_CONFIRMADAS, ...ESTADOS_CAMINO, ...ESTADOS_COMPLETADAS,
+  ...ESTADOS_NO_PROSPERO,
 ]
 
 // ─── Colores y etiquetas de estado (7 estados simplificados) ─────────────────
@@ -127,6 +129,7 @@ export default function PortalChina({ supabase, onLogout }) {
   const confirmadas = cots.filter(c => ESTADOS_CONFIRMADAS.includes(c.estado))
   const camino      = cots.filter(c => ESTADOS_CAMINO.includes(c.estado))
   const completadas = cots.filter(c => ESTADOS_COMPLETADAS.includes(c.estado))
+  const noProspero  = cots.filter(c => ESTADOS_NO_PROSPERO.includes(c.estado))
 
   const tabMap = {
     pend_cot:     pendCot,
@@ -134,6 +137,7 @@ export default function PortalChina({ supabase, onLogout }) {
     confirmadas:  confirmadas,
     camino:       camino,
     completadas:  completadas,
+    no_prospero:  noProspero,
     dashboard:    [],
   }
 
@@ -192,6 +196,12 @@ export default function PortalChina({ supabase, onLogout }) {
       urgent: false,
     },
     {
+      id:"no_prospero",
+      label:"未成交 No prosperaron",
+      count: noProspero.length,
+      urgent: false,
+    },
+    {
       id:"dashboard",
       label:"📊 数据",
       count: null,
@@ -205,6 +215,7 @@ export default function PortalChina({ supabase, onLogout }) {
     confirmadas:  { zh:"暂无进行中订单",         es:"No hay ordenes confirmadas" },
     camino:       { zh:"暂无运输中货物",          es:"No hay envios en camino" },
     completadas:  { zh:"暂无已完成记录",          es:"No hay importaciones completadas" },
+    no_prospero:  { zh:"暂无未成交记录",          es:"No hay cotizaciones que no prosperaron" },
   }
 
   return (
