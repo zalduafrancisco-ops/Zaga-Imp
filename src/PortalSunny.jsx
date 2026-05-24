@@ -1151,7 +1151,15 @@ function CotEditable({ c, supabase, ops, isExpanded, onExpand, onSaved }) {
               style={{ ...btn, background:"#fff", color:"#64748b", border:"1px solid #cbd5e1", flex:1 }}>
               💾 {saving ? "..." : "保存草稿 / Guardar borrador"}
             </button>
-            <button onClick={()=>persistirRespuestaSunny(true)} disabled={saving}
+            <button onClick={()=>{
+              if (saving) return
+              const esSolicitud = c.estado === "solicitud"
+              const msgConfirm = esSolicitud
+                ? "⚠️ 确认发送 / Confirmar enviar a admin?\n\nLa cotización pasará al tab '待客户 Pend. cliente' y el admin la verá. Asegúrate que el precio FOB y los datos estén completos antes de continuar."
+                : "确认更新数据 / Confirmar actualización de datos?\n\nSe guardan los cambios sin retroceder el estado de la cotización."
+              if (!window.confirm(msgConfirm)) return
+              persistirRespuestaSunny(true)
+            }} disabled={saving}
               style={{
                 ...btn,
                 background:"#c47830",
