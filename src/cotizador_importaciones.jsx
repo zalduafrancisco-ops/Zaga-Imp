@@ -1248,19 +1248,21 @@ export default function App({ supabase, usuario, onLogout }){
     if (n >= 1000) return 15;
     return 20;
   };
-  // Autocompletar margen v2 SOLO si margen está vacío (crea o edita sin margen guardado).
-  // No pisa valores existentes — respeta el ajuste manual del usuario.
+  // Autocompletar margen v2 SIEMPRE que cambia precio_china o unidades, EXCEPTO si el
+  // usuario ajustó manualmente (flag form.margen_manual === true).
+  // Para resetear al default: borrar margen_manual con el botón "↻ Auto" del panel.
   useEffect(()=>{
     if(!form.modelo_v2) return;
     const transMar = form.transporte === "maritimo" || form.transporte === "ambos";
     if(!transMar) return;
     const pCh = Number(form.precio_china)||0;
     if(pCh <= 0) return;
-    if(form.margen_und !== "" && Number(form.margen_und) > 0) return;
+    if(form.margen_manual === true) return;
     const pct = margenDefaultV2(form.unidades);
     const sugerido = Math.round(pCh * pct / 100);
+    if(Number(form.margen_und) === sugerido) return;
     setForm(p => ({...p, margen_und: sugerido}));
-  }, [form.precio_china, form.unidades, form.transporte, form.modelo_v2]);
+  }, [form.precio_china, form.unidades, form.transporte, form.modelo_v2, form.margen_manual]);
   const [openId,setOpenId]               = useState(null);
   const [filterEstado,setFilterEstado]   = useState("todos");
   const [filterCliente,setFilterCliente] = useState("todos");
@@ -3868,13 +3870,23 @@ Número de seguimiento: ${c.nro}`;
                       const totalCliIva = calcActual.totClIva || totalCli;
                       const setPct = (pct) => {
                         const nuevoMar = Math.round(pCh * pct / 100);
-                        setForm(p => ({...p, margen_und: nuevoMar}));
+                        setForm(p => ({...p, margen_und: nuevoMar, margen_manual: true}));
                       };
+                      const resetAuto = () => {
+                        const pct = margenDefaultV2(form.unidades);
+                        const nuevoMar = Math.round(pCh * pct / 100);
+                        setForm(p => ({...p, margen_und: nuevoMar, margen_manual: false}));
+                      };
+                      const esManual = form.margen_manual === true;
                       return (
                         <div style={{background:"#faf5ff",border:"1px solid #c4b5fd",borderRadius:9,padding:"12px 14px",marginBottom:14}}>
                           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:6}}>
-                            <span style={{fontSize:11,color:"#5b21b6",fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>🎯 Margen ZAGA (ajustable)</span>
-                            <span style={{fontSize:10,color:"#7c3aed",fontStyle:"italic"}}>Sugerido según volumen — editable</span>
+                            <span style={{fontSize:11,color:"#5b21b6",fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>🎯 Margen ZAGA {esManual?"(ajuste manual)":"(auto según volumen)"}</span>
+                            {esManual ? (
+                              <button onClick={resetAuto} style={{background:"#ede9fe",color:"#5b21b6",border:"1px solid #c4b5fd",borderRadius:6,padding:"4px 10px",fontSize:10,cursor:"pointer",fontWeight:700}}>↻ Volver al auto</button>
+                            ) : (
+                              <span style={{fontSize:10,color:"#7c3aed",fontStyle:"italic"}}>Aplicado automático</span>
+                            )}
                           </div>
                           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10,fontSize:10}}>
                             {[
