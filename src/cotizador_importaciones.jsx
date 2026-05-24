@@ -1238,18 +1238,29 @@ export default function App({ supabase, usuario, onLogout }){
   const [opForm, setOpForm] = useState(null);              // formulario operación
   const [opDistribucion, setOpDistribucion] = useState("cbm"); // cbm | unidades
   const [editId,setEditId]               = useState(null);
-  // Autocompletar margen 15% del precio China en marítimo v2, solo si está vacío y crea nueva cot.
+  // Margen default v2 marítimo según unidades:
+  //   < 1.000 und → 20%
+  //   1.000-1.999 → 15%
+  //   ≥ 2.000     → 10%
+  const margenDefaultV2 = (und) => {
+    const n = Number(und)||0;
+    if (n >= 2000) return 10;
+    if (n >= 1000) return 15;
+    return 20;
+  };
+  // Autocompletar margen v2 SOLO si margen está vacío (crea o edita sin margen guardado).
+  // No pisa valores existentes — respeta el ajuste manual del usuario.
   useEffect(()=>{
-    if(editId) return;
     if(!form.modelo_v2) return;
     const transMar = form.transporte === "maritimo" || form.transporte === "ambos";
     if(!transMar) return;
     const pCh = Number(form.precio_china)||0;
     if(pCh <= 0) return;
     if(form.margen_und !== "" && Number(form.margen_und) > 0) return;
-    const sugerido = Math.round(pCh * 0.15);
+    const pct = margenDefaultV2(form.unidades);
+    const sugerido = Math.round(pCh * pct / 100);
     setForm(p => ({...p, margen_und: sugerido}));
-  }, [form.precio_china, form.transporte, form.modelo_v2, editId]);
+  }, [form.precio_china, form.unidades, form.transporte, form.modelo_v2]);
   const [openId,setOpenId]               = useState(null);
   const [filterEstado,setFilterEstado]   = useState("todos");
   const [filterCliente,setFilterCliente] = useState("todos");
@@ -3863,7 +3874,16 @@ Número de seguimiento: ${c.nro}`;
                         <div style={{background:"#faf5ff",border:"1px solid #c4b5fd",borderRadius:9,padding:"12px 14px",marginBottom:14}}>
                           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:6}}>
                             <span style={{fontSize:11,color:"#5b21b6",fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>🎯 Margen ZAGA (ajustable)</span>
-                            <span style={{fontSize:10,color:"#7c3aed",fontStyle:"italic"}}>Default 15% sobre precio China</span>
+                            <span style={{fontSize:10,color:"#7c3aed",fontStyle:"italic"}}>Sugerido según volumen — editable</span>
+                          </div>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10,fontSize:10}}>
+                            {[
+                              {lbl:"< 1.000 und",pct:20,activo: u<1000},
+                              {lbl:"1.000–1.999 und",pct:15,activo: u>=1000 && u<2000},
+                              {lbl:"≥ 2.000 und",pct:10,activo: u>=2000},
+                            ].map(r=>(
+                              <span key={r.lbl} style={{background:r.activo?"#7c3aed":"#ede9fe",color:r.activo?"#fff":"#5b21b6",border:`1px solid ${r.activo?"#7c3aed":"#c4b5fd"}`,borderRadius:6,padding:"3px 8px",fontWeight:r.activo?700:500}}>{r.lbl} → {r.pct}%{r.activo?" ✓":""}</span>
+                            ))}
                           </div>
                           <div style={{display:"flex",gap:10,alignItems:"flex-end",flexWrap:"wrap"}}>
                             <div style={{flex:"0 0 140px"}}>
