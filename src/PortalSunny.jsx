@@ -1852,7 +1852,7 @@ function OpPagoCard({ op, cots }) {
     { lbl: "📑 Compra docs", val: compraDV },
     { lbl: "🚚 Transporte interno CN", val: transpV },
     { lbl: "🛣️ Logística Yiwu→SH (legacy)", val: logisticaEfectiva, hint: "Solo si no hay transporte_interno_cn nuevo" },
-    { lbl: `🛡️ Seguro (${segPctRaw}% sobre merc., mín ¥${segMin})`, val: seguroOp },
+    { lbl: `🛡️ Seguro (${(segPctRaw < 0.01 ? segPctRaw * 100 : segPctRaw)}% sobre merc., mín ¥${segMin})`, val: seguroOp },
   ]
 
   // Pagos realizados
