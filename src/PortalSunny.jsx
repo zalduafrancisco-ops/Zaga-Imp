@@ -1820,46 +1820,39 @@ function OpPagoCard({ op, cots }) {
     const fleteRMB     = pesoCobr * fleteRmbKg
     return { c, u, pesoReal, pesoVol, pesoCobr, cbm, mercanciaRMB, fleteRMB }
   })
-  // LEGACY (OP-001): productos_rmb es el total directo si no hay precio_china_rmb por cot
+  // Mercancía: suma por cot (modelo nuevo) o productos_rmb directo (legacy)
   const mercOpCalc = detallesCot.reduce((s,d) => s + d.mercanciaRMB, 0)
   const mercOp     = mercOpCalc > 0 ? mercOpCalc : (Number(cc.productos_rmb) || 0)
-  // LEGACY: si no hay flete por cot, usar peso_kg total × flete_rmb_kg
+  // Flete: suma por cot (modelo nuevo) o peso_kg total × flete_rmb_kg (legacy)
   const pesoCobrTotal  = detallesCot.reduce((s,d) => s + d.pesoCobr, 0)
   const fleteOpCalc    = detallesCot.reduce((s,d) => s + d.fleteRMB, 0)
   const fleteOp        = fleteOpCalc > 0 ? fleteOpCalc : ((Number(cc.peso_kg)||0) * fleteRmbKg)
   const comisionOp     = mercOp * comPct / 100
   const certOpRMB      = certOri * cotsActivas.length
   const seguroOp       = Math.max(segMin, mercOp * segPct)
-  const logisticaEff   = transpV > 0 ? 0 : logisticaLeg
-  // Extras legacy: form F en RMB (OP-001 usa form_f_rmb_por_producto)
-  const formFLegRMB    = (Number(cc.form_f_rmb_por_producto)||0) * cotsActivas.length
-  const despachoLegRMB = Number(cc.despacho_exportacion_rmb) || 0
-  const docsLegRMB     = Number(cc.docs_operacion_rmb) || 0
-  const compraDocsLegRMB = Number(cc.compra_docs_rmb) || 0
-  // Usar nuevos si están, sino legacy
-  const docFinal       = docOpV    > 0 ? docOpV    : docsLegRMB
-  const despFinal      = despV     > 0 ? despV     : despachoLegRMB
-  const compraDocsFinal= compraDV  > 0 ? compraDV  : compraDocsLegRMB
-  const otrosOpRMB     = docFinal + despFinal + compraDocsFinal + transpV + logisticaEff + seguroOp + formFLegRMB
-  const totalRMBCore   = mercOp + comisionOp + fleteOp + certOpRMB + otrosOpRMB
-  // Extras USD legacy se convierten a RMB para sumar al total (matching admin)
+  // EXACTO COMO ADMIN (línea 6306-6308):
+  // Logística legacy duplica transporte_interno_cn nuevo: solo sumar si NO hay nuevo
+  const logisticaEfectiva = transpV > 0 ? 0 : logisticaLeg
+  // OJO: admin SOLO usa campos top-level NUEVOS (op.cost_*) — NO usa los legacy
+  // dentro de op.costos_china.{docs_operacion_rmb, compra_docs_rmb, despacho_exportacion_rmb,
+  // form_f_rmb_por_producto}. En OP-001 esos están en otros_usd y form_f_usd_por_producto.
+  const otrosOpRMB     = docOpV + despV + compraDV + transpV + logisticaEfectiva + seguroOp
+  const totalRMB       = mercOp + comisionOp + fleteOp + certOpRMB + otrosOpRMB
+  // Extras USD legacy se muestran APARTE — admin NO los suma al totalRMB
   const totalUSDExtra  = otrosUSDLeg + formFUSDLeg
-  const totalRMB       = totalRMBCore + totalUSDExtra * TC_RMB_USD
 
-  // Desglose lineal
+  // Desglose lineal (sin extras USD — esos van aparte)
   const desgloseRMB = [
     { lbl: "📦 Mercancía total 货物", val: mercOp, sub: `${cotsActivas.length} cots · ${fmtN(detallesCot.reduce((s,d)=>s+d.u,0))} und` },
     { lbl: `💼 Comisión Sunny ${comPct}% 佣金`, val: comisionOp, sub: "Sobre mercancía total" },
     { lbl: "✈️ Flete aéreo 运费", val: fleteOp, sub: pesoCobrTotal > 0 ? `${fmtN(pesoCobrTotal,1)} kg × ¥${fmtN(fleteRmbKg,2)}/kg` : `${cc.peso_kg||0} kg × ¥${fleteRmbKg}/kg` },
     { lbl: `📜 Cert. origen × ${cotsActivas.length}`, val: certOpRMB, sub: `¥${certOri}/cot` },
-    { lbl: "📄 Doc. operación CN", val: docFinal },
-    { lbl: "🛃 Despacho aduanero CN", val: despFinal },
-    { lbl: "📑 Compra docs", val: compraDocsFinal },
+    { lbl: "📄 Doc. operación CN", val: docOpV },
+    { lbl: "🛃 Despacho aduanero CN", val: despV },
+    { lbl: "📑 Compra docs", val: compraDV },
     { lbl: "🚚 Transporte interno CN", val: transpV },
-    { lbl: "🛣️ Logística Yiwu→SH (legacy)", val: logisticaEff },
-    { lbl: `📄 Form F (legacy RMB) × ${cotsActivas.length}`, val: formFLegRMB },
+    { lbl: "🛣️ Logística Yiwu→SH (legacy)", val: logisticaEfectiva, hint: "Solo si no hay transporte_interno_cn nuevo" },
     { lbl: `🛡️ Seguro (${(segPct*100).toFixed(2)}% sobre merc., mín ¥${segMin})`, val: seguroOp },
-    { lbl: "⚙️ Extras USD legacy → RMB", val: totalUSDExtra * TC_RMB_USD, sub: totalUSDExtra > 0 ? `$${fmtN(totalUSDExtra,2)} USD × TC ${TC_RMB_USD}` : null },
   ]
 
   // Pagos realizados
@@ -1929,6 +1922,14 @@ function OpPagoCard({ op, cots }) {
                 <span style={{ color:"#c47830", fontWeight:800, fontSize:14 }}>¥{fmtN(totalRMB,2)}</span>
               </div>
             </div>
+            {totalUSDExtra > 0 && (
+              <div style={{ marginTop:8, padding:"8px 11px", background:"#fff", borderRadius:7, border:"1px solid #fde047", fontSize:11, color:"#78350f" }}>
+                <b>+ Extras USD (legacy):</b><br/>
+                {otrosUSDLeg > 0 && <>· Otros USD: <b style={{ color:"#0f172a" }}>${fmtN(otrosUSDLeg, 2)}</b><br/></>}
+                {formFUSDLeg > 0 && <>· Form F: <b style={{ color:"#0f172a" }}>${fmtN(formFUSDLeg, 2)}</b> ({cotsActivas.length} cots × ${cc.form_f_usd_por_producto}/cot)<br/></>}
+                <span style={{ fontStyle:"italic", fontSize:10, color:"#a16207" }}>Sunny los cobra en USD — NO se convierten a RMB</span>
+              </div>
+            )}
           </div>
 
           {/* 3 pagos */}
