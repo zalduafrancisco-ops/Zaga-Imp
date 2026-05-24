@@ -3801,7 +3801,12 @@ Número de seguimiento: ${c.nro}`;
                         </div>
                       </div>
                     )}
-                    {/* Precio final → calcula margen automático */}
+                    {(()=>{
+                      const esMaritimoV2_PV = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !form.pago_100;
+                      // V1: muestra "Precio de venta al cliente" (precio + margen calculado).
+                      // V2: oculto, se reemplaza por el bloque % Margen abajo.
+                      if (esMaritimoV2_PV) return null;
+                      return (
                     <div style={{background:"#f0fdf4",borderRadius:9,padding:"12px 14px",marginBottom:14,border:"1px solid #1aa35844"}}>
                       <div style={{fontSize:10,color:"#1aa358",fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>💵 Precio de venta al cliente</div>
                       <div style={{display:"flex",gap:10,alignItems:"flex-end"}}>
@@ -3838,9 +3843,60 @@ Número de seguimiento: ${c.nro}`;
                         </div>
                       )}
                     </div>
+                      );
+                    })()}
+
+                    {/* V2 marítimo: bloque ajuste de % margen (reemplaza ajuste por precio final) */}
+                    {form.modelo_v2===true && (form.transporte==="maritimo"||form.transporte==="ambos") && !form.pago_100 && Number(form.precio_china)>0 && Number(form.unidades)>0 && (()=>{
+                      const pCh = Number(form.precio_china)||0;
+                      const mar = Number(form.margen_und)||0;
+                      const u = Number(form.unidades)||0;
+                      const pctActual = pCh > 0 ? (mar / pCh) * 100 : 0;
+                      const pCUnd = pCh + mar;
+                      const totalCli = calcActual.totCl || 0;
+                      const totalCliIva = calcActual.totClIva || totalCli;
+                      const setPct = (pct) => {
+                        const nuevoMar = Math.round(pCh * pct / 100);
+                        setForm(p => ({...p, margen_und: nuevoMar}));
+                      };
+                      return (
+                        <div style={{background:"#faf5ff",border:"1px solid #c4b5fd",borderRadius:9,padding:"12px 14px",marginBottom:14}}>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:6}}>
+                            <span style={{fontSize:11,color:"#5b21b6",fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>🎯 Margen ZAGA (ajustable)</span>
+                            <span style={{fontSize:10,color:"#7c3aed",fontStyle:"italic"}}>Default 15% sobre precio China</span>
+                          </div>
+                          <div style={{display:"flex",gap:10,alignItems:"flex-end",flexWrap:"wrap"}}>
+                            <div style={{flex:"0 0 140px"}}>
+                              <label style={{display:"block",fontSize:9,color:"#5b21b6",marginBottom:3,textTransform:"uppercase",letterSpacing:0.5,fontWeight:700}}>% Margen</label>
+                              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                                <button onClick={()=>setPct(Math.max(0, pctActual-1))} style={{background:"#ede9fe",border:"1px solid #c4b5fd",borderRadius:6,padding:"6px 10px",cursor:"pointer",color:"#5b21b6",fontWeight:800,fontSize:14}}>−</button>
+                                <input type="number" step="0.5" value={pctActual.toFixed(pctActual%1===0?0:1)}
+                                  onChange={e=>setPct(Number(e.target.value)||0)}
+                                  style={{flex:1,background:"#fff",border:"1px solid #c4b5fd",borderRadius:6,padding:"8px 8px",fontSize:15,fontWeight:800,color:"#5b21b6",textAlign:"center",outline:"none",width:60}}/>
+                                <button onClick={()=>setPct(pctActual+1)} style={{background:"#ede9fe",border:"1px solid #c4b5fd",borderRadius:6,padding:"6px 10px",cursor:"pointer",color:"#5b21b6",fontWeight:800,fontSize:14}}>+</button>
+                              </div>
+                            </div>
+                            <div style={{flex:1,minWidth:120,background:"#fff",border:"1px solid #ede9fe",borderRadius:7,padding:"8px 12px"}}>
+                              <div style={{fontSize:9,color:"#5b21b6",fontWeight:700,marginBottom:2,textTransform:"uppercase"}}>Margen $/und</div>
+                              <div style={{fontSize:16,fontWeight:800,color:"#7c3aed"}}>{fmt(mar)}</div>
+                              <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>= {fmt(pCh)} × {pctActual.toFixed(1)}%</div>
+                            </div>
+                            <div style={{flex:1,minWidth:120,background:"#fff",border:"1px solid #ede9fe",borderRadius:7,padding:"8px 12px"}}>
+                              <div style={{fontSize:9,color:"#5b21b6",fontWeight:700,marginBottom:2,textTransform:"uppercase"}}>Precio cliente $/und</div>
+                              <div style={{fontSize:16,fontWeight:800,color:"#15803d"}}>{fmt(pCUnd)}</div>
+                              <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>= {fmt(pCh)} + {fmt(mar)}</div>
+                            </div>
+                          </div>
+                          <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #ede9fe",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8,fontSize:11,color:"#5b21b6"}}>
+                            <span>Total cliente: <b style={{color:"#15803d"}}>{form.con_iva?`${fmt(totalCliIva)} c/IVA`:fmt(totalCli)}</b></span>
+                            <span>× {fmtN(u)} und</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* 🎯 AJUSTE MANUAL — Precio final POR UNIDAD acordado con cliente (override del calculado) */}
-                    {Number(form.unidades)>0&&Number(form.precio_china)>0&&(()=>{
+                    {form.modelo_v2!==true && Number(form.unidades)>0&&Number(form.precio_china)>0&&(()=>{
                       const u = Number(form.unidades) || 0;
                       const totClIvaCalc = calcActual.totClIva || 0;
                       const pUndCalc = u > 0 ? totClIvaCalc / u : 0; // precio por unidad calculado c/IVA
