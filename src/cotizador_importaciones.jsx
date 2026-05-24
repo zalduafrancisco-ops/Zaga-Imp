@@ -3530,7 +3530,7 @@ Número de seguimiento: ${c.nro}`;
                       const esMaritimoV2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !form.pago_100;
                       return esMaritimoV2 && (
                         <div style={{fontSize:11,color:"#5b21b6",background:"#faf5ff",borderRadius:8,padding:"8px 12px",border:"1px solid #e9d5ff",marginBottom:10}}>
-                          ✨ <b>Modelo marítimo v2:</b> margen 15% sugerido al ingresar precio China · comisión 6.5% calculada automática · sin ítem servicio.
+                          ✨ <b>Modelo marítimo v2:</b> margen sugerido según volumen (&lt;1.000 und → 20% · 1.000–1.999 → 15% · ≥2.000 → 10%) · comisión 6.5% calculada automática · sin ítem servicio.
                         </div>
                       );
                     })()}
