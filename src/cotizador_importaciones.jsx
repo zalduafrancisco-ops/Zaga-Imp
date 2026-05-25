@@ -829,9 +829,15 @@ function ResultadoRealOp({ op, cots, fmt, fmtN }) {
   const snapsFin = cotsActivas.map(c => c.snapshot_final).filter(Boolean)
   const hayInicial = snapsIni.length > 0
   const hayFinal = snapsFin.length > 0
-
-  // Si no hay snapshots, mostrar mensaje (OPs anteriores al fix)
-  if (!hayInicial && !hayFinal) return null
+  // Hay pagos reales registrados?
+  const tienePagos = !!(op.pagos_reales?.egresos && (
+    Number(op.pagos_reales.egresos.pago1_sunny?.clp_enviado) > 0 ||
+    Number(op.pagos_reales.egresos.pago2_sunny?.clp_enviado) > 0 ||
+    Number(op.pagos_reales.egresos.pago3_sunny?.clp_enviado) > 0 ||
+    Number(op.pagos_reales.egresos.pago_final_chile?.servicio_aduana) > 0
+  ))
+  // Mostrar siempre que haya snapshots O pagos. Si no hay nada, igual mostrar
+  // panel vacío con mensaje informativo (para que admin sepa que existe el panel).
 
   const sumIni = snapsIni.reduce((s, x) => ({
     precio_cliente_clp: s.precio_cliente_clp + (Number(x.precio_cliente_clp)||0),
@@ -839,6 +845,11 @@ function ResultadoRealOp({ op, cots, fmt, fmtN }) {
     costo_chile_clp:    s.costo_chile_clp + (Number(x.costo_chile_clp)||0),
     ganancia_clp:       s.ganancia_clp + (Number(x.ganancia_clp)||0),
   }), {precio_cliente_clp:0,costo_china_clp:0,costo_chile_clp:0,ganancia_clp:0})
+  // Fallback: precio cliente desde precio_final_acordado_und × und (para OPs sin snapshot)
+  const precioClienteCLPFallback = cotsActivas.reduce((s,c) => s + (Number(c.precio_final_acordado_und)||0) * (Number(c.unidades)||0), 0)
+  if (!hayInicial && precioClienteCLPFallback > 0) {
+    sumIni.precio_cliente_clp = precioClienteCLPFallback
+  }
 
   const sumFin = snapsFin.reduce((s, x) => ({
     costo_china_clp: s.costo_china_clp + (Number(x.costo_china_clp)||0),
