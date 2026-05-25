@@ -6120,7 +6120,14 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{fontSize:11,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Cotizaciones aéreas — selecciona de uno o varios clientes</div>
                   <div style={{background:"#f8fafc",borderRadius:8,padding:10,maxHeight:260,overflowY:"auto",border:"1px solid #e2e8f0"}}>
                     {(()=>{
-                      const cotsDispo=cotizaciones.filter(c=>c.tipo!=="propia"&&c.transporte==="aereo"&&(!c.operacion_id||opForm.cotizaciones.includes(c.id)));
+                      // Solo cots activas (estado solicitud o cotizada) y sin OP asignada.
+                      // Excepción: si ya está seleccionada en este form (edición de OP existente), mostrarla aunque ya tenga operacion_id o estado avanzado — para no romper la selección actual.
+                      const ESTADOS_ACTIVOS_OP = new Set(["solicitud","cotizada"]);
+                      const cotsDispo=cotizaciones.filter(c =>
+                        c.tipo!=="propia" &&
+                        c.transporte==="aereo" &&
+                        (opForm.cotizaciones.includes(c.id) || (!c.operacion_id && ESTADOS_ACTIVOS_OP.has(c.estado)))
+                      );
                       const porCliente={};
                       cotsDispo.forEach(c=>{const k=c.cliente||"Sin cliente";if(!porCliente[k])porCliente[k]=[];porCliente[k].push(c);});
                       const clientes=Object.keys(porCliente).sort();
