@@ -525,7 +525,7 @@ function OpGroupCard({ op, cots, supabase, onSaved, children, editingId }) {
         </div>
 
         {/* Resumen RMB de la OP (Comparativo formato Excel Sunny + Costo por cot) */}
-        <ResumenRMBOp op={op} cots={cots} />
+        <ResumenRMBOp op={op} cots={cots} supabase={supabase} onSaved={onSaved} />
         </>
       )}
     </div>
@@ -2013,7 +2013,9 @@ function OpPagoCard({ op, cots }) {
   )
 }
 // ─── RESUMEN RMB DE LA OP — replica del Comparativo Excel Sunny del admin
-function ResumenRMBOp({ op, cots }) {
+function ResumenRMBOp({ op, cots, supabase, onSaved }) {
+  const [confirmando, setConfirmando] = useState(false)
+  const [msgConf, setMsgConf] = useState(null)
   const cotsActivas = cots.filter(c => !["no_prospero"].includes(c.estado))
   if (cotsActivas.length === 0) return null
   const cc = op.costos_china || {}
@@ -2079,7 +2081,6 @@ function ResumenRMBOp({ op, cots }) {
     <div style={{padding:"12px 16px",background:"#fefce8",borderTop:"2px solid #fde047"}}>
       <div style={{fontSize:11,color:"#854d0e",fontWeight:800,letterSpacing:1,textTransform:"uppercase",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
         <span>{`💴 Comparativo RMB — OP ${op.nro} (formato Excel Sunny)`}</span>
-        <span style={{fontSize:10,background:"#fff",color:"#854d0e",padding:"2px 8px",borderRadius:10,fontWeight:600,border:"1px solid #fde047"}}>{`💱 RMB ${TC_RMB} · USD ${tc}`}</span>
       </div>
       <div style={{fontSize:10,color:"#a16207",marginBottom:10,fontStyle:"italic"}}>
         使用此表与你的 Excel 对比 / Usa esta tabla para comparar con tu Excel. Si los totales coinciden, los costos están bien.
@@ -2107,29 +2108,17 @@ function ResumenRMBOp({ op, cots }) {
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           <div style={{background:"#fff",borderRadius:8,border:"1px solid #fde047",padding:"10px 12px"}}>
-            <div style={{fontSize:10,color:"#a16207",fontWeight:700,letterSpacing:0.5,textTransform:"uppercase",marginBottom:6}}>Total OP en 3 monedas</div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6,paddingBottom:6,borderBottom:"1px dashed #fde047"}}>
-              <span style={{fontSize:11,color:"#78350f"}}>RMB</span>
-              <span style={{fontSize:16,fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(totalRMB,2)}`}</span>
-            </div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6,paddingBottom:6,borderBottom:"1px dashed #fde047"}}>
-              <span style={{fontSize:11,color:"#78350f"}}>{`USD (÷ ${TC_RMB})`}</span>
-              <span style={{fontSize:16,fontWeight:800,color:"#0f172a"}}>{`$${fmtN(totalUSD,2)}`}</span>
-            </div>
+            <div style={{fontSize:10,color:"#a16207",fontWeight:700,letterSpacing:0.5,textTransform:"uppercase",marginBottom:6}}>Total OP en RMB</div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-              <span style={{fontSize:11,color:"#78350f"}}>{`CLP (× ${tc})`}</span>
-              <span style={{fontSize:18,fontWeight:800,color:"#c47830"}}>{`$${fmtN(totalCLP,0)}`}</span>
+              <span style={{fontSize:12,color:"#78350f"}}>RMB / 人民币</span>
+              <span style={{fontSize:20,fontWeight:800,color:"#c47830"}}>{`¥${fmtN(totalRMB,2)}`}</span>
             </div>
           </div>
           <div style={{background:"#fff",borderRadius:8,border:"1px solid #fde047",padding:"10px 12px"}}>
             <div style={{fontSize:10,color:"#a16207",fontWeight:700,letterSpacing:0.5,textTransform:"uppercase",marginBottom:6}}>Costo por unidad (promedio OP)</div>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}>
               <span style={{color:"#78350f"}}>RMB / und</span>
-              <span style={{fontWeight:700,color:"#0f172a"}}>{`¥${fmtN(costoUndRMB,2)}`}</span>
-            </div>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
-              <span style={{color:"#78350f"}}>CLP / und</span>
-              <span style={{fontWeight:700,color:"#c47830"}}>{`$${fmtN(costoUndCLP,0)}`}</span>
+              <span style={{fontWeight:700,color:"#c47830"}}>{`¥${fmtN(costoUndRMB,2)}`}</span>
             </div>
           </div>
         </div>
@@ -2137,7 +2126,7 @@ function ResumenRMBOp({ op, cots }) {
       <div style={{marginTop:10,background:"#fff",borderRadius:8,border:"1px solid #fde047",overflow:"hidden"}}>
         <div style={{padding:"7px 12px",fontSize:10,fontWeight:700,color:"#854d0e",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #fde047"}}>Costo por cot (mercancía + flete + share extras)</div>
         <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:680}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:560}}>
             <thead>
               <tr style={{background:"#fef3c7",color:"#78350f"}}>
                 <th style={{padding:"5px 8px",textAlign:"left"}}>Cot</th>
@@ -2148,7 +2137,6 @@ function ResumenRMBOp({ op, cots }) {
                 <th style={{padding:"5px 8px",textAlign:"right"}}>Flete ¥</th>
                 <th style={{padding:"5px 8px",textAlign:"right"}}>Total ¥</th>
                 <th style={{padding:"5px 8px",textAlign:"right"}}>¥/und</th>
-                <th style={{padding:"5px 8px",textAlign:"right"}}>CLP/und</th>
               </tr>
             </thead>
             <tbody>
@@ -2156,12 +2144,8 @@ function ResumenRMBOp({ op, cots }) {
                 const shareVal = mercOp > 0 ? d.mercanciaRMB / mercOp : 1/detallesCot.length
                 const otrosShareCotRMB = otrosOpRMB * shareVal
                 const comisionCotRMB = d.mercanciaRMB * comPct / 100
-                const otrosUSDShareCot = totalUSDExtra * shareVal
                 const totalCotRMB = d.mercanciaRMB + comisionCotRMB + d.fleteRMB + certOri + otrosShareCotRMB
-                const totalCotUSD = totalCotRMB / TC_RMB + otrosUSDShareCot
-                const totalCotCLP = totalCotUSD * tc
                 const undRMB = d.u > 0 ? totalCotRMB / d.u : 0
-                const undCLP = d.u > 0 ? totalCotCLP / d.u : 0
                 return (
                   <tr key={d.c._id} style={{borderTop:"1px solid #fef3c7"}}>
                     <td style={{padding:"5px 8px",fontWeight:700,color:"#0f172a"}}>{d.c.nro}</td>
@@ -2172,7 +2156,6 @@ function ResumenRMBOp({ op, cots }) {
                     <td style={{padding:"5px 8px",textAlign:"right",color:"#475569"}}>{`¥${fmtN(d.fleteRMB,0)}`}</td>
                     <td style={{padding:"5px 8px",textAlign:"right",fontWeight:700,color:"#0f172a"}}>{`¥${fmtN(totalCotRMB,0)}`}</td>
                     <td style={{padding:"5px 8px",textAlign:"right",fontWeight:700,color:"#854d0e"}}>{`¥${fmtN(undRMB,2)}`}</td>
-                    <td style={{padding:"5px 8px",textAlign:"right",fontWeight:700,color:"#c47830"}}>{`$${fmtN(undCLP,0)}`}</td>
                   </tr>
                 )
               })}
@@ -2184,12 +2167,104 @@ function ResumenRMBOp({ op, cots }) {
                 <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(fleteOp,0)}`}</td>
                 <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(totalRMB,0)}`}</td>
                 <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:"#854d0e"}}>{`¥${fmtN(costoUndRMB,2)}`}</td>
-                <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:"#c47830"}}>{`$${fmtN(costoUndCLP,0)}`}</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* BOTÓN CONFIRMAR FLETE — solo si TODAS las cots están en estado "pagada" y no se confirmó antes */}
+      {(() => {
+        const todasPagadas = cotsActivas.length > 0 && cotsActivas.every(c => c.estado === "pagada")
+        const yaConfirmado = op.flete_confirmado_sunny === true
+        if (!todasPagadas && !yaConfirmado) return null
+        if (yaConfirmado) {
+          return (
+            <div style={{marginTop:12,padding:"10px 14px",background:"#f0fdf4",border:"2px solid #22c55e",borderRadius:8,fontSize:12,color:"#15803d",fontWeight:700,textAlign:"center"}}>
+              ✅ 运费已确认 / Flete confirmado el {op.fecha_confirmacion_flete ? fmtDate(op.fecha_confirmacion_flete) : "—"} — carga en camino
+            </div>
+          )
+        }
+        return (
+          <div style={{marginTop:12,padding:"12px 14px",background:"#fff7ed",border:"2px solid #c47830",borderRadius:8}}>
+            <div style={{fontSize:11,color:"#92400e",fontWeight:700,marginBottom:6}}>
+              🚀 准备好运送 / Listo para enviar la carga?
+            </div>
+            <div style={{fontSize:10,color:"#a16207",marginBottom:8,fontStyle:"italic"}}>
+              Verifica que el peso y flete por cot estén ajustados al valor real antes de confirmar. Al confirmar, las {cotsActivas.length} cotizaciones de esta OP pasarán a estado "en camino" y el admin se enterará.
+            </div>
+            {msgConf && (
+              <div style={{marginBottom:8,padding:"6px 10px",borderRadius:6,fontSize:11,fontWeight:600,background:msgConf.tipo==="ok"?"#f0fdf4":"#fef2f2",color:msgConf.tipo==="ok"?"#15803d":"#dc2626",border:"1px solid "+(msgConf.tipo==="ok"?"#bbf7d0":"#fecaca")}}>{msgConf.txt}</div>
+            )}
+            <button disabled={confirmando} onClick={async()=>{
+              if (!window.confirm(`✈️ 确认运费 / Confirmar flete?\n\nLa OP ${op.nro} con ${cotsActivas.length} cotizaciones pasará a estado "en camino" (运输中).\n\nTotal RMB final: ¥${fmtN(totalRMB,2)}\nTotal CLP: $${fmtN(totalCLP,0)}\n\nVerifica que los pesos por cot estén correctos antes de continuar.`)) return
+              setConfirmando(true)
+              setMsgConf(null)
+              try {
+                // 1. Snapshot final por cot
+                const ahora = new Date().toISOString()
+                for (const c of cotsActivas) {
+                  const u = Number(c.unidades) || 0
+                  const undCaja = Number(c.dim_und_caja) || 0
+                  const esCaja = c.dim_tipo === "caja"
+                  const nCajas = esCaja && undCaja > 0 ? Math.ceil(u/undCaja) : 0
+                  const pesoReal = esCaja && undCaja > 0 ? (Number(c.peso_kg)||0)*nCajas : (Number(c.peso_kg)||0)*u
+                  const cbm = esCaja && undCaja > 0 ? (Number(c.dim_m3)||0)*nCajas : (Number(c.dim_m3)||0)*u
+                  const pesoVol = cbm * 167
+                  const pesoCobr = Math.max(pesoReal, pesoVol)
+                  const mercCot = (Number(c.precio_china_rmb)||0) * u
+                  const fleteCot = pesoCobr * fleteRmbKg
+                  const shareVal = mercOp > 0 ? mercCot / mercOp : 1/cotsActivas.length
+                  const otrosShareCot = otrosOpRMB * shareVal
+                  const otrosUSDShareCot = totalUSDExtra * shareVal
+                  const comCot = mercCot * comPct / 100
+                  const totalCotRMB = mercCot + comCot + fleteCot + certOri + otrosShareCot
+                  const totalCotCLP = (totalCotRMB / TC_RMB + otrosUSDShareCot) * tc
+                  const snapshotFinal = {
+                    fecha: ahora,
+                    autor: "Sunny",
+                    costo_china_rmb: totalCotRMB,
+                    costo_china_clp: totalCotCLP,
+                    peso_real_kg: pesoReal,
+                    peso_cobrable_kg: pesoCobr,
+                    flete_rmb: fleteCot,
+                    flete_rmb_kg: fleteRmbKg,
+                  }
+                  // Leer fresco, mergear, persistir cambio de estado a en_camino
+                  const { data: fresca } = await supabase.from("cotizaciones").select("datos").eq("id", c._id).single()
+                  const newDatos = {
+                    ...(fresca?.datos || {}),
+                    snapshot_final: snapshotFinal,
+                    estado: "en_camino",
+                    fecha_envio_china: ahora.split("T")[0],
+                    cambio_china_pendiente: true,
+                    fecha_cambio_china: ahora,
+                  }
+                  await supabase.from("cotizaciones").update({datos:newDatos, estado:"en_camino", updated_at:ahora}).eq("id", c._id)
+                }
+                // 2. Marcar OP confirmada
+                const { data: fop } = await supabase.from("operaciones").select("datos").eq("id", op._id).single()
+                const newOp = {
+                  ...(fop?.datos || {}),
+                  flete_confirmado_sunny: true,
+                  fecha_confirmacion_flete: ahora,
+                  total_rmb_final: totalRMB,
+                  total_clp_final: totalCLP,
+                }
+                await supabase.from("operaciones").update({datos:newOp, updated_at:ahora}).eq("id", op._id)
+                setMsgConf({tipo:"ok", txt:`✅ ${cotsActivas.length} cots → 运输中 / en camino. Admin notificado.`})
+                setTimeout(() => { onSaved && onSaved() }, 1500)
+              } catch (e) {
+                setMsgConf({tipo:"err", txt:"⚠️ " + (e.message || "Error al confirmar")})
+              } finally {
+                setConfirmando(false)
+              }
+            }} style={{width:"100%",padding:"12px 18px",fontSize:14,fontWeight:800,background:confirmando?"#94a3b8":"#c47830",color:"#fff",border:"none",borderRadius:8,cursor:confirmando?"wait":"pointer",fontFamily:"inherit"}}>
+              {confirmando ? "确认中... / Confirmando..." : "✈️ 确认运费并发送 / Confirmar flete y enviar carga"}
+            </button>
+          </div>
+        )
+      })()}
     </div>
   )
 }

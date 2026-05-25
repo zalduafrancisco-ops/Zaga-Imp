@@ -819,6 +819,135 @@ const METRIC=({label,value,sub,color})=>(
   </div>
 );
 // ─── Bloque "Pagos reales de la OP" — admin lleva ingresos por cliente + egresos a Sunny/Chile ───
+// ─── RESULTADO REAL OP — comparativo Inicial vs Final vs Pagado real (solo admin) ─
+function ResultadoRealOp({ op, cots, fmt, fmtN }) {
+  const cotsActivas = cots.filter(c => !["no_prospero"].includes(c.estado))
+  if (cotsActivas.length === 0) return null
+
+  // Sumar snapshots inicial por cot
+  const snapsIni = cotsActivas.map(c => c.snapshot_inicial).filter(Boolean)
+  const snapsFin = cotsActivas.map(c => c.snapshot_final).filter(Boolean)
+  const hayInicial = snapsIni.length > 0
+  const hayFinal = snapsFin.length > 0
+
+  // Si no hay snapshots, mostrar mensaje (OPs anteriores al fix)
+  if (!hayInicial && !hayFinal) return null
+
+  const sumIni = snapsIni.reduce((s, x) => ({
+    precio_cliente_clp: s.precio_cliente_clp + (Number(x.precio_cliente_clp)||0),
+    costo_china_clp:    s.costo_china_clp + (Number(x.costo_china_clp)||0),
+    costo_chile_clp:    s.costo_chile_clp + (Number(x.costo_chile_clp)||0),
+    ganancia_clp:       s.ganancia_clp + (Number(x.ganancia_clp)||0),
+  }), {precio_cliente_clp:0,costo_china_clp:0,costo_chile_clp:0,ganancia_clp:0})
+
+  const sumFin = snapsFin.reduce((s, x) => ({
+    costo_china_clp: s.costo_china_clp + (Number(x.costo_china_clp)||0),
+    costo_china_rmb: s.costo_china_rmb + (Number(x.costo_china_rmb)||0),
+  }), {costo_china_clp:0,costo_china_rmb:0})
+
+  // Pagado real (suma de pagos_reales.egresos)
+  const pagos = op.pagos_reales?.egresos || {}
+  const pagoSunny = (k) => {
+    const e = pagos[k] || {}
+    const clp = Number(e.clp_enviado) || 0
+    const com = Number(e.comision) || 0
+    const ivaCom = e.iva_comision != null && e.iva_comision !== "" ? Number(e.iva_comision) : com * 0.19
+    const rmb = Number(e.rmb) || 0
+    return { clp: clp + com + ivaCom, rmb, fecha: e.fecha }
+  }
+  const p1 = pagoSunny("pago1_sunny"), p2 = pagoSunny("pago2_sunny"), p3 = pagoSunny("pago3_sunny")
+  const pagadoChinaCLP = p1.clp + p2.clp + p3.clp
+  const pagadoChinaRMB = p1.rmb + p2.rmb + p3.rmb
+  const pagosHechos = [p1,p2,p3].filter(p => p.clp > 0 || p.rmb > 0).length
+  const pagoChile = pagos.pago_final_chile || {}
+  const pagadoChileCLP = (Number(pagoChile.servicio_aduana)||0) + (Number(pagoChile.iva_aduana)||0)
+  const tienePagoChile = pagadoChileCLP > 0
+
+  // Ganancias por escenario
+  const precioClienteCLP = sumIni.precio_cliente_clp
+  const precioClienteNeto = precioClienteCLP / 1.19
+
+  const gananciaInicial = sumIni.ganancia_clp
+  const costoChinaFin = hayFinal ? sumFin.costo_china_clp : sumIni.costo_china_clp
+  const gananciaFinal = precioClienteNeto - costoChinaFin - sumIni.costo_chile_clp
+  const costoChinaReal = pagadoChinaCLP > 0 ? pagadoChinaCLP : costoChinaFin
+  const costoChileReal = tienePagoChile ? pagadoChileCLP : sumIni.costo_chile_clp
+  const gananciaReal = precioClienteNeto - costoChinaReal - costoChileReal
+  const diffReal = gananciaReal - gananciaInicial
+  const pctReal = gananciaInicial > 0 ? (diffReal / gananciaInicial) * 100 : 0
+  const margenInicialPct = precioClienteNeto > 0 ? (gananciaInicial / precioClienteNeto) * 100 : 0
+  const margenRealPct = precioClienteNeto > 0 ? (gananciaReal / precioClienteNeto) * 100 : 0
+
+  const Row = ({lbl, ini, fin, real, diff, bold, sub}) => (
+    <tr style={{borderBottom: bold ? "2px solid #1aa358" : "1px solid #e2e8f0", background: bold ? "#f0fdf4" : "transparent"}}>
+      <td style={{padding:bold?"8px 10px":"6px 10px", fontSize: bold?13:11, color:"#475569", fontWeight: bold?800:500, fontStyle: sub?"italic":"normal"}}>{lbl}</td>
+      <td style={{padding:bold?"8px 10px":"6px 10px", fontSize: bold?13:11, color: bold?"#0f172a":"#64748b", textAlign:"right", fontWeight: bold?800:600}}>{ini !== null ? fmt(ini) : "—"}</td>
+      <td style={{padding:bold?"8px 10px":"6px 10px", fontSize: bold?13:11, color: bold?"#0f172a":"#64748b", textAlign:"right", fontWeight: bold?800:600}}>{fin !== null ? fmt(fin) : "—"}</td>
+      <td style={{padding:bold?"8px 10px":"6px 10px", fontSize: bold?13:11, color: bold?"#0f172a":"#64748b", textAlign:"right", fontWeight: bold?800:600}}>{real !== null ? fmt(real) : "—"}</td>
+      <td style={{padding:bold?"8px 10px":"6px 10px", fontSize: bold?13:11, color: diff != null ? (diff>=0?"#16a34a":"#dc2626") : "#94a3b8", textAlign:"right", fontWeight: bold?800:700}}>
+        {diff != null ? `${diff>=0?"+":""}${fmt(diff)}` : "—"}
+      </td>
+    </tr>
+  )
+
+  return (
+    <div style={{marginTop:14,padding:16,background: diffReal>=0 ? "#f0fdf4" : "#fffbeb", border:`2px solid ${diffReal>=0 ? "#22c55e" : "#fbbf24"}`,borderRadius:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
+        <div style={{fontSize:13,fontWeight:800,color: diffReal>=0 ? "#15803d" : "#92400e", letterSpacing:0.5}}>📊 RESULTADO REAL — OP {op.nro}</div>
+        <div style={{fontSize:10,color:"#64748b"}}>
+          {op.flete_confirmado_sunny ? `✈️ Flete confirmado por Sunny` : "⏳ Esperando confirmación de flete"}
+          {pagosHechos > 0 && ` · ${pagosHechos}/3 pagos hechos`}
+        </div>
+      </div>
+
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:680}}>
+          <thead>
+            <tr style={{background:"#f1f5f9"}}>
+              <th style={{padding:"7px 10px",fontSize:10,color:"#64748b",textAlign:"left",textTransform:"uppercase",letterSpacing:0.5,fontWeight:700}}>Concepto</th>
+              <th style={{padding:"7px 10px",fontSize:10,color:"#64748b",textAlign:"right",textTransform:"uppercase",letterSpacing:0.5,fontWeight:700}}>Inicial<br/><span style={{fontSize:8,fontWeight:400}}>(al cliente)</span></th>
+              <th style={{padding:"7px 10px",fontSize:10,color:"#64748b",textAlign:"right",textTransform:"uppercase",letterSpacing:0.5,fontWeight:700}}>Final<br/><span style={{fontSize:8,fontWeight:400}}>(Sunny flete)</span></th>
+              <th style={{padding:"7px 10px",fontSize:10,color:"#64748b",textAlign:"right",textTransform:"uppercase",letterSpacing:0.5,fontWeight:700}}>Pagado real<br/><span style={{fontSize:8,fontWeight:400}}>(caja)</span></th>
+              <th style={{padding:"7px 10px",fontSize:10,color:"#64748b",textAlign:"right",textTransform:"uppercase",letterSpacing:0.5,fontWeight:700}}>Δ vs proy.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <Row lbl="Costo China RMB" ini={null} fin={hayFinal?sumFin.costo_china_rmb:null} real={pagadoChinaRMB||null} diff={hayFinal && pagadoChinaRMB ? pagadoChinaRMB - sumFin.costo_china_rmb : null} />
+            <Row lbl="Costo China CLP" ini={hayInicial?sumIni.costo_china_clp:null} fin={hayFinal?sumFin.costo_china_clp:null} real={pagadoChinaCLP||null} diff={pagadoChinaCLP>0 && hayInicial ? pagadoChinaCLP - sumIni.costo_china_clp : null} />
+            {(p1.clp+p2.clp+p3.clp) > 0 && <>
+              {p1.clp > 0 && <Row lbl={`· Pago 1 Sunny${p1.fecha?` (${p1.fecha})`:""}`} ini={null} fin={null} real={p1.clp} diff={null} sub />}
+              {p2.clp > 0 && <Row lbl={`· Pago 2 Sunny${p2.fecha?` (${p2.fecha})`:""}`} ini={null} fin={null} real={p2.clp} diff={null} sub />}
+              {p3.clp > 0 && <Row lbl={`· Pago 3 Sunny${p3.fecha?` (${p3.fecha})`:""}`} ini={null} fin={null} real={p3.clp} diff={null} sub />}
+            </>}
+            <Row lbl="Costo Chile CLP" ini={hayInicial?sumIni.costo_chile_clp:null} fin={hayInicial?sumIni.costo_chile_clp:null} real={tienePagoChile?pagadoChileCLP:null} diff={tienePagoChile && hayInicial ? pagadoChileCLP - sumIni.costo_chile_clp : null} />
+            <Row lbl="Precio cliente CLP (c/IVA)" ini={precioClienteCLP||null} fin={precioClienteCLP||null} real={precioClienteCLP||null} diff={0} />
+            <Row lbl="GANANCIA NETA" ini={hayInicial?gananciaInicial:null} fin={(hayFinal||hayInicial)?gananciaFinal:null} real={(pagadoChinaCLP>0||tienePagoChile)?gananciaReal:null} diff={(pagadoChinaCLP>0||tienePagoChile)&&hayInicial?diffReal:null} bold />
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{marginTop:10,padding:"10px 14px",background:"#fff",border:`1px solid ${diffReal>=0?"#22c55e":"#fbbf24"}`,borderRadius:8,fontSize:12}}>
+        {(pagadoChinaCLP>0 || tienePagoChile) && hayInicial ? (
+          <>
+            {diffReal>=0
+              ? <span style={{color:"#15803d"}}>✅ <b>Margen real {margenRealPct.toFixed(1)}%</b> · ganaste <b>+{fmt(diffReal)}</b> ({pctReal>=0?"+":""}{pctReal.toFixed(1)}%) vs lo proyectado al cliente (margen {margenInicialPct.toFixed(1)}%)</span>
+              : <span style={{color:"#92400e"}}>⚠️ <b>Margen real {margenRealPct.toFixed(1)}%</b> · perdiste <b>{fmt(diffReal)}</b> ({pctReal.toFixed(1)}%) vs lo proyectado al cliente (margen {margenInicialPct.toFixed(1)}%)</span>
+            }
+          </>
+        ) : (
+          <span style={{color:"#64748b",fontStyle:"italic"}}>⏳ Cifras finales se completan a medida que cargues los pagos en el panel "Pagos reales OP" de arriba.</span>
+        )}
+      </div>
+
+      {!hayInicial && (
+        <div style={{marginTop:8,fontSize:10,color:"#a16207",fontStyle:"italic"}}>
+          ⚠️ Sin snapshot inicial — OP anterior al fix. Solo se muestran cifras finales/pagadas.
+        </div>
+      )}
+    </div>
+  )
+}
+
 function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCostoNeto, fmt }){
   const [pagos, setPagos] = useState(op.pagos_reales || {});
   const [saving, setSaving] = useState(false);
@@ -4799,16 +4928,26 @@ Número de seguimiento: ${c.nro}`;
                                 if(!confirm(`✅ Validar y enviar al cliente?\n\nLa cotización ${c.nro} pasará a ser visible en el portal del cliente.\n\nSe FIJARÁ el precio acordado en: $${Math.round(precioUnd).toLocaleString("es-CL")}/und (total ${u} und = $${Math.round(totalCli).toLocaleString("es-CL")} ${conIvaCot?"c/IVA":"sin IVA"}).\n\nA partir de este momento, si Lenlen edita costos, el precio al cliente NO cambia — solo se ajusta el margen ZAGA.`)) return;
                                 try {
                                   const { id, ...rest } = c;
+                                  // Snapshot inicial — congelar los costos en este momento para comparar con final
+                                  const snapshotInicial = {
+                                    fecha: new Date().toISOString(),
+                                    precio_cliente_clp: Math.round(totalCli),
+                                    precio_cliente_und: Math.round(precioUnd),
+                                    unidades: u,
+                                    // Costos según calc actual de la cot (los que conoce admin al validar)
+                                    costo_china_clp: Number(c.calc?.tCh) || 0,
+                                    costo_chile_clp: Number(c.calc?.cdaCl) || 0,
+                                    ganancia_clp: Number(c.calc?.ganImp) || 0,
+                                  };
                                   const newDatos = {
                                     ...rest,
                                     validada_admin:true,
                                     fecha_validacion_admin:new Date().toISOString(),
-                                    // CONGELAR precio al cliente: persistir como override que sobreescribe totClIva
-                                    // Si Lenlen modifica costos, el precio_final_acordado_und manda y el ajuste va al margen
                                     precio_final_acordado_und: Math.round(precioUnd),
+                                    snapshot_inicial: snapshotInicial,
                                   };
                                   await supabase.from("cotizaciones").update({datos:newDatos, updated_at:new Date().toISOString()}).eq("id", c.id);
-                                  setCotizaciones(prev => prev.map(x => x.id===c.id ? {...x, validada_admin:true, fecha_validacion_admin:newDatos.fecha_validacion_admin, precio_final_acordado_und: Math.round(precioUnd)} : x));
+                                  setCotizaciones(prev => prev.map(x => x.id===c.id ? {...x, validada_admin:true, fecha_validacion_admin:newDatos.fecha_validacion_admin, precio_final_acordado_und: Math.round(precioUnd), snapshot_inicial: snapshotInicial} : x));
                                   showToast(`✅ ${c.nro} validada — precio fijado $${Math.round(precioUnd).toLocaleString("es-CL")}/und`);
                                 } catch(err) {
                                   showToast("Error: "+(err.message||""),"err");
@@ -6729,6 +6868,9 @@ Número de seguimiento: ${c.nro}`;
 
                                   {/* BLOQUE PAGOS REALES — admin lleva ingresos por cliente + egresos */}
                                   <PagosRealesOp op={op} cots={cots} supabase={supabase} setOperaciones={setOperaciones} totVentaIva={totVentaIva} totCostoNeto={totCostoNeto} fmt={fmt} />
+
+                                  {/* RESULTADO REAL OP — Inicial vs Final vs Pagado real */}
+                                  <ResultadoRealOp op={op} cots={cots} fmt={fmt} fmtN={fmtN} />
                                   </>
                                 );
                               })()}
@@ -6804,6 +6946,20 @@ Número de seguimiento: ${c.nro}`;
                                         newCot.precio_final_acordado_und = pv.precio;
                                         newCot.margen_objetivo_pct = pv.margen;
                                       }
+                                      // Snapshot inicial — congelar los costos al momento de aplicar consolidado
+                                      // Se usa después para comparar con el costo real al cierre del flete.
+                                      const cz = calcCostoRealZaga(c, op, cots);
+                                      const undC = Number(c.unidades) || 0;
+                                      const precioUndAct = pv?.precio || Number(c.precio_final_acordado_und) || 0;
+                                      newCot.snapshot_inicial = {
+                                        fecha: new Date().toISOString(),
+                                        precio_cliente_clp: Math.round(precioUndAct * undC),
+                                        precio_cliente_und: precioUndAct,
+                                        unidades: undC,
+                                        costo_china_clp: cz.totalChinaCLP || 0,
+                                        costo_chile_clp: cz.totalChileCLP || 0,
+                                        ganancia_clp: (Math.round(precioUndAct * undC / 1.19)) - (cz.totalChinaCLP || 0) - (cz.totalChileCLP || 0),
+                                      };
                                       if (promovibles.has(c.estado || "")) {
                                         newCot.estado = "cotizada";
                                         newCot.checklist = {...(c.checklist||{}), cotizada: true};
