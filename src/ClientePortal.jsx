@@ -1141,6 +1141,14 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                   var dias = (c.fecha_llegada_est&&!isRech&&!['completada','en_bodega'].includes(c.estado))?getDias(c.fecha_llegada_est):null
                   var tab = getTab(c.id)
                   var pctPago = c.pago_100?(pagado1?100:0):(pagado1&&pagado2?100:pagado1?30:0)
+                  // ¿La cot tiene precio válido y aprobado por admin?
+                  // Si NO, cliente NO debe ver precios ni "pagado" — solo "estamos cotizando".
+                  var precioValido = (
+                    Number(c.precio_final_acordado_und) > 0 ||
+                    c.validada_admin === true ||
+                    c.consolidado_aplicado_cliente === true ||
+                    ['pagada','en_camino','en_bodega','completada'].includes(c.estado)
+                  )
 
                   // ── PASO ACTIVO: desde estado + checklist para estados con sub-pasos ─
                   var _maxPaso = getMaxPaso(c)
@@ -1190,7 +1198,8 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               </div>
                             </div>
                           )}
-                          {tot>0&&!isRech&&<div style={{fontSize:14,fontWeight:800,color:"#040c18"}}>{fmt(tot)}</div>}
+                          {tot>0&&!isRech&&precioValido&&<div style={{fontSize:14,fontWeight:800,color:"#040c18"}}>{fmt(tot)}</div>}
+                          {!precioValido&&!isRech&&<div style={{fontSize:10,color:"#94a3b8",fontStyle:"italic"}}>⏳ Cotizando</div>}
                           <div style={{fontSize:18,color:"#cbd5e1",transition:"transform .2s",transform:isOpen?"rotate(180deg)":"none"}}>⌄</div>
                         </div>
                       </div>
@@ -1268,7 +1277,17 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                             )}
 
                             {/* TAB PAGOS */}
-                            {tab==="pagos"&&!isRech&&(
+                            {tab==="pagos"&&!isRech&&!precioValido&&(
+                              <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:12,padding:"20px 18px",textAlign:"center"}}>
+                                <div style={{fontSize:36,marginBottom:8}}>⏳</div>
+                                <div style={{fontSize:14,fontWeight:700,color:"#92400e",marginBottom:6}}>Tu cotización está siendo procesada</div>
+                                <div style={{fontSize:12,color:"#a16207",lineHeight:1.5}}>
+                                  Estamos cotizando esta solicitud con nuestro agente en China.<br/>
+                                  Apenas tengamos el precio final, te avisaremos por aquí y por WhatsApp.
+                                </div>
+                              </div>
+                            )}
+                            {tab==="pagos"&&!isRech&&precioValido&&(
                               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                                 <div style={{background:"#f8fafc",borderRadius:10,padding:"13px 14px",border:"1px solid #e2e8f0"}}>
                                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
