@@ -2980,6 +2980,7 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{fontSize:11,color:"#92400e",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>🇨🇳 1. Datos confirmados por Sunny (read-only)</div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr auto",rowGap:5,columnGap:10,fontSize:12,color:"#475569"}}>
                     {c.material_china && <><span>🧪 Material:</span><b style={{color:"#0f172a",textAlign:"right"}}>{c.material_china}</b></>}
+                    <span>📦 Unidades por caja:</span><b style={{color:"#0f172a",textAlign:"right"}}>{c.dim_und_caja || "—"} und/caja{c.dim_und_caja && Number(c.dim_und_caja)>0 && <span style={{color:"#64748b",fontWeight:400}}> · {nCajas} cajas</span>}</b>
                     <span>FOB Exw / und:</span><b style={{color:"#0f172a",textAlign:"right"}}>¥{precioRmb}</b>
                     <span>Mercancía total ({u} und):</span><b style={{color:"#0f172a",textAlign:"right"}}>{fmtRMB(valorMercanciaRMB)}</b>
                     <span>Comisión Sunny ({comisionPct}%):</span><b style={{color:"#0f172a",textAlign:"right"}}>{fmtRMB(comisionRMB)}</b>
@@ -5272,9 +5273,7 @@ Número de seguimiento: ${c.nro}`;
                           setVistaValidarId(cFresh.id);
                         }} style={{background:"#c4783022",color:"#c47830",border:"1px solid #c4783055",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700}}>🛬 Validar</button>}
                         {!isPropia&&<button onClick={()=>setVistaId(c.id)} style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📄 Vista cliente</button>}
-                        {c.transporte !== "aereo" && (
-                          <button onClick={()=>handleEdit(c)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>✏️ Editar</button>
-                        )}
+                        <button onClick={()=>handleEdit(c)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>✏️ Editar</button>
                         <button onClick={()=>handleDelete(c.id)} style={{background:"#fff1f2",color:"#c0392b",border:"1px solid #ef444433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>🗑</button>
                       </div>
                     </div>
