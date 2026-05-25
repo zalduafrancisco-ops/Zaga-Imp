@@ -1877,6 +1877,64 @@ export default function App({ supabase, usuario, onLogout }){
     showToast(`✓ ${cot.nro || "Cotización"} ajustada: ${unidadesOriginales} → ${unidadesNuevas} und`);
   };
   const handleEdit=(c)=>{ setForm({...defaultForm,...c}); setEditId(c.id); setTab("calc"); };
+
+  // Duplicar cot: crea una nueva cot copia con nuevo nro correlativo.
+  // Útil para variantes (mismo producto, distinta cantidad/precio/etc).
+  // Se limpia: estado→solicitud, fechas, snapshots, flags de validación, checklist fresh.
+  const handleDuplicar = async (c) => {
+    if (!confirm(`📋 Duplicar ${c.nro}?\n\nSe creará una nueva cotización con los mismos datos base (cliente, producto, link, imagen, transporte) y abrirá el editor para que ajustes la variante (cantidad, precio China, etc).\n\nLa nueva cot arranca en estado "solicitud" y NO arrastra: pagos, validaciones, snapshots ni vínculo a OP.`)) return;
+    try {
+      const checklDef = c.tipo === "propia" ? CHECKLIST_PROPIA : CHECKLIST_CLIENTE;
+      // Calcular siguiente nro disponible
+      const maxNro = cotizaciones.reduce((m, x) => {
+        const n = parseInt(String(x.nro||"").replace(/^COT-/, ""), 10);
+        return isNaN(n) ? m : Math.max(m, n);
+      }, 0);
+      const nuevoNro = `COT-${String(maxNro+1).padStart(3,"0")}`;
+      const nuevoId = Date.now().toString();
+
+      // Copiar campos base, limpiar lo específico de la cot original
+      const camposLimpiar = [
+        "id","nro","estado","calc",
+        "checklist","fecha_llegada_real","fecha_llegada_est","fecha_solicitud",
+        "fecha_pago1_cliente","fecha_pago2_cliente","fecha_pago_china",
+        "fecha_respuesta_china","fecha_cotizada_china","fecha_aplicacion_cliente",
+        "fecha_validacion_admin","fecha_revision_admin","fecha_cambio_china","fecha_envio_china",
+        "precio_final_acordado_und","margen_objetivo_pct",
+        "validada_admin","consolidado_aplicado_cliente","cotizada_china",
+        "cambio_china_pendiente","snapshot_inicial","snapshot_final",
+        "operacion_id",
+        "negociacion_rondas","historial",
+        "notas_historial","notas_internas","notas_china_historial","nota_china_nueva",
+        "notas_cliente_historial",
+        "sku_bodega","fulfillment_producto_creado",
+        "recotizacion_pendiente_sunny","recotizacion_completada_sunny",
+        "nro_factura_cliente","link_factura_cliente",
+      ];
+      const copia = {...c};
+      camposLimpiar.forEach(k => { delete copia[k]; });
+      const ahora = new Date().toISOString().split("T")[0];
+      const nueva = {
+        ...copia,
+        id: nuevoId,
+        nro: nuevoNro,
+        estado: "solicitud",
+        fecha_solicitud: ahora,
+        checklist: Object.fromEntries(checklDef.map(d => [d.key, false])),
+        duplicada_de: c.nro,
+      };
+      // Calcular calc inicial con los datos copiados
+      try { nueva.calc = nueva.tipo === "propia" ? calcPropia(nueva) : calcCliente(nueva); } catch(_) {}
+      await persist([nueva, ...cotizaciones]);
+      // Abrir el editor de la nueva para que el usuario ajuste la variante
+      setForm({...defaultForm, ...nueva});
+      setEditId(nuevoId);
+      setTab("calc");
+      showToast(`✓ ${nuevoNro} creada (copia de ${c.nro}) — edita la variante`);
+    } catch(e) {
+      showToast("Error al duplicar: " + (e.message||""), "err");
+    }
+  };
   // DELETE explícito por ID (única forma autorizada de borrar). Confirma antes.
   const handleDelete=async id=>{
     const cot=cotizaciones.find(c=>c.id===id);
@@ -5274,6 +5332,7 @@ Número de seguimiento: ${c.nro}`;
                         }} style={{background:"#c4783022",color:"#c47830",border:"1px solid #c4783055",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700}}>🛬 Validar</button>}
                         {!isPropia&&<button onClick={()=>setVistaId(c.id)} style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📄 Vista cliente</button>}
                         <button onClick={()=>handleEdit(c)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>✏️ Editar</button>
+                        <button onClick={()=>handleDuplicar(c)} title="Duplicar para crear variante del mismo producto" style={{background:"#eef6ff",color:"#2d78c8",border:"1px solid #bfdbfe",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📋 Duplicar</button>
                         <button onClick={()=>handleDelete(c.id)} style={{background:"#fff1f2",color:"#c0392b",border:"1px solid #ef444433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>🗑</button>
                       </div>
                     </div>
