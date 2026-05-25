@@ -1466,6 +1466,9 @@ export default function App({ supabase, usuario, onLogout }){
   const [resumenChina,setResumenChina] = useState(null);
   const [backupModal,setBackupModal] = useState(null); // null | "export" | "import"
   const [simModal,setSimModal]       = useState(false);
+  // Contabilidad — selector mes (formato YYYY-MM) y submodo maritimo/aereo
+  const [contMes, setContMes]        = useState(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;});
+  const [contModo, setContModo]      = useState("maritimo"); // "maritimo" | "aereo"
   const [backupText,setBackupText] = useState(""); // {[cotId]: {nota, unidades_prop, precio_prop}}
   const vistaRef                         = useRef(null);
   const vistaClienteRef                  = useRef(null);
@@ -2240,7 +2243,7 @@ export default function App({ supabase, usuario, onLogout }){
 
         {/* NAV TABS */}
         <div className="nav-tabs" style={{maxWidth:1280,margin:"0 auto",padding:"0 24px",display:"flex",gap:0,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-          {[["calc","Calculadora"],["tracker",`Tracker (${cotizaciones.length})`],["operaciones",`✈️ Operaciones${operaciones.length>0?` (${operaciones.length})`:""}`],["dashboard","Dashboard"],["clientes","Clientes"],["luisa","Luisa"]].map(([k,l])=>(
+          {[["calc","Calculadora"],["tracker",`Tracker (${cotizaciones.length})`],["operaciones",`✈️ Operaciones${operaciones.length>0?` (${operaciones.length})`:""}`],["dashboard","Dashboard"],["clientes","Clientes"],["luisa","Luisa"],["contabilidad","📑 Contabilidad"]].map(([k,l])=>(
             <button key={k} onClick={()=>setTab(k)} style={{position:"relative",
               background:"transparent",
               color:tab2===k?"#ffffff":"rgba(255,255,255,0.4)",
@@ -8102,6 +8105,296 @@ Número de seguimiento: ${c.nro}`;
                   <div style={{fontSize:50,marginBottom:12}}>👩‍💼</div>
                   <div style={{fontSize:16,fontWeight:700,color:"#a85590",marginBottom:8}}>¡Bienvenida Luisa!</div>
                   <div style={{fontSize:13,color:"#64748b"}}>Tus cotizaciones aparecerán aquí cuando estén asignadas a ti.</div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ══ CONTABILIDAD — reporte mensual para contador ══ */}
+        {tab2==="contabilidad"&&(()=>{
+          // Mes seleccionado (YYYY-MM). Las cots se filtran por fecha_llegada_real
+          // (cuándo se completó la operación). Solo se considera estado === "completada".
+          const mesPicker = (() => {
+            // Lista de meses con cots completadas (para selector rápido)
+            const setMeses = new Set();
+            cotizaciones.forEach(c => {
+              if (c.estado === "completada" && c.fecha_llegada_real) {
+                setMeses.add(c.fecha_llegada_real.substring(0,7));
+              }
+            });
+            // Asegurar mes actual y mes anterior siempre en la lista
+            const hoy = new Date();
+            for (let i=0; i<3; i++) {
+              const d = new Date(hoy.getFullYear(), hoy.getMonth()-i, 1);
+              setMeses.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
+            }
+            return [...setMeses].sort().reverse();
+          })();
+
+          const filtroBase = (c) => {
+            if (c.estado !== "completada") return false;
+            if (!c.fecha_llegada_real) return false;
+            if (c.fecha_llegada_real.substring(0,7) !== contMes) return false;
+            const esAereo = c.transporte === "aereo";
+            return contModo === "aereo" ? esAereo : !esAereo;
+          };
+          const cotsMes = cotizaciones.filter(filtroBase);
+
+          // ─── MARÍTIMO ─────────────────────────────────────────────────
+          const filasMar = cotsMes.map(c => {
+            const u = Number(c.unidades) || 0;
+            const precioUnd = Number(c.precio_final_acordado_und) || 0;
+            const cobrado = precioUnd > 0 ? precioUnd * u : Number(c.calc?.totCl) || 0;
+            const costoChina = ((Number(c.precio_china)||0) * u) + (Number(c.comision_real)||0);
+            // Comisión Luisa: solo si gestor luisa. Tasa = 20% o 25% según volumen del mes EN QUE SE COMPLETÓ.
+            const esLuisa = c.gestor === "luisa";
+            const ganImpCot = Number(c.calc?.ganImp) || (cobrado - costoChina);
+            return { c, u, precioUnd, cobrado, costoChina, ganImpCot, esLuisa };
+          });
+          const cotsLuisaMes = filasMar.filter(f => f.esLuisa);
+          // Tasa Luisa para este mes (mismo criterio que panel Luisa: >=6 cierres → 25%, sino 20%)
+          const tasaLuisaMes = cotsLuisaMes.length >= 6 ? 0.25 : 0.20;
+          const filasMarConCom = filasMar.map(f => ({
+            ...f,
+            comLuisa: f.esLuisa ? f.ganImpCot * tasaLuisaMes : 0,
+            ganNeta: f.cobrado - f.costoChina - (f.esLuisa ? f.ganImpCot * tasaLuisaMes : 0),
+          }));
+          const totCobradoMar = filasMarConCom.reduce((s,f)=>s+f.cobrado, 0);
+          const totCostoChinaMar = filasMarConCom.reduce((s,f)=>s+f.costoChina, 0);
+          const totComLuisaMar = filasMarConCom.reduce((s,f)=>s+f.comLuisa, 0);
+          const totGanNetaMar = filasMarConCom.reduce((s,f)=>s+f.ganNeta, 0);
+
+          // ─── AÉREO ────────────────────────────────────────────────────
+          const filasAer = cotsMes.map(c => {
+            const u = Number(c.unidades) || 0;
+            const precioUnd = Number(c.precio_final_acordado_und) || 0;
+            const cobradoIva = precioUnd > 0 ? precioUnd * u : Number(c.calc?.totClIva) || 0;
+            const cobradoNeto = cobradoIva / 1.19;
+            const ivaCobradoCliente = cobradoIva - cobradoNeto;
+            // Costo China aéreo: del snapshot final si existe (incluye flete real), sino calc
+            const costoChina = Number(c.snapshot_final?.costo_china_clp) || Number(c.calc?.totCh) || 0;
+            // IVA aduana pagado (info para DIN)
+            const ivaAduana = Number(c.calc?.aer?.ivaAduanaReal) || 0;
+            const ivaAgente = Number(c.calc?.aer?.ivaAgente) || 0;
+            const ivaRecuperable = ivaAduana + ivaAgente;
+            const esLuisa = c.gestor === "luisa";
+            const ganImpCot = Number(c.calc?.ganImp) || 0;
+            return { c, u, precioUnd, cobradoIva, cobradoNeto, ivaCobradoCliente, costoChina, ivaAduana, ivaAgente, ivaRecuperable, esLuisa, ganImpCot };
+          });
+          const cotsLuisaAer = filasAer.filter(f => f.esLuisa);
+          const tasaLuisaAer = cotsLuisaAer.length >= 6 ? 0.25 : 0.20;
+          const filasAerConCom = filasAer.map(f => ({
+            ...f,
+            comLuisa: f.esLuisa ? f.ganImpCot * tasaLuisaAer : 0,
+          }));
+          const totCobradoAerIva = filasAerConCom.reduce((s,f)=>s+f.cobradoIva, 0);
+          const totCobradoAerNeto = filasAerConCom.reduce((s,f)=>s+f.cobradoNeto, 0);
+          const totIvaCobradoAer = filasAerConCom.reduce((s,f)=>s+f.ivaCobradoCliente, 0);
+          const totCostoChinaAer = filasAerConCom.reduce((s,f)=>s+f.costoChina, 0);
+          const totIvaAduanaAer = filasAerConCom.reduce((s,f)=>s+f.ivaAduana, 0);
+          const totIvaAgenteAer = filasAerConCom.reduce((s,f)=>s+f.ivaAgente, 0);
+          const totIvaRecAer = filasAerConCom.reduce((s,f)=>s+f.ivaRecuperable, 0);
+          const totComLuisaAer = filasAerConCom.reduce((s,f)=>s+f.comLuisa, 0);
+          const totGanNetaAer = totCobradoAerNeto - totCostoChinaAer - totComLuisaAer;
+          const saldoF29 = totIvaCobradoAer - totIvaRecAer;
+
+          const mesLabel = (() => {
+            const [y,m] = contMes.split("-");
+            const meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+            return `${meses[parseInt(m)-1]} ${y}`;
+          })();
+
+          return (
+            <div style={{maxWidth:1100,margin:"0 auto"}}>
+              <div style={{background:"#040c18",borderRadius:14,padding:"20px 24px",marginBottom:18,color:"#fff"}}>
+                <div style={{fontSize:18,fontWeight:800,color:"#c9a055",marginBottom:6}}>📑 Reporte tributario para contador</div>
+                <div style={{fontSize:12,color:"#94a3b8"}}>Cots con estado "completada" agrupadas por mes de llegada real. Marítimo: factura exenta por ganancia neta. Aéreo: factura normal + flujo F29 IVA.</div>
+              </div>
+
+              {/* Selector mes + sub-modo */}
+              <div style={{display:"flex",gap:14,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+                <div>
+                  <label style={{display:"block",fontSize:10,color:"#64748b",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Mes</label>
+                  <select value={contMes} onChange={e=>setContMes(e.target.value)} style={{padding:"8px 12px",borderRadius:8,border:"1px solid #e2e8f0",fontSize:13,background:"#fff",color:"#0f172a",fontFamily:"inherit",cursor:"pointer"}}>
+                    {mesPicker.map(m => {
+                      const [y,mm] = m.split("-");
+                      const meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+                      return <option key={m} value={m}>{meses[parseInt(mm)-1]} {y}</option>;
+                    })}
+                  </select>
+                </div>
+                <div style={{display:"flex",gap:6,paddingTop:18}}>
+                  {[["maritimo","🚢 Marítimo","#2a8aaa"],["aereo","✈️ Aéreo","#c47830"]].map(([k,l,col])=>(
+                    <button key={k} onClick={()=>setContModo(k)} style={{background:contModo===k?col+"22":"#f8fafc",color:contModo===k?col:"#64748b",border:`1px solid ${contModo===k?col+"66":"#e2e8f0"}`,borderRadius:8,padding:"8px 16px",fontSize:13,cursor:"pointer",fontWeight:contModo===k?700:500}}>{l}</button>
+                  ))}
+                </div>
+                <button onClick={()=>window.print()} style={{marginLeft:"auto",marginTop:18,background:"#040c18",color:"#c9a055",border:"none",borderRadius:8,padding:"9px 18px",fontSize:13,cursor:"pointer",fontWeight:700}}>🖨️ Imprimir / PDF</button>
+              </div>
+
+              {cotsMes.length === 0 ? (
+                <div style={{background:"#fff",borderRadius:12,padding:40,textAlign:"center",border:"1px solid #e2e8f0"}}>
+                  <div style={{fontSize:40,marginBottom:8}}>📭</div>
+                  <div style={{fontSize:14,color:"#64748b"}}>No hay operaciones {contModo} completadas en {mesLabel}.</div>
+                </div>
+              ) : contModo === "maritimo" ? (
+                /* ─── VISTA MARÍTIMO ─────────────────────────────────────── */
+                <div style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",overflow:"hidden"}}>
+                  <div style={{padding:"14px 20px",background:"#f8fafc",borderBottom:"1px solid #e2e8f0"}}>
+                    <div style={{fontSize:14,fontWeight:800,color:"#0f172a"}}>🚢 Marítimo — {mesLabel}</div>
+                    <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{cotsMes.length} operaciones completadas · factura exenta por ganancia neta</div>
+                  </div>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:780}}>
+                      <thead>
+                        <tr style={{background:"#f1f5f9",color:"#475569"}}>
+                          <th style={{padding:"8px 10px",textAlign:"left",fontWeight:700}}>COT</th>
+                          <th style={{padding:"8px 10px",textAlign:"left",fontWeight:700}}>Cliente</th>
+                          <th style={{padding:"8px 10px",textAlign:"right",fontWeight:700}}>Llegada</th>
+                          <th style={{padding:"8px 10px",textAlign:"right",fontWeight:700}}>Cobrado</th>
+                          <th style={{padding:"8px 10px",textAlign:"right",fontWeight:700}}>Costo China</th>
+                          <th style={{padding:"8px 10px",textAlign:"right",fontWeight:700}}>Com. Luisa</th>
+                          <th style={{padding:"8px 10px",textAlign:"right",fontWeight:700}}>Ganancia</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filasMarConCom.map(f => (
+                          <tr key={f.c.id} style={{borderTop:"1px solid #f1f5f9"}}>
+                            <td style={{padding:"8px 10px",fontWeight:700,color:"#0f172a"}}>{f.c.nro}</td>
+                            <td style={{padding:"8px 10px",color:"#475569"}}>
+                              {f.c.cliente}
+                              {f.esLuisa && <span style={{marginLeft:6,fontSize:10,background:"#a8559022",color:"#a85590",padding:"2px 6px",borderRadius:10,fontWeight:700}}>L</span>}
+                            </td>
+                            <td style={{padding:"8px 10px",textAlign:"right",fontSize:11,color:"#64748b"}}>{f.c.fecha_llegada_real}</td>
+                            <td style={{padding:"8px 10px",textAlign:"right",color:"#0f172a"}}>{fmt(f.cobrado)}</td>
+                            <td style={{padding:"8px 10px",textAlign:"right",color:"#c0392b"}}>−{fmt(f.costoChina)}</td>
+                            <td style={{padding:"8px 10px",textAlign:"right",color:f.comLuisa>0?"#a85590":"#cbd5e1"}}>{f.comLuisa>0?"−"+fmt(f.comLuisa):"—"}</td>
+                            <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:f.ganNeta>=0?"#15803d":"#dc2626"}}>{fmt(f.ganNeta)}</td>
+                          </tr>
+                        ))}
+                        <tr style={{background:"#fffbeb",borderTop:"2px solid #fde047"}}>
+                          <td colSpan={3} style={{padding:"12px 10px",fontWeight:800,color:"#854d0e"}}>TOTAL {mesLabel}</td>
+                          <td style={{padding:"12px 10px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{fmt(totCobradoMar)}</td>
+                          <td style={{padding:"12px 10px",textAlign:"right",fontWeight:800,color:"#c0392b"}}>−{fmt(totCostoChinaMar)}</td>
+                          <td style={{padding:"12px 10px",textAlign:"right",fontWeight:800,color:"#a85590"}}>{totComLuisaMar>0?"−"+fmt(totComLuisaMar):"—"}</td>
+                          <td style={{padding:"12px 10px",textAlign:"right",fontWeight:800,color:"#15803d",fontSize:14}}>{fmt(totGanNetaMar)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{padding:"14px 20px",background:"#f0fdf4",borderTop:"2px solid #22c55e"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                      <div>
+                        <div style={{fontSize:11,color:"#16a34a",fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>📄 Factura exenta a emitir</div>
+                        <div style={{fontSize:10,color:"#64748b",marginTop:2}}>Monto a facturar como ganancia operacional del mes (exenta de IVA)</div>
+                      </div>
+                      <div style={{fontSize:22,fontWeight:800,color:"#15803d"}}>{fmt(totGanNetaMar)}</div>
+                    </div>
+                  </div>
+                  {totComLuisaMar > 0 && (
+                    <div style={{padding:"10px 20px",background:"#fdf4ff",borderTop:"1px solid #e9d5ff",fontSize:11,color:"#7c3aed"}}>
+                      💡 Tasa Luisa aplicada este mes: {(tasaLuisaMes*100).toFixed(0)}% ({cotsLuisaMes.length} cierres ≥ 6 = 25% · si menos = 20%). Comisión devengada al cierre — anticipos pagados en mes de primer pago se imputan acá.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* ─── VISTA AÉREO ────────────────────────────────────────── */
+                <div style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",overflow:"hidden"}}>
+                  <div style={{padding:"14px 20px",background:"#f8fafc",borderBottom:"1px solid #e2e8f0"}}>
+                    <div style={{fontSize:14,fontWeight:800,color:"#0f172a"}}>✈️ Aéreo — {mesLabel}</div>
+                    <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{cotsMes.length} operaciones completadas · factura normal con IVA + recuperación F29</div>
+                  </div>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:880}}>
+                      <thead>
+                        <tr style={{background:"#f1f5f9",color:"#475569"}}>
+                          <th style={{padding:"8px 10px",textAlign:"left",fontWeight:700}}>COT</th>
+                          <th style={{padding:"8px 10px",textAlign:"left",fontWeight:700}}>Cliente</th>
+                          <th style={{padding:"8px 10px",textAlign:"right",fontWeight:700}}>Cobrado c/IVA</th>
+                          <th style={{padding:"8px 10px",textAlign:"right",fontWeight:700}}>IVA débito</th>
+                          <th style={{padding:"8px 10px",textAlign:"right",fontWeight:700}}>Costo China</th>
+                          <th style={{padding:"8px 10px",textAlign:"right",fontWeight:700}}>IVA aduana<br/><span style={{fontSize:8,fontWeight:400}}>(crédito DIN)</span></th>
+                          <th style={{padding:"8px 10px",textAlign:"right",fontWeight:700}}>IVA agente<br/><span style={{fontSize:8,fontWeight:400}}>(crédito factura)</span></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filasAerConCom.map(f => (
+                          <tr key={f.c.id} style={{borderTop:"1px solid #f1f5f9"}}>
+                            <td style={{padding:"8px 10px",fontWeight:700,color:"#0f172a"}}>{f.c.nro}</td>
+                            <td style={{padding:"8px 10px",color:"#475569"}}>{f.c.cliente}</td>
+                            <td style={{padding:"8px 10px",textAlign:"right",color:"#0f172a"}}>{fmt(f.cobradoIva)}</td>
+                            <td style={{padding:"8px 10px",textAlign:"right",color:"#16a34a"}}>+{fmt(f.ivaCobradoCliente)}</td>
+                            <td style={{padding:"8px 10px",textAlign:"right",color:"#c0392b"}}>−{fmt(f.costoChina)}</td>
+                            <td style={{padding:"8px 10px",textAlign:"right",color:"#c47830"}}>{f.ivaAduana>0?"−"+fmt(f.ivaAduana):"—"}</td>
+                            <td style={{padding:"8px 10px",textAlign:"right",color:"#c47830"}}>{f.ivaAgente>0?"−"+fmt(f.ivaAgente):"—"}</td>
+                          </tr>
+                        ))}
+                        <tr style={{background:"#fffbeb",borderTop:"2px solid #fde047"}}>
+                          <td colSpan={2} style={{padding:"12px 10px",fontWeight:800,color:"#854d0e"}}>TOTAL {mesLabel}</td>
+                          <td style={{padding:"12px 10px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{fmt(totCobradoAerIva)}</td>
+                          <td style={{padding:"12px 10px",textAlign:"right",fontWeight:800,color:"#16a34a"}}>+{fmt(totIvaCobradoAer)}</td>
+                          <td style={{padding:"12px 10px",textAlign:"right",fontWeight:800,color:"#c0392b"}}>−{fmt(totCostoChinaAer)}</td>
+                          <td style={{padding:"12px 10px",textAlign:"right",fontWeight:800,color:"#c47830"}}>−{fmt(totIvaAduanaAer)}</td>
+                          <td style={{padding:"12px 10px",textAlign:"right",fontWeight:800,color:"#c47830"}}>−{fmt(totIvaAgenteAer)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Resumen final aéreo */}
+                  <div style={{padding:"14px 20px",background:"#f8fafc",borderTop:"1px solid #e2e8f0"}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+                      <div style={{background:"#fff",borderRadius:8,padding:"12px 14px",border:"1px solid #e2e8f0"}}>
+                        <div style={{fontSize:11,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>💰 Resumen operacional (neto)</div>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+                          <span style={{color:"#475569"}}>Cobrado clientes (neto)</span>
+                          <span style={{color:"#0f172a",fontWeight:700}}>{fmt(totCobradoAerNeto)}</span>
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+                          <span style={{color:"#475569"}}>− Costo China</span>
+                          <span style={{color:"#c0392b",fontWeight:700}}>−{fmt(totCostoChinaAer)}</span>
+                        </div>
+                        {totComLuisaAer > 0 && (
+                          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+                            <span style={{color:"#475569"}}>− Com. Luisa ({(tasaLuisaAer*100).toFixed(0)}%)</span>
+                            <span style={{color:"#a85590",fontWeight:700}}>−{fmt(totComLuisaAer)}</span>
+                          </div>
+                        )}
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:14,marginTop:8,paddingTop:8,borderTop:"1px solid #e2e8f0"}}>
+                          <span style={{color:"#0f172a",fontWeight:800}}>GANANCIA NETA</span>
+                          <span style={{color:totGanNetaAer>=0?"#15803d":"#dc2626",fontWeight:800}}>{fmt(totGanNetaAer)}</span>
+                        </div>
+                      </div>
+                      <div style={{background:"#fff",borderRadius:8,padding:"12px 14px",border:"1px solid #e2e8f0"}}>
+                        <div style={{fontSize:11,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>🧾 Flujo IVA F29</div>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+                          <span style={{color:"#475569"}}>IVA cobrado (débito)</span>
+                          <span style={{color:"#16a34a",fontWeight:700}}>+{fmt(totIvaCobradoAer)}</span>
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+                          <span style={{color:"#475569"}}>− IVA aduana (DIN)</span>
+                          <span style={{color:"#c47830",fontWeight:700}}>−{fmt(totIvaAduanaAer)}</span>
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+                          <span style={{color:"#475569"}}>− IVA agente (Leslie)</span>
+                          <span style={{color:"#c47830",fontWeight:700}}>−{fmt(totIvaAgenteAer)}</span>
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:14,marginTop:8,paddingTop:8,borderTop:"1px solid #e2e8f0"}}>
+                          <span style={{color:"#0f172a",fontWeight:800}}>Saldo F29</span>
+                          <span style={{color:saldoF29>=0?"#dc2626":"#15803d",fontWeight:800}}>{saldoF29>=0?"+":""}{fmt(saldoF29)}</span>
+                        </div>
+                        <div style={{fontSize:10,color:"#64748b",marginTop:6,fontStyle:"italic"}}>
+                          {saldoF29>=0 ? "→ a pagar al SII" : "→ a favor (recupera)"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {totIvaAduanaAer > 0 && (
+                    <div style={{padding:"10px 20px",background:"#fff7ed",borderTop:"1px solid #fed7aa",fontSize:11,color:"#92400e"}}>
+                      📄 <b>Recordatorio DIN:</b> verifica que tienes el DIN (Declaración de Ingreso) de cada operación aérea de este mes — son los documentos que respaldan el crédito fiscal por IVA aduana ({fmt(totIvaAduanaAer)}). Pásalos al contador junto con este reporte.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
