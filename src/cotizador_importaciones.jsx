@@ -397,7 +397,9 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
   let docOp_op       = _takeMax("cost_doc_operacion_rmb");
   let despacho_op    = _takeMax("cost_despacho_aduanero_rmb");
   let compraDocs_op  = _takeMax("cost_compra_docs_rmb");
-  let transporteCn_op= _takeMax("cost_transporte_interno_cn_rmb");
+  // Transporte interno CN es PER COT (Sunny cobra individual, depende del origen).
+  // Se trata directo, NO se prorratea. Coherente con tabla 1 (panel RMB).
+  const transporteCnDirectoRMB = Number(d.cost_transporte_interno_cn_rmb) || 0;
   let logistica_op   = 0;
   let otrosUSD_op    = 0;
   let formFUSD_op    = 0;
@@ -423,11 +425,11 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
     : 0;
 
   // Compartidos del OP (en RMB) prorrateados para esta cot:
+  // NOTA: transporteCn ya NO va aquí — se cobra per cot directo (transporteCnDirectoRMB)
   const compartidosCotRMB =
       docOp_op       * share
     + despacho_op    * share
     + compraDocs_op  * share
-    + transporteCn_op* share
     + logistica_op   * share
     + seguroOpRMB    * share;
   // Compartidos USD (legacy) prorrateados:
@@ -436,7 +438,8 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
   // Total RMB y CLP del cot
   const valorMercanciaRMB = mercanciaCotRMB; // alias para retornar
   const seguroRMB         = seguroOpRMB * share;
-  const otrosGastosRMB    = certOrigen + compartidosCotRMB;
+  // cert origen y transp_cn son PER COT directo (no se prorratean)
+  const otrosGastosRMB    = certOrigen + transporteCnDirectoRMB + compartidosCotRMB;
   const totalChinaRMB     = mercanciaCotRMB + comisionRMB + fleteRMB + otrosGastosRMB;
   const totalChinaCLP_RMB = (totalChinaRMB / TC_RMB_USD) * tc;
   const totalChinaCLP_USD = compartidosCotUSD * tc;
@@ -457,7 +460,7 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
   const docOp = docOp_op * share;
   const despacho = despacho_op * share;
   const compraDocs = compraDocs_op * share;
-  const transporteCn = transporteCn_op * share;
+  const transporteCn = transporteCnDirectoRMB; // per cot directo, no share
   const comisionPct = comisionPctEff;
   const pesoTotal = pesoTotalCot;
 
@@ -7024,8 +7027,8 @@ Número de seguimiento: ${c.nro}`;
                                             <th style={{padding:"5px 6px",textAlign:"right"}} title="Transporte interno CN: cobrado por cot individual (cada origen distinto)">Transp CN ¥</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}} title="Doc op + Despacho + Compra docs + Seguro, prorrateado por share del valor mercancía">Otros ¥</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>Total ¥</th>
-                                            <th style={{padding:"5px 6px",textAlign:"right"}}>¥/und</th>
-                                            <th style={{padding:"5px 6px",textAlign:"right"}}>CLP/und</th>
+                                            <th style={{padding:"5px 6px",textAlign:"right"}} title="Costo China total /und. NO incluye aduana Chile. Para costo total ver tabla siguiente.">¥/und China</th>
+                                            <th style={{padding:"5px 6px",textAlign:"right"}} title="Costo China /und convertido a CLP. NO incluye aduana Chile.">CLP/und China</th>
                                           </tr>
                                         </thead>
                                         <tbody>
