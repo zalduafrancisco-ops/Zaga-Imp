@@ -7302,52 +7302,6 @@ Número de seguimiento: ${c.nro}`;
                                     </div>
                                   </div>
 
-                                  {/* ── PANEL CAJA PROYECTADA CON F29 ── */}
-                                  {(() => {
-                                    const cobroBruto = totVentaIva;
-                                    const costoBrutoCaja = totCostoCIva;
-                                    const ivaDebito = totVentaIva - totVentaNeto;
-                                    const ivaCredito = totIvaAduana + totIvaAgente;
-                                    const f29AlSii = Math.max(0, ivaDebito - ivaCredito);
-                                    const gananciaCajaFinal = cobroBruto - costoBrutoCaja - f29AlSii;
-                                    return (
-                                      <div style={{marginTop:14,padding:16,background:"#0f1e30",borderRadius:12,color:"#fff",border:"1px solid #c9a05544"}}>
-                                        <div style={{fontSize:12,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:14,textAlign:"center"}}>
-                                          💸 Flujo de caja proyectado con F29 — OP {op.nro}
-                                        </div>
-                                        <div style={{fontSize:10,color:"#94a3b8",marginBottom:12,fontStyle:"italic",textAlign:"center"}}>
-                                          Muestra qué plata efectivamente queda en caja, considerando IVA aduana + IVA agente que salen al despacho y el IVA neto que ZAGA paga al SII después.
-                                        </div>
-                                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                                          <tbody>
-                                            <tr style={{borderBottom:"1px solid #1a2740"}}>
-                                              <td style={{padding:"7px 0",color:"#bbf7d0"}}>+ Cobrado bruto al cliente (c/IVA)</td>
-                                              <td style={{padding:"7px 0",textAlign:"right",fontWeight:700,color:"#22c55e"}}>{fmt(cobroBruto)}</td>
-                                            </tr>
-                                            <tr style={{borderBottom:"1px solid #1a2740"}}>
-                                              <td style={{padding:"7px 0",color:"#fca5a5"}}>− Costo bruto (China + Chile + IVA aduana + IVA agente)</td>
-                                              <td style={{padding:"7px 0",textAlign:"right",fontWeight:700,color:"#fca5a5"}}>{fmt(costoBrutoCaja)}</td>
-                                            </tr>
-                                            <tr style={{borderBottom:"1px solid #1a2740"}}>
-                                              <td style={{padding:"7px 0",color:"#fde68a"}}>
-                                                − IVA neto al SII (F29 = débito − crédito)
-                                                <div style={{fontSize:9,color:"#94a3b8",fontStyle:"italic"}}>Débito {fmt(ivaDebito)} − Crédito {fmt(ivaCredito)} = {fmt(f29AlSii)}</div>
-                                              </td>
-                                              <td style={{padding:"7px 0",textAlign:"right",fontWeight:700,color:"#fde68a"}}>{fmt(f29AlSii)}</td>
-                                            </tr>
-                                            <tr style={{background:gananciaCajaFinal >= 0 ? "#14532d" : "#3f2410",borderTop:"2px solid #c9a055"}}>
-                                              <td style={{padding:"12px 10px",fontWeight:800,fontSize:13,color:"#fff"}}>= GANANCIA EN CAJA FINAL</td>
-                                              <td style={{padding:"12px 10px",textAlign:"right",fontWeight:900,fontSize:18,color:gananciaCajaFinal >= 0 ? "#22c55e" : "#fbbf24"}}>{fmt(gananciaCajaFinal)}</td>
-                                            </tr>
-                                          </tbody>
-                                        </table>
-                                        <div style={{marginTop:10,padding:"8px 12px",background:"#1a2740",borderRadius:6,fontSize:10,color:"#94a3b8",lineHeight:1.6,fontStyle:"italic"}}>
-                                          💡 Esta ganancia coincide con la "Ganancia neta" del resumen (modelo neto = cobrado neto − costo neto). Es la misma cuenta, presentada en formato caja. <b style={{color:"#cbd5e1"}}>Verificación: {fmt(totGanancia)}</b> (debe ser igual).
-                                        </div>
-                                      </div>
-                                    );
-                                  })()}
-
                                   {/* BLOQUE PAGOS REALES — admin lleva ingresos por cliente + egresos */}
                                   <PagosRealesOp op={op} cots={cots} supabase={supabase} setOperaciones={setOperaciones} totVentaIva={totVentaIva} totCostoNeto={totCostoNeto} fmt={fmt} />
 
