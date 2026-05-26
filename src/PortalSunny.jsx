@@ -1897,10 +1897,13 @@ function OpPagoCard({ op, cots }) {
     totalClpPagado += totalClp
     return { ...p, rmb, tc, clp, com, ivaCom, totalClp, fecha: e.fecha, nota: e.nota, pagado: rmb > 0 || clp > 0 }
   })
-  // "Pagado completo" = LOS 3 PAGOS están hechos (no por monto, que puede tener TC distinto)
+  // Plan flexible: 2 pagos por default, 3 cuando se carga el tercero.
   const nPagados = pagosCalc.filter(p => p.pagado).length
-  const todosPagados = nPagados === 3
+  const usaTresPagos = pagosCalc[2]?.pagado || false
+  const totalPagosPlan = usaTresPagos ? 3 : 2
   const saldoRmb = totalRMB - totalRmbPagado
+  // "Totalmente pagada" = saldo RMB cerrado (con pequeña tolerancia decimal)
+  const todosPagados = totalRMB > 0 && saldoRmb <= 0.5
 
   return (
     <div style={{ background:"#fff", border:"2px solid #fde68a", borderRadius:12, overflow:"hidden" }}>
@@ -1910,7 +1913,7 @@ function OpPagoCard({ op, cots }) {
             <span style={{ background:"#040c18", color:"#c47830", borderRadius:5, padding:"3px 9px", fontSize:12, fontWeight:800 }}>✈️ {op.nro}</span>
             <span style={{ background:"#fff", color:"#854d0e", border:"1px solid #fde68a", borderRadius:5, padding:"2px 8px", fontSize:11 }}>{cotsOp.length} cot · {cotsOp.reduce((s,c)=>s+(Number(c.unidades)||0),0)} und</span>
             <span style={{ background:todosPagados?"#dcfce7":"#fef3c7", color:todosPagados?"#15803d":"#92400e", border:`1px solid ${todosPagados?"#22c55e":"#fbbf24"}`, borderRadius:5, padding:"2px 8px", fontSize:11, fontWeight:700 }}>
-              {todosPagados ? "✓ 3/3 已支付 Pagada completa" : `⏳ ${nPagados}/3 pagos · 待付款 / Falta ${3-nPagados}`}
+              {todosPagados ? `✓ ${nPagados}/${totalPagosPlan} 已支付 Pagada completa` : `⏳ ${nPagados}/${totalPagosPlan} pagos · 待付款 / Falta ¥${fmtN(saldoRmb,2)}`}
             </span>
           </div>
           <div style={{ fontSize:12, color:"#854d0e", display:"flex", gap:12, flexWrap:"wrap" }}>
@@ -1996,14 +1999,14 @@ function OpPagoCard({ op, cots }) {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <div>
                 <div style={{ fontSize:11, color: todosPagados ? "#15803d" : "#92400e", fontWeight:700 }}>
-                  {todosPagados ? "✅ 3/3 已支付 / Totalmente pagada" : `⏳ ${nPagados}/3 pagos · Falta ${3-nPagados}`}
+                  {todosPagados ? `✅ ${nPagados}/${totalPagosPlan} 已支付 / Totalmente pagada` : `⏳ ${nPagados}/${totalPagosPlan} pagos · Falta ¥${fmtN(saldoRmb,2)}`}
                 </div>
                 <div style={{ fontSize:10, color:"#64748b", marginTop:2 }}>
                   Pagado ¥{fmtN(totalRmbPagado, 0)} de ¥{fmtN(totalRMB, 0)} acordados
                 </div>
               </div>
               <div style={{ fontSize:18, fontWeight:800, color: todosPagados ? "#15803d" : "#92400e" }}>
-                {todosPagados ? "✓" : `${nPagados}/3`}
+                {todosPagados ? "✓" : `${nPagados}/${totalPagosPlan}`}
               </div>
             </div>
           </div>

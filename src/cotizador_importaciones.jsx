@@ -910,9 +910,16 @@ function ResultadoRealOp({ op, cots, fmt, fmtN }) {
   const pagadoChinaCLP = p1.clp + p2.clp + p3.clp
   const pagadoChinaRMB = p1.rmb + p2.rmb + p3.rmb
   const pagosHechos = [p1,p2,p3].filter(p => p.clp > 0 || p.rmb > 0).length
+  // Plan flexible: si hay 3er pago cargado → plan de 3 pagos; si no → plan de 2 (default).
+  const usaTresPagos = p3.clp > 0 || p3.rmb > 0
+  const totalPagosPlan = usaTresPagos ? 3 : 2
   const pagoChile = pagos.pago_final_chile || {}
-  const pagadoChileCLP = (Number(pagoChile.servicio_aduana)||0) + (Number(pagoChile.iva_aduana)||0)
-  const tienePagoChile = pagadoChileCLP > 0
+  // Caja: TODO lo desembolsado (incluyendo IVA aduana). Costo: solo servicio_aduana (IVA aduana es recuperable F29).
+  const pagadoChileCajaCLP = (Number(pagoChile.servicio_aduana)||0) + (Number(pagoChile.iva_aduana)||0)
+  const pagadoChileCostoCLP = (Number(pagoChile.servicio_aduana)||0)
+  const ivaAduanaReal = (Number(pagoChile.iva_aduana)||0)
+  const pagadoChileCLP = pagadoChileCajaCLP // alias para columna "Pagado real" (muestra caja)
+  const tienePagoChile = pagadoChileCajaCLP > 0
 
   // Ganancias por escenario
   const precioClienteCLP = sumIni.precio_cliente_clp
@@ -922,7 +929,8 @@ function ResultadoRealOp({ op, cots, fmt, fmtN }) {
   const costoChinaFin = hayFinal ? sumFin.costo_china_clp : sumIni.costo_china_clp
   const gananciaFinal = precioClienteNeto - costoChinaFin - sumIni.costo_chile_clp
   const costoChinaReal = pagadoChinaCLP > 0 ? pagadoChinaCLP : costoChinaFin
-  const costoChileReal = tienePagoChile ? pagadoChileCLP : sumIni.costo_chile_clp
+  // Para ganancia: usar costo Chile sin IVA aduana (recuperable F29 — no es costo real)
+  const costoChileReal = tienePagoChile ? pagadoChileCostoCLP : sumIni.costo_chile_clp
   const gananciaReal = precioClienteNeto - costoChinaReal - costoChileReal
   const diffReal = gananciaReal - gananciaInicial
   const pctReal = gananciaInicial > 0 ? (diffReal / gananciaInicial) * 100 : 0
@@ -946,8 +954,9 @@ function ResultadoRealOp({ op, cots, fmt, fmtN }) {
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
         <div style={{fontSize:13,fontWeight:800,color: diffReal>=0 ? "#15803d" : "#92400e", letterSpacing:0.5}}>📊 RESULTADO REAL — OP {op.nro}</div>
         <div style={{fontSize:10,color:"#64748b"}}>
-          {op.flete_confirmado_sunny ? `✈️ Flete confirmado por Sunny` : "⏳ Esperando confirmación de flete"}
-          {pagosHechos > 0 && ` · ${pagosHechos}/3 pagos hechos`}
+          {op.flete_confirmado_sunny ? `✈️ Flete confirmado` : "⏳ Esperando confirmación de flete"}
+          {` · 🇨🇳 Sunny ${pagosHechos}/${totalPagosPlan}`}
+          {` · 🇨🇱 Chile ${tienePagoChile ? "✓" : "⏳"}`}
         </div>
       </div>
 
@@ -1003,6 +1012,7 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
   const [pagos, setPagos] = useState(op.pagos_reales || {});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [vistaCalc, setVistaCalc] = useState("neto"); // "neto" | "caja"
 
   const cotsActivas = cots.filter(c => !["no_prospero"].includes(c.estado));
   const clientes = [...new Set(cotsActivas.map(c => (c.cliente||"").trim()).filter(Boolean))];
@@ -1067,26 +1077,43 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
   const totIngresoTeorico = cotsActivas.reduce((s, c) => s + ((Number(c.precio_final_acordado_und)||0) * (Number(c.unidades)||0)), 0);
   const totIngresoReal = clientes.reduce((s, cl) => s + getIngreso(cl), 0);
   const porCobrar = totIngresoTeorico - totIngresoReal;
-  // Total egreso: pagos Sunny y Chile usan sus formulas detalladas, otros usan monto directo
-  const totEgresoReal = egresosDefs.reduce((s, e) => {
+  // Total egreso CAJA: todo lo desembolsado, incluye IVA aduana (recuperable F29)
+  const totEgresoCaja = egresosDefs.reduce((s, e) => {
     if (isPagoSunny(e.key)) {
       const c = calcTotalCLPPagoSunny(e.key);
       return s + (c > 0 ? c : getEgreso(e.key));
     }
     if (isPagoChile(e.key)) {
-      const c = calcTotalChile(e.key);
+      const c = calcTotalChile(e.key); // servicio_aduana + iva_aduana
       return s + (c > 0 ? c : getEgreso(e.key));
     }
     return s + getEgreso(e.key);
   }, 0);
+  // Total egreso COSTO operacional: excluye IVA aduana (recuperable F29 — no es costo real)
+  const totEgresoCosto = egresosDefs.reduce((s, e) => {
+    if (isPagoSunny(e.key)) {
+      const c = calcTotalCLPPagoSunny(e.key);
+      return s + (c > 0 ? c : getEgreso(e.key));
+    }
+    if (isPagoChile(e.key)) {
+      const e0 = pagos.egresos?.[e.key] || {};
+      return s + (Number(e0.servicio_aduana) || 0); // sin IVA aduana
+    }
+    return s + getEgreso(e.key);
+  }, 0);
+  const ivaAduanaPagado = (Number(pagos.egresos?.pago_final_chile?.iva_aduana) || 0);
+  const servicioChilePagado = (Number(pagos.egresos?.pago_final_chile?.servicio_aduana) || 0);
+  // Solo pagos a Sunny (China), suma de CLP + comisión WU + IVA comisión
+  const pagadoChinaCLP_pago = ["pago1_sunny","pago2_sunny","pago3_sunny"].reduce((s,k)=>{
+    return s + calcTotalCLPPagoSunny(k);
+  }, 0);
+  const totEgresoReal = totEgresoCaja; // alias: lo "pagado real" en panel inferior muestra caja
   const gananciaTeorica = (totIngresoTeorico/1.19) - totCostoNeto;
-  // Ganancia real: si faltan pagos por cargar, usamos el costo teórico como
-  // egreso estimado para no inflar artificialmente la ganancia.
-  // Solo usamos el egreso real cuando supera el teórico (pagos más caros de lo previsto).
-  const egresoParaReal = Math.max(totEgresoReal, totCostoNeto);
+  // Para ganancia: usar COSTO operacional (sin IVAs F29), NUNCA el desembolso de caja
+  const egresoParaReal = Math.max(totEgresoCosto, totCostoNeto);
   const ingresoParaReal = totIngresoReal > 0 ? totIngresoReal : totIngresoTeorico;
-  const faltaCargarPagos = totEgresoReal > 0 && totEgresoReal < totCostoNeto;
-  const noHayPagosRegistrados = totEgresoReal === 0;
+  const faltaCargarPagos = totEgresoCosto > 0 && totEgresoCosto < totCostoNeto;
+  const noHayPagosRegistrados = totEgresoCosto === 0;
   const noHayIngresosRegistrados = totIngresoReal === 0;
   const gananciaReal = (ingresoParaReal/1.19) - egresoParaReal;
   const diffGanancia = gananciaReal - gananciaTeorica;
@@ -1325,62 +1352,140 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
       </div>
 
       {/* COMPARATIVO TEÓRICO vs REAL */}
+      {(() => {
+        // Modelo CAJA completa con F29: ingreso bruto − egresos caja − IVA neto al SII
+        const cobradoBruto = totIngresoReal > 0 ? totIngresoReal : totIngresoTeorico;
+        const ivaDebito = cobradoBruto - cobradoBruto / 1.19;
+        const ivaCredito = ivaAduanaPagado;
+        const ivaF29 = Math.max(0, ivaDebito - ivaCredito);
+      return (
       <div style={{marginTop:14,padding:14,background:"#0f1e30",borderRadius:8,color:"#fff"}}>
-        <div style={{fontSize:10,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:14}}>📊 Comparativo teórico (cotizador) vs real (caja)</div>
-
-        {/* Ganancia en GRANDE: 2 cards lado a lado */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
-          <div style={{background:"#1a2740",borderRadius:10,padding:"18px 20px",border:"1px solid #c9a05533"}}>
-            <div style={{fontSize:10,color:"#c9a055",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>🧮 Ganancia teórica neta</div>
-            <div style={{fontSize:28,fontWeight:900,color:"#cbd5e1",lineHeight:1.2}}>{fmt(gananciaTeorica)}</div>
-            <div style={{fontSize:10,color:"#64748b",marginTop:4,fontStyle:"italic"}}>según cálculos del cotizador</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+          <div style={{fontSize:10,color:"#c9a055",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase"}}>📊 Comparativo teórico (cotizador) vs real (caja)</div>
+          <div style={{display:"flex",gap:0,background:"#1a2740",borderRadius:7,padding:2,border:"1px solid #c9a05544"}}>
+            <button onClick={()=>setVistaCalc("neto")} style={{padding:"5px 10px",fontSize:10,fontWeight:700,border:"none",borderRadius:5,cursor:"pointer",fontFamily:"inherit",background:vistaCalc==="neto"?"#c9a055":"transparent",color:vistaCalc==="neto"?"#0f172a":"#cbd5e1"}}>Vista neta</button>
+            <button onClick={()=>setVistaCalc("caja")} style={{padding:"5px 10px",fontSize:10,fontWeight:700,border:"none",borderRadius:5,cursor:"pointer",fontFamily:"inherit",background:vistaCalc==="caja"?"#c9a055":"transparent",color:vistaCalc==="caja"?"#0f172a":"#cbd5e1"}}>Vista caja (con F29)</button>
           </div>
-          <div style={{background: gananciaReal>=gananciaTeorica?"#14532d":"#3f2410",borderRadius:10,padding:"18px 20px",border:`2px solid ${gananciaReal>=gananciaTeorica?"#16a34a":"#fbbf24"}`}}>
-            <div style={{fontSize:10,color: gananciaReal>=gananciaTeorica?"#bbf7d0":"#fde68a",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>
-              🏆 Ganancia REAL neta {(faltaCargarPagos || noHayPagosRegistrados || noHayIngresosRegistrados) && <span style={{fontWeight:600,color:"#fde68a"}}>(estimada)</span>}
+        </div>
+
+        {vistaCalc === "neto" && (
+          <>
+            {/* Ganancia en GRANDE: 2 cards lado a lado */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+              <div style={{background:"#1a2740",borderRadius:10,padding:"18px 20px",border:"1px solid #c9a05533"}}>
+                <div style={{fontSize:10,color:"#c9a055",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>🧮 Ganancia teórica neta</div>
+                <div style={{fontSize:28,fontWeight:900,color:"#cbd5e1",lineHeight:1.2}}>{fmt(gananciaTeorica)}</div>
+                <div style={{fontSize:10,color:"#64748b",marginTop:4,fontStyle:"italic"}}>Cobrado NETO − Costo operacional (sin IVA F29)</div>
+              </div>
+              <div style={{background: gananciaReal>=gananciaTeorica?"#14532d":"#3f2410",borderRadius:10,padding:"18px 20px",border:`2px solid ${gananciaReal>=gananciaTeorica?"#16a34a":"#fbbf24"}`}}>
+                <div style={{fontSize:10,color: gananciaReal>=gananciaTeorica?"#bbf7d0":"#fde68a",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>
+                  🏆 Ganancia REAL neta {(faltaCargarPagos || noHayPagosRegistrados || noHayIngresosRegistrados) && <span style={{fontWeight:600,color:"#fde68a"}}>(estimada)</span>}
+                </div>
+                <div style={{fontSize:32,fontWeight:900,color: gananciaReal>=gananciaTeorica?"#22c55e":"#fbbf24",lineHeight:1.2}}>{fmt(gananciaReal)}</div>
+                {(faltaCargarPagos || noHayPagosRegistrados) && (
+                  <div style={{fontSize:10,color:"#fde68a",marginTop:4,fontStyle:"italic"}}>
+                    {noHayPagosRegistrados
+                      ? `Usando costo teórico como egreso (${fmt(totCostoNeto)}). Carga pagos a Sunny/Chile para ver ganancia real.`
+                      : `Falta cargar ${fmt(Math.round(totCostoNeto - totEgresoCosto))} de COSTO operacional Chile (servicio Leslie + arancel). El IVA aduana sale aparte pero se compensa con débito F29 — no afecta esta ganancia.`}
+                  </div>
+                )}
+                {noHayIngresosRegistrados && !faltaCargarPagos && !noHayPagosRegistrados && (
+                  <div style={{fontSize:10,color:"#fde68a",marginTop:4,fontStyle:"italic"}}>Cliente aún no pagó — usando cobrado teórico.</div>
+                )}
+                {!faltaCargarPagos && !noHayPagosRegistrados && !noHayIngresosRegistrados && Math.abs(diffGanancia)>1000 && (
+                  <div style={{fontSize:12,fontWeight:700,color:diffGanancia>=0?"#22c55e":"#fca5a5",marginTop:4}}>
+                    {diffGanancia>=0?"▲ +":"▼ "}{fmt(Math.abs(diffGanancia))} vs teórico ({diffGanancia>=0?"ganaste más":"perdiste"})
+                  </div>
+                )}
+                {!faltaCargarPagos && !noHayPagosRegistrados && !noHayIngresosRegistrados && Math.abs(diffGanancia)<=1000 && (
+                  <div style={{fontSize:10,color:"#94a3b8",marginTop:4,fontStyle:"italic"}}>✓ Real al día con lo esperado</div>
+                )}
+              </div>
             </div>
-            <div style={{fontSize:32,fontWeight:900,color: gananciaReal>=gananciaTeorica?"#22c55e":"#fbbf24",lineHeight:1.2}}>{fmt(gananciaReal)}</div>
-            {(faltaCargarPagos || noHayPagosRegistrados) && (
-              <div style={{fontSize:10,color:"#fde68a",marginTop:4,fontStyle:"italic"}}>
-                {noHayPagosRegistrados
-                  ? `Usando costo teórico como egreso (${fmt(totCostoNeto)}). Carga pagos a Sunny/Chile para ver ganancia real.`
-                  : `Faltan pagos por cargar: $${(totCostoNeto - totEgresoReal).toLocaleString("es-CL")} pendientes vs teórico.`}
-              </div>
-            )}
-            {noHayIngresosRegistrados && !faltaCargarPagos && !noHayPagosRegistrados && (
-              <div style={{fontSize:10,color:"#fde68a",marginTop:4,fontStyle:"italic"}}>Cliente aún no pagó — usando cobrado teórico.</div>
-            )}
-            {!faltaCargarPagos && !noHayPagosRegistrados && !noHayIngresosRegistrados && Math.abs(diffGanancia)>1000 && (
-              <div style={{fontSize:12,fontWeight:700,color:diffGanancia>=0?"#22c55e":"#fca5a5",marginTop:4}}>
-                {diffGanancia>=0?"▲ +":"▼ "}{fmt(Math.abs(diffGanancia))} vs teórico ({diffGanancia>=0?"ganaste más":"perdiste"})
-              </div>
-            )}
-            {!faltaCargarPagos && !noHayPagosRegistrados && !noHayIngresosRegistrados && Math.abs(diffGanancia)<=1000 && (
-              <div style={{fontSize:10,color:"#94a3b8",marginTop:4,fontStyle:"italic"}}>✓ Real al día con lo esperado</div>
-            )}
-          </div>
-        </div>
 
-        {/* Datos auxiliares en pequeño */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,fontSize:11,paddingTop:12,borderTop:"1px solid #1a2740"}}>
-          <div>
-            <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Cobrado teórico</div>
-            <div style={{fontWeight:700}}>{fmt(totIngresoTeorico)}</div>
-          </div>
-          <div>
-            <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Cobrado real</div>
-            <div style={{fontWeight:700,color:"#22c55e"}}>{fmt(totIngresoReal)}</div>
-          </div>
-          <div>
-            <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Costo teórico</div>
-            <div style={{fontWeight:700}}>{fmt(totCostoNeto)}</div>
-          </div>
-          <div>
-            <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Pagado real</div>
-            <div style={{fontWeight:700,color:"#c47830"}}>{fmt(totEgresoReal)}</div>
-          </div>
-        </div>
+            {/* Datos auxiliares en pequeño */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,fontSize:11,paddingTop:12,borderTop:"1px solid #1a2740"}}>
+              <div>
+                <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Cobrado teórico (c/IVA)</div>
+                <div style={{fontWeight:700}}>{fmt(totIngresoTeorico)}</div>
+                <div style={{fontSize:9,color:"#94a3b8",marginTop:2}}>neto: {fmt(totIngresoTeorico/1.19)}</div>
+              </div>
+              <div>
+                <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Cobrado real (c/IVA)</div>
+                <div style={{fontWeight:700,color:"#22c55e"}}>{fmt(totIngresoReal)}</div>
+              </div>
+              <div>
+                <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Costo teórico</div>
+                <div style={{fontWeight:700}}>{fmt(totCostoNeto)}</div>
+              </div>
+              <div>
+                <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Pagado caja</div>
+                <div style={{fontWeight:700,color:"#c47830"}}>{fmt(totEgresoCaja)}</div>
+                {ivaAduanaPagado > 0 && <div style={{fontSize:9,color:"#94a3b8",marginTop:2}}>incl. IVA aduana {fmt(ivaAduanaPagado)} (F29)</div>}
+              </div>
+              <div>
+                <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>Costo real (sin IVA F29)</div>
+                <div style={{fontWeight:700,color:"#facc15"}}>{fmt(totEgresoCosto)}</div>
+                <div style={{fontSize:9,color:"#94a3b8",marginTop:2}}>el que define la ganancia</div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {vistaCalc === "caja" && (
+          <>
+            <div style={{background:"#1a2740",borderRadius:10,padding:"16px 20px",border:"1px solid #c9a05533",marginBottom:14}}>
+              <div style={{fontSize:10,color:"#c9a055",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10}}>💸 Flujo de caja completo (con F29)</div>
+              <table style={{width:"100%",fontSize:12,borderCollapse:"collapse"}}>
+                <tbody>
+                  <tr style={{borderBottom:"1px solid #1a2740"}}>
+                    <td style={{padding:"6px 0",color:"#bbf7d0"}}>+ Cobrado al cliente (c/IVA)</td>
+                    <td style={{padding:"6px 0",textAlign:"right",fontWeight:700,color:"#22c55e"}}>{fmt(cobradoBruto)}</td>
+                  </tr>
+                  <tr style={{borderBottom:"1px solid #1a2740"}}>
+                    <td style={{padding:"6px 0",color:"#fca5a5"}}>− Pagos a Sunny (China)</td>
+                    <td style={{padding:"6px 0",textAlign:"right",fontWeight:700,color:"#fca5a5"}}>{fmt(pagadoChinaCLP_pago)}</td>
+                  </tr>
+                  <tr style={{borderBottom:"1px solid #1a2740"}}>
+                    <td style={{padding:"6px 0",color:"#fca5a5"}}>− Servicio Leslie + arancel (Chile)</td>
+                    <td style={{padding:"6px 0",textAlign:"right",fontWeight:700,color:"#fca5a5"}}>{fmt(servicioChilePagado)}</td>
+                  </tr>
+                  {ivaAduanaPagado > 0 && (
+                    <tr style={{borderBottom:"1px solid #1a2740"}}>
+                      <td style={{padding:"6px 0",color:"#fde68a"}}>− IVA aduana (sale de caja, recup. F29)</td>
+                      <td style={{padding:"6px 0",textAlign:"right",fontWeight:700,color:"#fde68a"}}>{fmt(ivaAduanaPagado)}</td>
+                    </tr>
+                  )}
+                  <tr style={{borderBottom:"1px solid #c9a05544"}}>
+                    <td style={{padding:"6px 0",color:"#fde68a"}}>− IVA neto al SII (F29 = débito − crédito)</td>
+                    <td style={{padding:"6px 0",textAlign:"right",fontWeight:700,color:"#fde68a"}}>{fmt(ivaF29)}</td>
+                  </tr>
+                  <tr style={{background:gananciaReal>=gananciaTeorica?"#14532d":"#3f2410"}}>
+                    <td style={{padding:"10px 0",fontWeight:800,fontSize:13,color:"#fff"}}>= GANANCIA REAL</td>
+                    <td style={{padding:"10px 0",textAlign:"right",fontWeight:900,fontSize:18,color:gananciaReal>=0?"#22c55e":"#fbbf24"}}>{fmt(gananciaReal)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style={{marginTop:10,fontSize:10,color:"#94a3b8",lineHeight:1.6,fontStyle:"italic"}}>
+                💡 IVA débito cobrado al cliente: <b style={{color:"#cbd5e1"}}>{fmt(ivaDebito)}</b> · IVA crédito en aduana: <b style={{color:"#cbd5e1"}}>{fmt(ivaCredito)}</b> → ZAGA paga al SII la diferencia: <b style={{color:"#fde68a"}}>{fmt(ivaF29)}</b>.<br/>
+                Es exactamente la misma ganancia del modelo "Vista neta", solo desglosada al detalle del flujo real de plata.
+              </div>
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,fontSize:11}}>
+              <div style={{padding:"10px 12px",background:"#1a2740",borderRadius:8,border:"1px solid #c9a05533"}}>
+                <div style={{fontSize:9,color:"#94a3b8",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>🧮 Ganancia teórica</div>
+                <div style={{fontSize:18,fontWeight:800,color:"#cbd5e1"}}>{fmt(gananciaTeorica)}</div>
+              </div>
+              <div style={{padding:"10px 12px",background:gananciaReal>=gananciaTeorica?"#14532d":"#3f2410",borderRadius:8,border:`1px solid ${gananciaReal>=gananciaTeorica?"#16a34a":"#fbbf24"}`}}>
+                <div style={{fontSize:9,color: gananciaReal>=gananciaTeorica?"#bbf7d0":"#fde68a",marginBottom:2,textTransform:"uppercase",letterSpacing:1}}>🏆 Δ vs teórico</div>
+                <div style={{fontSize:18,fontWeight:800,color: gananciaReal>=gananciaTeorica?"#22c55e":"#fbbf24"}}>{diffGanancia>=0?"+":""}{fmt(diffGanancia)}</div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
+      );})()}
 
       <div style={{marginTop:12,display:"flex",gap:10,alignItems:"center",justifyContent:"flex-end"}}>
         <button onClick={guardar} disabled={saving}
