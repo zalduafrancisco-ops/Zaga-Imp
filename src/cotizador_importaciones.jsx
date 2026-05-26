@@ -1382,13 +1382,20 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
                   🏆 Ganancia REAL neta {(faltaCargarPagos || noHayPagosRegistrados || noHayIngresosRegistrados) && <span style={{fontWeight:600,color:"#fde68a"}}>(estimada)</span>}
                 </div>
                 <div style={{fontSize:32,fontWeight:900,color: gananciaReal>=gananciaTeorica?"#22c55e":"#fbbf24",lineHeight:1.2}}>{fmt(gananciaReal)}</div>
-                {(faltaCargarPagos || noHayPagosRegistrados) && (
+                {(faltaCargarPagos || noHayPagosRegistrados) && (() => {
+                  // Costo Chile esperado: directo de op.costos_chile.aduana_neta (valor real Leslie)
+                  // Fallback: usar la diferencia totCostoNeto-totEgresoCosto si no hay dato en BD
+                  const aduanaNetaOp = Number(op?.costos_chile?.aduana_neta) || 0;
+                  const faltaChileServicio = aduanaNetaOp > 0
+                    ? Math.max(0, aduanaNetaOp - servicioChilePagado)
+                    : Math.round(totCostoNeto - totEgresoCosto);
+                  return (
                   <div style={{fontSize:10,color:"#fde68a",marginTop:4,fontStyle:"italic"}}>
                     {noHayPagosRegistrados
                       ? `Usando costo teórico como egreso (${fmt(totCostoNeto)}). Carga pagos a Sunny/Chile para ver ganancia real.`
-                      : `Falta cargar ${fmt(Math.round(totCostoNeto - totEgresoCosto))} de COSTO operacional Chile (servicio Leslie + arancel). El IVA aduana sale aparte pero se compensa con débito F29 — no afecta esta ganancia.`}
+                      : `Falta cargar pago Chile (~${fmt(faltaChileServicio)} de servicio Leslie + arancel). El IVA aduana e IVA agente se compensan con débito F29 — no afectan esta ganancia.`}
                   </div>
-                )}
+                  );})()}
                 {noHayIngresosRegistrados && !faltaCargarPagos && !noHayPagosRegistrados && (
                   <div style={{fontSize:10,color:"#fde68a",marginTop:4,fontStyle:"italic"}}>Cliente aún no pagó — usando cobrado teórico.</div>
                 )}
