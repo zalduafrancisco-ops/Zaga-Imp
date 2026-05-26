@@ -6996,11 +6996,11 @@ Número de seguimiento: ${c.nro}`;
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>Und</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>Peso real</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>Peso vol</th>
-                                            <th style={{padding:"5px 6px",textAlign:"right"}}>单价 ¥/und</th>
+                                            <th style={{padding:"5px 6px",textAlign:"right"}}>Precio ¥/und</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>Mercancía ¥</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>+ Com ({comPct}%)</th>
-                                            <th style={{padding:"5px 6px",textAlign:"right"}}>体积运费</th>
-                                            <th style={{padding:"5px 6px",textAlign:"right"}}>重量运费</th>
+                                            <th style={{padding:"5px 6px",textAlign:"right"}}>Flete vol ¥</th>
+                                            <th style={{padding:"5px 6px",textAlign:"right"}}>Flete peso ¥</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>Cert ¥</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>Total ¥</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>¥/und</th>
