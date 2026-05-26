@@ -7021,6 +7021,8 @@ Número de seguimiento: ${c.nro}`;
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>Flete vol ¥</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>Flete peso ¥</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>Cert ¥</th>
+                                            <th style={{padding:"5px 6px",textAlign:"right"}} title="Transporte interno CN: cobrado por cot individual (cada origen distinto)">Transp CN ¥</th>
+                                            <th style={{padding:"5px 6px",textAlign:"right"}} title="Doc op + Despacho + Compra docs + Seguro, prorrateado por share del valor mercancía">Otros ¥</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>Total ¥</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>¥/und</th>
                                             <th style={{padding:"5px 6px",textAlign:"right"}}>CLP/und</th>
@@ -7060,6 +7062,8 @@ Número de seguimiento: ${c.nro}`;
                                                 <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>¥{fmtN(fleteVolCot,2)}</td>
                                                 <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>¥{fmtN(fletePesoCot,2)}</td>
                                                 <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>¥{fmtN(certCotRMB,0)}</td>
+                                                <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>¥{fmtN(transpCotRMB,0)}</td>
+                                                <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>¥{fmtN(otrosShareCotRMB,0)}</td>
                                                 <td style={{padding:"5px 6px",textAlign:"right",fontWeight:700,color:"#0f172a"}}>¥{fmtN(totalCotRMB,0)}</td>
                                                 <td style={{padding:"5px 6px",textAlign:"right",fontWeight:700,color:"#854d0e"}}>¥{fmtN(undRMB,2)}</td>
                                                 <td style={{padding:"5px 6px",textAlign:"right",fontWeight:700,color:"#c47830"}}>{fmt(undCLP)}</td>
@@ -7077,6 +7081,8 @@ Número de seguimiento: ${c.nro}`;
                                             <td style={{padding:"7px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>¥{fmtN(fleteVolOp,2)}</td>
                                             <td style={{padding:"7px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>¥{fmtN(fletePesoOp,2)}</td>
                                             <td style={{padding:"7px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>¥{fmtN(certOpRMB,0)}</td>
+                                            <td style={{padding:"7px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>¥{fmtN(transpV,0)}</td>
+                                            <td style={{padding:"7px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>¥{fmtN(docOpV + despV + compraDV + (transpV > 0 ? 0 : logisticaLeg) + seguroOp,0)}</td>
                                             <td style={{padding:"7px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>¥{fmtN(totalRMB,0)}</td>
                                             <td style={{padding:"7px 6px",textAlign:"right",fontWeight:800,color:"#854d0e"}}>¥{fmtN(costoUndRMB,2)}</td>
                                             <td style={{padding:"7px 6px",textAlign:"right",fontWeight:800,color:"#c47830"}}>{fmt(costoUndCLP)}</td>
