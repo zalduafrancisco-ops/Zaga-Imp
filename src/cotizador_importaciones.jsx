@@ -6819,8 +6819,12 @@ Número de seguimiento: ${c.nro}`;
                                 );
                                 const comPct = Number(op.comision_sunny_pct ?? op.costos_china?.comision_pct) ||
                                                _maxOpCot("comision_sunny_pct") || 0;
-                                const segPct_raw = Number(op.seguro_pct ?? op.costos_china?.seguro_pct) ||
-                                                   _maxOpCot("seguro_pct") || 0;
+                                // seguro_pct: modelo NUEVO viene como 0.002 (decimal directo, 0.2%).
+                                // Modelo LEGACY (op.costos_china.seguro_pct) viene como 0.2 (= 0.2%, % directo) → dividir por 100.
+                                // Coherente con calcCostoRealZaga línea 385.
+                                const segPctLegacy = Number(op.costos_china?.seguro_pct) || 0;
+                                const segPctNuevo = Number(op.seguro_pct) || _maxOpCot("seguro_pct") || 0;
+                                const segPct_raw = segPctNuevo > 0 ? segPctNuevo : (segPctLegacy > 0 ? segPctLegacy / 100 : 0);
                                 const segPct = segPct_raw > 1 ? segPct_raw/100 : segPct_raw;
                                 const segMin = Number(op.seguro_min_rmb) || _maxOpCot("seguro_min_rmb") || 0;
                                 const certOri = _maxOpCot("cost_cert_origen_rmb");
