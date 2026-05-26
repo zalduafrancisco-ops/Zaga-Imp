@@ -3075,7 +3075,17 @@ Número de seguimiento: ${c.nro}`;
         const transporteCn = _tMax("cost_transporte_interno_cn_rmb");
         const comisionRMB = valorMercanciaRMB * comisionPct / 100;
         const seguroRMB = Math.max(seguroMin, valorMercanciaRMB * seguroPct);
-        const otrosRMB = certOrigen + docOp + despacho + compraDocs + transporteCn + seguroRMB;
+        // Estimado consolidado virtual (cot SIN OP): N cots asumidas. Reparte solo costos fijos.
+        // Directos a la cot (NO se reparten): mercancía, comisión, flete, cert origen, seguro, arancel, IVA aduana.
+        // Compartidos por OP (÷ N): aduana fija Chile (sin arancel) + IVA agente Chile + doc op + despacho CN + compra docs + transporte CN.
+        const nCotsAsumido = Math.max(1, Number(validarForm.n_cots_asumido ?? 3));
+        const otrosDirectosRMB = certOrigen + seguroRMB;
+        const otrosCompartidosRMB = docOp + despacho + compraDocs + transporteCn;
+        // shareVirtual: si hay OP real, usa el real (calculado abajo); si no, usa 1/N.
+        // Por ahora calculamos el preliminar; lo override después si hay opVinc.
+        let shareVirtual = opVinc ? 1 : (1 / nCotsAsumido);
+        const otrosCompartidosProrraRMB = otrosCompartidosRMB * shareVirtual;
+        const otrosRMB = otrosDirectosRMB + otrosCompartidosProrraRMB;
         const totalChinaRMB = valorMercanciaRMB + comisionRMB + fleteRMB + otrosRMB;
         const totalChinaCLP = (totalChinaRMB / TC_RMB_USD) * tc;
 
@@ -3107,10 +3117,18 @@ Número de seguimiento: ${c.nro}`;
         const agencia = Number(validarForm.agencia) || 0;
         const formF = c.form_f_incluido !== false;
         const arancelPct = formF ? 0 : 0.06;
-        const cifReal = (totalChinaCLP); // costo China en CLP es la base CIF
+        // CIF para arancel: usar la mercancía DIRECTA cot (NO el totalChina que ya tiene prorrateos virtuales).
+        // Mercancía cot + flete cot + seguro cot en CLP = CIF aduanero real de esta cot.
+        const cifRealRMB = valorMercanciaRMB + fleteRMB + seguroRMB;
+        const cifReal = (cifRealRMB / TC_RMB_USD) * tc;
         const arancelReal = cifReal * arancelPct;
-        const aduanaFijaCompleta = honorarios + edi + despChile + aeropuerto + aforoMonto + arancelReal;
-        const aduanaFijaProrra = aduanaFijaCompleta * shareAduana;
+        // Aduana fija (sin arancel) se prorratea con shareVirtual cuando no hay OP, o shareAduana cuando hay
+        const shareAduanaFinal = opVinc ? shareAduana : shareVirtual;
+        const aduanaFijaSinArancel = honorarios + edi + despChile + aeropuerto + aforoMonto;
+        const aduanaFijaProrra = aduanaFijaSinArancel * shareAduanaFinal + arancelReal;
+        // IVA agente Chile (recuperable F29) también es por DESPACHO → se prorratea
+        const baseIvaAgente = honorarios + edi + despChile; // del calcCliente
+        const ivaAgenteEstim = baseIvaAgente * 0.19 * shareAduanaFinal;
         const totalChileCLP = aduanaFijaProrra + transpInterno + agencia;
 
         // ─── Costo ZAGA + precio sugerido ──────────────────────────────────
@@ -3238,7 +3256,21 @@ Número de seguimiento: ${c.nro}`;
                     <input type="number" value={validarForm.agencia||0} onChange={e=>setValidarForm(p=>({...p,agencia:e.target.value}))} style={{width:120,padding:"5px 8px",border:"1px solid #cbd5e1",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit"}}/>
                   </div>
                   {opVinc && shareAduana < 1 && (
-                    <div style={{marginTop:8,fontSize:10,color:"#1e40af",fontStyle:"italic",lineHeight:1.4}}>📐 Aduana fija + arancel prorrateados por share {fmtP(shareAduana*100)} (1 envío consolidado).</div>
+                    <div style={{marginTop:8,fontSize:10,color:"#1e40af",fontStyle:"italic",lineHeight:1.4}}>📐 Aduana fija prorrateada por share {fmtP(shareAduana*100)} (peso real OP). Arancel directo sobre CIF cot.</div>
+                  )}
+                  {!opVinc && (
+                    <div style={{marginTop:10,padding:"8px 11px",background:"#fefce8",border:"1px dashed #fde047",borderRadius:7,fontSize:11,color:"#78350f"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:4}}>
+                        <span style={{fontWeight:700,color:"#92400e"}}>💡 Estimado consolidado virtual</span>
+                        <label style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#475569"}}>
+                          Asumir N cots:
+                          <input type="number" min="1" max="10" step="1" value={validarForm.n_cots_asumido ?? 3} onChange={e=>setValidarForm(p=>({...p,n_cots_asumido:e.target.value}))} style={{width:48,padding:"3px 6px",border:"1px solid #facc15",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",fontWeight:700,background:"#fff"}}/>
+                        </label>
+                      </div>
+                      <div style={{fontSize:10,color:"#854d0e",lineHeight:1.4,fontStyle:"italic"}}>
+                        Aduana fija + IVA agente + costos CN compartidos se dividen por {nCotsAsumido}. Mercancía, flete, seguro, arancel, IVA aduana quedan directos.
+                      </div>
+                    </div>
                   )}
                   <div style={{borderTop:"2px solid #2d78c8",marginTop:10,paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:800}}>
                     <span style={{color:"#1e40af"}}>Total Chile:</span>
@@ -3271,6 +3303,27 @@ Número de seguimiento: ${c.nro}`;
                       <div style={{fontSize:9,color:"#94a3b8",marginTop:2}}>Neto: {fmt(precioSugUnd)}</div>
                     </div>
                   </div>
+                  {/* Comparativo margen actual vs 30% objetivo */}
+                  {(()=>{
+                    const precio30 = costoZAGAUnd / (1 - 0.30);
+                    const precio30Iva = precio30 * 1.19;
+                    const total30Iva = precio30Iva * u;
+                    const totalActualIva = precioSugUndIva * u;
+                    return (
+                      <div style={{marginTop:12,padding:"10px 14px",background:"#0f1e30",borderRadius:8,border:"1px solid #c9a05533",display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+                        <div>
+                          <div style={{fontSize:9,color:"#c9a055",textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700}}>📊 Al margen actual ({margenPct}%)</div>
+                          <div style={{fontSize:16,fontWeight:800,color:"#cbd5e1"}}>{fmt(precioSugUndIva)}/und</div>
+                          <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>Total {u} und: <b style={{color:"#22c55e"}}>{fmt(totalActualIva)}</b></div>
+                        </div>
+                        <div style={{borderLeft:"1px solid #1a2740",paddingLeft:14}}>
+                          <div style={{fontSize:9,color:"#facc15",textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700}}>🎯 Al 30% objetivo</div>
+                          <div style={{fontSize:16,fontWeight:800,color:"#cbd5e1"}}>{fmt(precio30Iva)}/und</div>
+                          <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>Total {u} und: <b style={{color:"#facc15"}}>{fmt(total30Iva)}</b></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* SECCIÓN 4 — 🎯 Aplicar precio */}
