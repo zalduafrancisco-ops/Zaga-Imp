@@ -2885,7 +2885,8 @@ Número de seguimiento: ${c.nro}`;
                   const margenPanel = margenesPorCot[c.id] ?? c.margen_objetivo_pct;
                   if (margenPanel != null && margenPanel > 0) {
                     const cz = calcCostoRealZaga(c, op, cotsOp);
-                    const costoNeto = (cz.totalChinaCLP || 0) + (cz.totalChileCLP || 0) + (cz.ivaAgenteAer || 0);
+                    // Coherente con tabla admin 'Resumen con IVA': IVA agente es recuperable F29, NO se cuenta como costo.
+                    const costoNeto = (cz.totalChinaCLP || 0) + (cz.totalChileCLP || 0);
                     const und = Number(c.unidades) || 0;
                     if (und > 0 && costoNeto > 0) {
                       const precioNetoUnd = (costoNeto / und) / (1 - margenPanel/100);
