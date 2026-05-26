@@ -6827,7 +6827,13 @@ Número de seguimiento: ${c.nro}`;
                                 const docOpV = _maxOpCot("cost_doc_operacion_rmb");
                                 const despV = _maxOpCot("cost_despacho_aduanero_rmb");
                                 const compraDV = _maxOpCot("cost_compra_docs_rmb");
-                                const transpV = _maxOpCot("cost_transporte_interno_cn_rmb");
+                                // Transporte interno CN es POR COT (cada cot trae su mercancía desde distinta fábrica).
+                                // Sunny lo cobra individualmente — NO se prorratea entre cots, ni se toma el max.
+                                // Si OP tiene un valor seteado, gana (asume agrupado); si no, cada cot suma el suyo.
+                                const transpOpDirect = Number(op.cost_transporte_interno_cn_rmb) || 0;
+                                const transpV = transpOpDirect > 0
+                                  ? transpOpDirect
+                                  : cotsActivas.reduce((s,c) => s + (Number(c.cost_transporte_interno_cn_rmb) || 0), 0);
                                 const fleteRmbKg = Number(op.flete_rmb_kg_consolidado ?? op.costos_china?.flete_rmb_kg) ||
                                                    Math.max(...cotsActivas.map(c => Number(c.aer_tarifa_sunny_rmb_kg) || 0)) || 0;
                                 const cc = op.costos_china || {};
@@ -7022,14 +7028,18 @@ Número de seguimiento: ${c.nro}`;
                                             const shareVal = mercOp > 0 ? d.mercanciaRMB / mercOp : 1/detallesCot.length;
                                             // Cert origen ES per cot, no por share
                                             const certCotRMB = certOri;
-                                            const otrosShareCotRMB = otrosOpRMB * shareVal;
+                                            // Transporte interno CN ES per cot — cada cot suma su propio valor (cobrado por Sunny individual)
+                                            const transpCotRMB = Number(d.c.cost_transporte_interno_cn_rmb) || 0;
+                                            // Otros compartidos OP (sin transp_cn ni cert origen que ya van per cot)
+                                            const otrosOpSinTranspRMB = docOpV + despV + compraDV + (transpV > 0 ? 0 : logisticaLeg) + seguroOp;
+                                            const otrosShareCotRMB = otrosOpSinTranspRMB * shareVal;
                                             const comisionCotRMB = d.mercanciaRMB * comPct / 100;
                                             const conComisionCotRMB = d.mercanciaRMB + comisionCotRMB;
                                             const fleteVolCot = d.pesoVol * fleteRmbKg;
                                             const fletePesoCot = d.pesoReal * fleteRmbKg;
                                             const precioUndRMB = d.u > 0 ? d.mercanciaRMB / d.u : 0;
                                             const otrosUSDShareCot = totalUSDExtra * shareVal;
-                                            const totalCotRMB = d.mercanciaRMB + comisionCotRMB + d.fleteRMB + certCotRMB + otrosShareCotRMB;
+                                            const totalCotRMB = d.mercanciaRMB + comisionCotRMB + d.fleteRMB + certCotRMB + transpCotRMB + otrosShareCotRMB;
                                             const totalCotUSD = totalCotRMB / TC_RMB_USD + otrosUSDShareCot;
                                             const totalCotCLP = totalCotUSD * tc;
                                             const undRMB = d.u > 0 ? totalCotRMB / d.u : 0;
