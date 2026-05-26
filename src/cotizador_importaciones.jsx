@@ -6811,16 +6811,24 @@ Número de seguimiento: ${c.nro}`;
                                 if (cotsActivas.length === 0) return null;
                                 const TC_RMB_USD = Number(op.tc_rmb_usd) || 7.03;
                                 const tc = Number(op.tc_usd_clp ?? op.pago?.tc_efectivo) || 950;
-                                const comPct = Number(op.comision_sunny_pct ?? op.costos_china?.comision_pct) || 0;
-                                const segPct_raw = Number(op.seguro_pct ?? op.costos_china?.seguro_pct) || 0;
+                                // Fallback OP → max entre cots: si OP no tiene el campo, usa el mayor de las cots
+                                const _maxOpCot = (k) => Math.max(
+                                  Number(op[k]) || 0,
+                                  ...cotsActivas.map(c => Number(c[k]) || 0)
+                                );
+                                const comPct = Number(op.comision_sunny_pct ?? op.costos_china?.comision_pct) ||
+                                               _maxOpCot("comision_sunny_pct") || 0;
+                                const segPct_raw = Number(op.seguro_pct ?? op.costos_china?.seguro_pct) ||
+                                                   _maxOpCot("seguro_pct") || 0;
                                 const segPct = segPct_raw > 1 ? segPct_raw/100 : segPct_raw;
-                                const segMin = Number(op.seguro_min_rmb) || 0;
-                                const certOri = Number(op.cost_cert_origen_rmb) || 0;
-                                const docOpV = Number(op.cost_doc_operacion_rmb) || 0;
-                                const despV = Number(op.cost_despacho_aduanero_rmb) || 0;
-                                const compraDV = Number(op.cost_compra_docs_rmb) || 0;
-                                const transpV = Number(op.cost_transporte_interno_cn_rmb) || 0;
-                                const fleteRmbKg = Number(op.flete_rmb_kg_consolidado ?? op.costos_china?.flete_rmb_kg) || 0;
+                                const segMin = Number(op.seguro_min_rmb) || _maxOpCot("seguro_min_rmb") || 0;
+                                const certOri = _maxOpCot("cost_cert_origen_rmb");
+                                const docOpV = _maxOpCot("cost_doc_operacion_rmb");
+                                const despV = _maxOpCot("cost_despacho_aduanero_rmb");
+                                const compraDV = _maxOpCot("cost_compra_docs_rmb");
+                                const transpV = _maxOpCot("cost_transporte_interno_cn_rmb");
+                                const fleteRmbKg = Number(op.flete_rmb_kg_consolidado ?? op.costos_china?.flete_rmb_kg) ||
+                                                   Math.max(...cotsActivas.map(c => Number(c.aer_tarifa_sunny_rmb_kg) || 0)) || 0;
                                 const cc = op.costos_china || {};
                                 const otrosUSDLeg = Number(cc.otros_usd) || 0;
                                 const formFUSDLeg = (Number(cc.form_f_usd_por_producto)||0) * cotsActivas.length;
