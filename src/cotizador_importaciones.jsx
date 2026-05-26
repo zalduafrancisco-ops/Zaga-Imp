@@ -118,7 +118,34 @@ const makeDefaultForm = (usuario) => ({
 // ── Calculations ─────────────────────────────────────────────────
 function calcCliente(d) {
   const isAereo = d.transporte === "aereo";
-  const u=Number(d.unidades)||0, pCh=Number(d.precio_china)||0, comR=Number(d.comision_real)||0;
+  const u=Number(d.unidades)||0;
+  let pCh=Number(d.precio_china)||0;
+  const comR=Number(d.comision_real)||0;
+  // Aéreo con datos RMB (modelo nuevo): pCh efectivo = costo China TOTAL /und en CLP
+  // (mercancía + comisión Sunny + flete + cert origen + costos OP compartidos + seguro)
+  // Esto reemplaza el `precio_china` legacy (que solo era mercancía CLP) para que el snapshot
+  // calc.totCl refleje el costo real ZAGA y NO se subestime el precio al cliente.
+  const pChRmb = Number(d.precio_china_rmb) || 0;
+  if (isAereo && pChRmb > 0 && u > 0) {
+    const TC_RMB_USD = Number(d.tc_rmb_usd) || 7.03;
+    const tcClp = Number(d.tc_usd_clp) || 950;
+    const mercRMB = pChRmb * u;
+    const comRMB = mercRMB * (Number(d.comision_sunny_pct) || 0) / 100;
+    const undC = Number(d.dim_und_caja) || 0;
+    const esC = d.dim_tipo === "caja";
+    const pesoUnit = Number(d.peso_kg) || 0;
+    const pesoTotal = esC && undC > 0 ? pesoUnit * Math.ceil(u/undC) : pesoUnit * u;
+    const tarifaKg = Number(d.aer_tarifa_sunny_rmb_kg) || (Number(d.aer_tarifa_sunny_kg) || 0) * TC_RMB_USD;
+    const fleteRMB = pesoTotal * tarifaKg;
+    const otrosRMB = (Number(d.cost_cert_origen_rmb)||0) + (Number(d.cost_doc_operacion_rmb)||0) +
+                     (Number(d.cost_despacho_aduanero_rmb)||0) + (Number(d.cost_compra_docs_rmb)||0) +
+                     (Number(d.cost_transporte_interno_cn_rmb)||0);
+    const seguroPctEff = Number(d.seguro_pct) || 0;
+    const seguroMinEff = Number(d.seguro_min_rmb) || 0;
+    const seguroRMB = mercRMB > 0 ? Math.max(seguroMinEff, mercRMB * seguroPctEff) : 0;
+    const totalChinaRMB = mercRMB + comRMB + fleteRMB + otrosRMB + seguroRMB;
+    pCh = ((totalChinaRMB / TC_RMB_USD) * tcClp) / u;
+  }
   // En aéreo: forzar pago 100%, sin comisión préstamo, servicio default 6%, con factura
   const pDep = isAereo ? 1 : (Number(d.pct_deposito)||30)/100;
   const mar=Number(d.margen_und)||0;
