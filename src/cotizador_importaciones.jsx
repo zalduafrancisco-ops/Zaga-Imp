@@ -818,6 +818,46 @@ const METRIC=({label,value,sub,color})=>(
     {sub&&<div style={{fontSize:10,color:"#444",marginTop:2}}>{sub}</div>}
   </div>
 );
+
+// ─── Input RMB con decimales (es-CL: coma=decimal, punto=miles) ─────────────
+// Componente con state local: durante edición (focus) mantiene el texto crudo
+// para que la coma no desaparezca por el toLocaleString. Al perder foco parsea.
+function RmbInputDec({ value, onChange, width = 120 }) {
+  const [text, setText] = React.useState("");
+  const [focused, setFocused] = React.useState(false);
+  const n = Number(value) || 0;
+  const formatted = n > 0 ? "¥" + n.toLocaleString("es-CL", { maximumFractionDigits: 2 }) : "";
+  const parseRaw = (raw) => {
+    let s = String(raw).replace("¥", "").trim();
+    if (s.includes(",")) {
+      const [intPart, decPart=""] = s.split(",");
+      const intLimpio = intPart.replace(/[^\d]/g, "");
+      const decLimpio = decPart.replace(/[^\d]/g, "").slice(0,2);
+      s = intLimpio + (decLimpio ? "." + decLimpio : "");
+    } else {
+      s = s.replace(/[^\d]/g, "");
+    }
+    return Number(s) || 0;
+  };
+  return (
+    <input type="text" value={focused ? text : formatted}
+      placeholder="¥0"
+      onFocus={() => {
+        setText(n > 0 ? n.toString().replace(".", ",") : "");
+        setFocused(true);
+      }}
+      onChange={e => {
+        // Permitir solo dígitos, coma y punto (miles); usuario tipea libre durante focus
+        setText(e.target.value.replace("¥","").replace(/[^\d,.]/g, ""));
+      }}
+      onBlur={() => {
+        onChange(parseRaw(text));
+        setFocused(false);
+      }}
+      style={{width,padding:"5px 7px",border:"1px solid #cbd5e1",borderRadius:6,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fff"}}/>
+  );
+}
+
 // ─── Bloque "Pagos reales de la OP" — admin lleva ingresos por cliente + egresos a Sunny/Chile ───
 // ─── RESULTADO REAL OP — comparativo Inicial vs Final vs Pagado real (solo admin) ─
 function ResultadoRealOp({ op, cots, fmt, fmtN }) {
@@ -1203,7 +1243,8 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"100px 1fr 80px 1fr",gap:6,alignItems:"center",fontSize:11,marginBottom:6}}>
                     <span style={{color:"#475569"}}>¥ RMB enviado:</span>
-                    {rmbInput(rmb, v=>setEgreso(e.key,"rmb",v))}
+                    <RmbInputDec value={rmb} onChange={v=>setEgreso(e.key,"rmb",v)} />
+                    {/* legacy: rmbInput(rmb, v=>setEgreso(e.key,"rmb",v)) reemplazado por RmbInputDec con state local */}
                     <span style={{color:"#475569",textAlign:"right"}}>TC WU:</span>
                     {decInput(tc, v=>setEgreso(e.key,"tc_wu",v), 100, "0.01", "ej. 137")}
                   </div>
