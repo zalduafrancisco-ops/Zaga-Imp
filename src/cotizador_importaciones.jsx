@@ -1070,7 +1070,8 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
   }
 
   // Inputs con formato $ (CLP) / ¥ (RMB) — separadores de miles
-  // allowDec=true: permite decimales con coma o punto (para RMB que puede tener centavos)
+  // allowDec=true: permite decimales con coma (formato es-CL: '44.163,36')
+  // El punto SIEMPRE se trata como separador de miles, la coma SIEMPRE como decimal.
   const moneyInput = (val, onChange, currency="$", w=130, ph, allowDec=false) => {
     const n = Number(val) || 0;
     const display = n > 0 ? currency + n.toLocaleString("es-CL", allowDec ? { maximumFractionDigits: 2 } : { maximumFractionDigits: 0 }) : "";
@@ -1079,18 +1080,17 @@ function PagosRealesOp({ op, cots, supabase, setOperaciones, totVentaIva, totCos
         onChange={e => {
           let raw = e.target.value.replace(currency, "").trim();
           if (allowDec) {
-            // Acepta '.' o ',' como decimal. Remueve separadores de miles.
-            // Lógica: si tiene coma Y punto, asume formato es-CL (puntos miles, coma decimal).
-            // Si solo coma, es decimal. Si solo punto, depende — preferimos decimal si hay 1 sólo y va seguido de 1-2 dígitos.
-            const tieneComa = raw.includes(",");
-            const tienePunto = raw.includes(".");
-            if (tieneComa && tienePunto) raw = raw.replace(/\./g, "").replace(",", ".");
-            else if (tieneComa) raw = raw.replace(",", ".");
-            // si solo punto, lo dejamos como decimal (ej: 34492.71)
-            raw = raw.replace(/[^\d.]/g, "");
-            // Si hay múltiples puntos, conservar solo el último como decimal
-            const partes = raw.split(".");
-            if (partes.length > 2) raw = partes.slice(0,-1).join("") + "." + partes[partes.length-1];
+            // Formato es-CL: coma=decimal, punto=miles (siempre).
+            // Si tiene coma: parte entera (antes de coma, sin puntos) + parte decimal (después).
+            // Si no tiene coma: todo es entero, puntos eran separadores de miles.
+            if (raw.includes(",")) {
+              const [intPart, decPart=""] = raw.split(",");
+              const intLimpio = intPart.replace(/[^\d]/g, "");
+              const decLimpio = decPart.replace(/[^\d]/g, "").slice(0,2);
+              raw = intLimpio + (decLimpio ? "." + decLimpio : "");
+            } else {
+              raw = raw.replace(/[^\d]/g, "");
+            }
             onChange(Number(raw) || 0);
           } else {
             raw = raw.replace(/[^\d]/g, "");
