@@ -2885,8 +2885,9 @@ Número de seguimiento: ${c.nro}`;
               const consolidados = cotsCliente.map(c => {
                 const calcStandard = calcConsolidado(c, op, cotsOp);
                 if (!aplicado) {
-                  const margenPanel = margenesPorCot[c.id] ?? c.margen_objetivo_pct;
-                  if (margenPanel != null && margenPanel > 0) {
+                  // Default 30% si no hay margen explícito — coherente con tabla admin 'Costo y propuesta cliente'.
+                  const margenPanel = Number(margenesPorCot[c.id] ?? c.margen_objetivo_pct ?? 30);
+                  if (margenPanel > 0) {
                     const cz = calcCostoRealZaga(c, op, cotsOp);
                     // Coherente con tabla admin 'Resumen con IVA': IVA agente es recuperable F29, NO se cuenta como costo.
                     const costoNeto = (cz.totalChinaCLP || 0) + (cz.totalChileCLP || 0);
