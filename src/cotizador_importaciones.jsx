@@ -7030,21 +7030,24 @@ Número de seguimiento: ${c.nro}`;
                                         </thead>
                                         <tbody>
                                           {detallesCot.map((d) => {
-                                            // share por valor (consistente con calcCostoRealZaga)
-                                            const shareVal = mercOp > 0 ? d.mercanciaRMB / mercOp : 1/detallesCot.length;
+                                            // Share por CBM (consistente con calcCostoRealZaga). Si no hay CBM, fallback por valor o equitativo.
+                                            const cbmOpLocal = detallesCot.reduce((s,x) => s + (x.cbm || 0), 0);
+                                            const shareCBM = (cbmOpLocal > 0 && d.cbm > 0)
+                                              ? d.cbm / cbmOpLocal
+                                              : (mercOp > 0 ? d.mercanciaRMB / mercOp : 1/detallesCot.length);
                                             // Cert origen ES per cot, no por share
                                             const certCotRMB = certOri;
                                             // Transporte interno CN ES per cot — cada cot suma su propio valor (cobrado por Sunny individual)
                                             const transpCotRMB = Number(d.c.cost_transporte_interno_cn_rmb) || 0;
                                             // Otros compartidos OP (sin transp_cn ni cert origen que ya van per cot)
                                             const otrosOpSinTranspRMB = docOpV + despV + compraDV + (transpV > 0 ? 0 : logisticaLeg) + seguroOp;
-                                            const otrosShareCotRMB = otrosOpSinTranspRMB * shareVal;
+                                            const otrosShareCotRMB = otrosOpSinTranspRMB * shareCBM;
                                             const comisionCotRMB = d.mercanciaRMB * comPct / 100;
                                             const conComisionCotRMB = d.mercanciaRMB + comisionCotRMB;
                                             const fleteVolCot = d.pesoVol * fleteRmbKg;
                                             const fletePesoCot = d.pesoReal * fleteRmbKg;
                                             const precioUndRMB = d.u > 0 ? d.mercanciaRMB / d.u : 0;
-                                            const otrosUSDShareCot = totalUSDExtra * shareVal;
+                                            const otrosUSDShareCot = totalUSDExtra * shareCBM;
                                             const totalCotRMB = d.mercanciaRMB + comisionCotRMB + d.fleteRMB + certCotRMB + transpCotRMB + otrosShareCotRMB;
                                             const totalCotUSD = totalCotRMB / TC_RMB_USD + otrosUSDShareCot;
                                             const totalCotCLP = totalCotUSD * tc;
