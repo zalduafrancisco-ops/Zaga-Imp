@@ -3075,15 +3075,29 @@ Número de seguimiento: ${c.nro}`;
         const transporteCn = _tMax("cost_transporte_interno_cn_rmb");
         const comisionRMB = valorMercanciaRMB * comisionPct / 100;
         const seguroRMB = Math.max(seguroMin, valorMercanciaRMB * seguroPct);
-        // Estimado consolidado virtual (cot SIN OP): N cots asumidas. Reparte solo costos fijos.
+        // Estimado consolidado virtual (cot SIN OP): asume un PESO TOTAL de la OP.
+        // Share virtual = peso_cot / peso_op_asumido. Refleja cómo opera la realidad.
         // Directos a la cot (NO se reparten): mercancía, comisión, flete, cert origen, seguro, arancel, IVA aduana.
-        // Compartidos por OP (÷ N): aduana fija Chile (sin arancel) + IVA agente Chile + doc op + despacho CN + compra docs + transporte CN.
-        const nCotsAsumido = Math.max(1, Number(validarForm.n_cots_asumido ?? 3));
+        // Compartidos por OP (× share): aduana fija Chile (sin arancel) + IVA agente Chile + doc op + despacho CN + compra docs + transporte CN.
+        const pesoOpHistorico = (() => {
+          const opsCerradas = (operaciones||[]).filter(o => ["pagada","en_camino","en_bodega","completada"].includes(o.estado));
+          const pesos = opsCerradas.map(o => {
+            const cotsDeOp = (cotizaciones||[]).filter(x => (o.cotizaciones||[]).includes(x.id) && x.transporte === "aereo");
+            return cotsDeOp.reduce((s,x) => {
+              const p = Number(x.peso_kg) || 0;
+              const uc = Number(x.unidades) || 0;
+              const udC = Number(x.dim_und_caja) || 0;
+              const esC = x.dim_tipo === "caja";
+              return s + (esC && udC > 0 ? p * Math.ceil(uc/udC) : p * uc);
+            }, 0);
+          }).filter(p => p > 0);
+          return pesos.length > 0 ? Math.round(pesos.reduce((s,p) => s+p, 0) / pesos.length) : 100;
+        })();
+        const pesoOpAsumido = Math.max(1, Number(validarForm.peso_op_kg_asumido ?? pesoOpHistorico));
         const otrosDirectosRMB = certOrigen + seguroRMB;
         const otrosCompartidosRMB = docOp + despacho + compraDocs + transporteCn;
-        // shareVirtual: si hay OP real, usa el real (calculado abajo); si no, usa 1/N.
-        // Por ahora calculamos el preliminar; lo override después si hay opVinc.
-        let shareVirtual = opVinc ? 1 : (1 / nCotsAsumido);
+        // shareVirtual: si hay OP real, usa el real (calculado abajo); si no, usa peso_cot/peso_op_asumido (cap 1).
+        let shareVirtual = opVinc ? 1 : Math.min(1, pesoTotal / pesoOpAsumido);
         const otrosCompartidosProrraRMB = otrosCompartidosRMB * shareVirtual;
         const otrosRMB = otrosDirectosRMB + otrosCompartidosProrraRMB;
         const totalChinaRMB = valorMercanciaRMB + comisionRMB + fleteRMB + otrosRMB;
@@ -3259,16 +3273,30 @@ Número de seguimiento: ${c.nro}`;
                     <div style={{marginTop:8,fontSize:10,color:"#1e40af",fontStyle:"italic",lineHeight:1.4}}>📐 Aduana fija prorrateada por share {fmtP(shareAduana*100)} (peso real OP). Arancel directo sobre CIF cot.</div>
                   )}
                   {!opVinc && (
-                    <div style={{marginTop:10,padding:"8px 11px",background:"#fefce8",border:"1px dashed #fde047",borderRadius:7,fontSize:11,color:"#78350f"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:4}}>
+                    <div style={{marginTop:10,padding:"10px 12px",background:"#fefce8",border:"1px dashed #fde047",borderRadius:7,fontSize:11,color:"#78350f"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
                         <span style={{fontWeight:700,color:"#92400e"}}>💡 Estimado consolidado virtual</span>
                         <label style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#475569"}}>
-                          Asumir N cots:
-                          <input type="number" min="1" max="10" step="1" value={validarForm.n_cots_asumido ?? 3} onChange={e=>setValidarForm(p=>({...p,n_cots_asumido:e.target.value}))} style={{width:48,padding:"3px 6px",border:"1px solid #facc15",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",fontWeight:700,background:"#fff"}}/>
+                          Peso OP asumido:
+                          <input type="number" min="1" step="1" value={validarForm.peso_op_kg_asumido ?? pesoOpHistorico} onChange={e=>setValidarForm(p=>({...p,peso_op_kg_asumido:e.target.value}))} style={{width:64,padding:"3px 6px",border:"1px solid #facc15",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",fontWeight:700,background:"#fff"}}/>
+                          <span style={{color:"#475569",fontSize:10}}>kg</span>
                         </label>
                       </div>
-                      <div style={{fontSize:10,color:"#854d0e",lineHeight:1.4,fontStyle:"italic"}}>
-                        Aduana fija + IVA agente + costos CN compartidos se dividen por {nCotsAsumido}. Mercancía, flete, seguro, arancel, IVA aduana quedan directos.
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6,alignItems:"center"}}>
+                        <span style={{fontSize:10,color:"#854d0e",fontWeight:600}}>Presets:</span>
+                        {[
+                          {lbl:"Liviana", kg:50},
+                          {lbl:"Mediana", kg:100},
+                          {lbl:"Pesada", kg:200},
+                          {lbl:`Histórico (${pesoOpHistorico})`, kg:pesoOpHistorico},
+                        ].map(p => (
+                          <button key={p.lbl} onClick={()=>setValidarForm(prev=>({...prev,peso_op_kg_asumido:p.kg}))} style={{background: Number(validarForm.peso_op_kg_asumido ?? pesoOpHistorico)===p.kg ? "#c9a055" : "#fff",color: Number(validarForm.peso_op_kg_asumido ?? pesoOpHistorico)===p.kg ? "#fff" : "#92400e",border:"1px solid #fde047",borderRadius:5,padding:"3px 9px",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                            {p.lbl} {p.kg}kg
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{fontSize:10,color:"#854d0e",lineHeight:1.5,fontStyle:"italic"}}>
+                        Esta cot pesa <b>{fmtN(pesoTotal,1)} kg</b> → share virtual <b>{fmtP(shareVirtual*100)}</b>. Aduana fija + IVA agente + costos CN compartidos × share. Mercancía, flete, seguro, arancel, IVA aduana quedan directos.
                       </div>
                     </div>
                   )}
