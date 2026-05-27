@@ -2055,12 +2055,21 @@ function ResumenRMBOp({ op, cots, supabase, onSaved }) {
   const mercOpCalc = detallesCot.reduce((s,d) => s + d.mercanciaRMB, 0)
   const mercOp = mercOpCalc > 0 ? mercOpCalc : (Number(cc.productos_rmb)||0)
   const comisionOp = mercOp * comPct / 100
+  const conComisionOp = mercOp + comisionOp
   const pesoCobrTotal = detallesCot.reduce((s,d) => s + d.pesoCobr, 0)
+  const pesoRealTotal = detallesCot.reduce((s,d) => s + d.pesoReal, 0)
+  const pesoVolTotal = detallesCot.reduce((s,d) => s + d.pesoVol, 0)
   const fleteOpCalc = detallesCot.reduce((s,d) => s + d.fleteRMB, 0)
   const fleteOp = fleteOpCalc > 0 ? fleteOpCalc : ((Number(cc.peso_kg)||0) * fleteRmbKg)
+  const fletePesoOp = pesoRealTotal * fleteRmbKg
+  const fleteVolOp = pesoVolTotal * fleteRmbKg
+  const fleteCobradoSunny = Math.max(fletePesoOp, fleteVolOp)
+  const fleteSunnyTipo = fletePesoOp >= fleteVolOp ? "peso" : "volumen"
   const certOpRMB = certOri * cotsActivas.length
   const seguroOp = Math.max(segMin, mercOp * segPct)
   const logisticaEfectiva = transpV > 0 ? 0 : logisticaLeg
+  const gastosFijosOp = docOpV + despV + compraDV + (transpV > 0 ? 0 : logisticaLeg) + otrosGastosManualRMB
+  const totalCostoFleteSunny = fleteCobradoSunny + certOpRMB + gastosFijosOp + seguroOp + transpV
   const otrosOpRMB = docOpV + despV + compraDV + transpV + logisticaEfectiva + seguroOp + otrosGastosManualRMB
   const totalRMB = mercOp + comisionOp + fleteOp + certOpRMB + otrosOpRMB
   const totalUSDExtra = otrosUSDLeg + formFUSDLeg
@@ -2090,18 +2099,80 @@ function ResumenRMBOp({ op, cots, supabase, onSaved }) {
         使用此表与你的 Excel 对比 / Usa esta tabla para comparar con tu Excel. Si los totales coinciden, los costos están bien.
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:12}}>
-        <div style={{background:"#fff",border:"1px solid #fde047",borderRadius:8,padding:"8px 12px"}}>
-          <RowRMB lbl="📦 Mercancía total / 货物" val={mercOp} hint={`${cotsActivas.length} cots · ${fmtN(totalUnd)} und`} />
-          <RowRMB lbl={`💼 Comisión Sunny ${comPct}% / 佣金`} val={comisionOp} hint="Sobre mercancía total" />
-          <RowRMB lbl="✈️ Flete aéreo / 运费" val={fleteOp} hint={`${fmtN(pesoCobrTotal,1)} kg cobrable × ¥${fmtN(fleteRmbKg,2)}/kg`} />
-          <RowRMB lbl={`📜 Cert. origen × ${cotsActivas.length}`} val={certOpRMB} hint={`¥${certOri}/cot`} />
-          {docOpV > 0 && <RowRMB lbl="📄 Doc. operación CN" val={docOpV} hint="Fijo OP" />}
-          {despV > 0 && <RowRMB lbl="🛃 Despacho aduanero CN" val={despV} hint="Fijo OP" />}
-          {compraDV > 0 && <RowRMB lbl="📑 Compra docs" val={compraDV} hint="Fijo OP" />}
-          {transpV > 0 && <RowRMB lbl="🚚 Transporte interno CN" val={transpV} hint="Fijo OP" />}
-          {logisticaEfectiva > 0 && transpV === 0 && <RowRMB lbl="🛣️ Logística Yiwu→SH (legacy)" val={logisticaEfectiva} />}
-          {otrosGastosManualRMB > 0 && <RowRMB lbl="➕ Otros gastos / 其他费用" val={otrosGastosManualRMB} hint="Ajustes manuales ZAGA" />}
-          <RowRMB lbl={`🛡️ Seguro (${segPctLabel}% sobre merc., mín ¥${segMin})`} val={seguroOp} />
+        <div>
+          {/* Bloque 1: Mercancía + comisión */}
+          <table style={{width:"100%",borderCollapse:"collapse",background:"#fff",borderRadius:8,overflow:"hidden",border:"1px solid #fde047",marginBottom:8,fontSize:11}}>
+            <tbody>
+              <tr style={{borderBottom:"1px solid #fde68a"}}>
+                <td style={{padding:"5px 10px",color:"#78350f"}}>📦 Mercancía total (sin com.) <span style={{fontSize:9,color:"#a16207",fontStyle:"italic"}}>{cotsActivas.length} cots · {fmtN(totalUnd)} und</span></td>
+                <td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(mercOp,2)}`}</td>
+              </tr>
+              <tr style={{borderBottom:"1px solid #fde68a"}}>
+                <td style={{padding:"5px 10px",color:"#78350f"}}>💼 Comisión Sunny ({comPct}%) <span style={{fontSize:9,color:"#a16207",fontStyle:"italic"}}>含佣金 sobre mercancía</span></td>
+                <td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(comisionOp,2)}`}</td>
+              </tr>
+              <tr style={{background:"#fef3c7",borderTop:"2px solid #c47830"}}>
+                <td style={{padding:"6px 10px",fontSize:11,fontWeight:800,color:"#78350f"}}>= Con comisión total <span style={{fontSize:9,fontStyle:"italic",color:"#a16207"}}>含佣金总金额</span></td>
+                <td style={{padding:"6px 10px",fontSize:13,textAlign:"right",fontWeight:800,color:"#c47830"}}>{`¥${fmtN(conComisionOp,2)}`}</td>
+              </tr>
+            </tbody>
+          </table>
+          {/* Bloque 2: Flete vol vs peso */}
+          <table style={{width:"100%",borderCollapse:"collapse",background:"#fff",borderRadius:8,overflow:"hidden",border:"1px solid #fde047",marginBottom:8,fontSize:11}}>
+            <tbody>
+              <tr style={{background:"#fef3c7"}}>
+                <td colSpan={2} style={{padding:"5px 10px",fontSize:10,fontWeight:700,color:"#854d0e",textTransform:"uppercase",letterSpacing:1}}>✈️ Flete aéreo (cobra el mayor)</td>
+              </tr>
+              <tr style={{borderBottom:"1px solid #fde68a",background:fleteSunnyTipo==="volumen"?"#dcfce7":"transparent"}}>
+                <td style={{padding:"5px 10px",color:"#78350f"}}>体积运费 Flete por volumen <span style={{fontSize:9,color:"#a16207",fontStyle:"italic"}}>{fmtN(pesoVolTotal,2)} kg vol × ¥{fmtN(fleteRmbKg,2)}</span></td>
+                <td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(fleteVolOp,2)}`}{fleteSunnyTipo==="volumen" && <span style={{marginLeft:4,fontSize:10,color:"#16a34a",fontWeight:700}}>✓</span>}</td>
+              </tr>
+              <tr style={{background:fleteSunnyTipo==="peso"?"#dcfce7":"transparent"}}>
+                <td style={{padding:"5px 10px",color:"#78350f"}}>重量运费 Flete por peso <span style={{fontSize:9,color:"#a16207",fontStyle:"italic"}}>{fmtN(pesoRealTotal,2)} kg real × ¥{fmtN(fleteRmbKg,2)}</span></td>
+                <td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(fletePesoOp,2)}`}{fleteSunnyTipo==="peso" && <span style={{marginLeft:4,fontSize:10,color:"#16a34a",fontWeight:700}}>✓</span>}</td>
+              </tr>
+            </tbody>
+          </table>
+          {/* Bloque 3: Gastos fijos desglosados */}
+          <table style={{width:"100%",borderCollapse:"collapse",background:"#fff",borderRadius:8,overflow:"hidden",border:"1px solid #fde047",marginBottom:8,fontSize:11}}>
+            <tbody>
+              <tr style={{background:"#fef3c7"}}>
+                <td colSpan={2} style={{padding:"5px 10px",fontSize:10,fontWeight:700,color:"#854d0e",textTransform:"uppercase",letterSpacing:1}}>固定杂费 Gastos fijos OP (desglose)</td>
+              </tr>
+              {docOpV > 0 && <tr style={{borderBottom:"1px solid #fde68a"}}><td style={{padding:"5px 10px",color:"#78350f"}}>· Doc. operación</td><td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(docOpV,2)}`}</td></tr>}
+              {despV > 0 && <tr style={{borderBottom:"1px solid #fde68a"}}><td style={{padding:"5px 10px",color:"#78350f"}}>· Despacho aduanero CN</td><td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(despV,2)}`}</td></tr>}
+              {compraDV > 0 && <tr style={{borderBottom:"1px solid #fde68a"}}><td style={{padding:"5px 10px",color:"#78350f"}}>· Compra docs</td><td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(compraDV,2)}`}</td></tr>}
+              {logisticaEfectiva > 0 && transpV === 0 && <tr style={{borderBottom:"1px solid #fde68a"}}><td style={{padding:"5px 10px",color:"#78350f"}}>· Logística Yiwu→SH (legacy)</td><td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(logisticaEfectiva,2)}`}</td></tr>}
+              {otrosGastosManualRMB > 0 && <tr style={{borderBottom:"1px solid #fde68a"}}><td style={{padding:"5px 10px",color:"#78350f"}}>· Otros gastos / 其他费用 <span style={{fontSize:9,color:"#a16207",fontStyle:"italic"}}>(manual ZAGA)</span></td><td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(otrosGastosManualRMB,2)}`}</td></tr>}
+              <tr style={{background:"#fef3c7",borderTop:"1px solid #c47830"}}>
+                <td style={{padding:"6px 10px",fontSize:11,fontWeight:700,color:"#78350f"}}>= Total gastos fijos</td>
+                <td style={{padding:"6px 10px",fontSize:12,textAlign:"right",fontWeight:800,color:"#c47830"}}>{`¥${fmtN(gastosFijosOp,2)}`}</td>
+              </tr>
+            </tbody>
+          </table>
+          {/* Bloque 4: Cert + Seguro + Flete nacional + TOTAL COSTO FLETE */}
+          <table style={{width:"100%",borderCollapse:"collapse",background:"#fff",borderRadius:8,overflow:"hidden",border:"1px solid #fde047",fontSize:11}}>
+            <tbody>
+              <tr style={{borderBottom:"1px solid #fde68a"}}>
+                <td style={{padding:"5px 10px",color:"#78350f"}}>📜 Cert. origen (×{cotsActivas.length}) <span style={{fontSize:9,color:"#a16207",fontStyle:"italic"}}>原产地证书 ¥{certOri}/cot</span></td>
+                <td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(certOpRMB,2)}`}</td>
+              </tr>
+              <tr style={{borderBottom:"1px solid #fde68a"}}>
+                <td style={{padding:"5px 10px",color:"#78350f"}}>🛡️ Seguro <span style={{fontSize:9,color:"#a16207",fontStyle:"italic"}}>保险费 {(segPct*100).toFixed(2)}%, mín ¥{segMin}</span></td>
+                <td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(seguroOp,2)}`}</td>
+              </tr>
+              {transpV > 0 && (
+                <tr style={{borderBottom:"1px solid #fde68a"}}>
+                  <td style={{padding:"5px 10px",color:"#78350f"}}>🚚 Flete nacional CN <span style={{fontSize:9,color:"#a16207",fontStyle:"italic"}}>中国运费 dentro de China</span></td>
+                  <td style={{padding:"5px 10px",textAlign:"right",fontWeight:600,color:"#0f172a"}}>{`¥${fmtN(transpV,2)}`}</td>
+                </tr>
+              )}
+              <tr style={{background:"#fde68a",borderTop:"3px double #c47830"}}>
+                <td style={{padding:"7px 10px",fontSize:12,fontWeight:800,color:"#78350f"}}>💰 TOTAL COSTO FLETE <span style={{fontSize:9,fontStyle:"italic",color:"#a16207"}}>总运费</span></td>
+                <td style={{padding:"7px 10px",fontSize:14,textAlign:"right",fontWeight:900,color:"#c47830"}}>{`¥${fmtN(totalCostoFleteSunny,2)}`}</td>
+              </tr>
+            </tbody>
+          </table>
           {totalUSDExtra > 0 && (
             <div style={{marginTop:8,padding:"6px 10px",background:"#fefce8",borderRadius:6,border:"1px dashed #fde047",fontSize:10,color:"#78350f"}}>
               <b>+ Extras USD (legacy):</b>{" "}
@@ -2129,49 +2200,83 @@ function ResumenRMBOp({ op, cots, supabase, onSaved }) {
         </div>
       </div>
       <div style={{marginTop:10,background:"#fff",borderRadius:8,border:"1px solid #fde047",overflow:"hidden"}}>
-        <div style={{padding:"7px 12px",fontSize:10,fontWeight:700,color:"#854d0e",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #fde047"}}>Costo por cot (mercancía + flete + share extras)</div>
+        <div style={{padding:"7px 12px",fontSize:10,fontWeight:700,color:"#854d0e",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #fde047"}}>Costo por cot — formato Excel Sunny (mercancía + flete + share extras)</div>
         <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:560}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:10.5,minWidth:1000}}>
             <thead>
               <tr style={{background:"#fef3c7",color:"#78350f"}}>
-                <th style={{padding:"5px 8px",textAlign:"left"}}>Cot</th>
-                <th style={{padding:"5px 8px",textAlign:"right"}}>Und</th>
-                <th style={{padding:"5px 8px",textAlign:"right"}}>Peso real</th>
-                <th style={{padding:"5px 8px",textAlign:"right"}}>Peso cobr.</th>
-                <th style={{padding:"5px 8px",textAlign:"right"}}>Mercancía ¥</th>
-                <th style={{padding:"5px 8px",textAlign:"right"}}>Flete ¥</th>
-                <th style={{padding:"5px 8px",textAlign:"right"}}>Total ¥</th>
-                <th style={{padding:"5px 8px",textAlign:"right"}}>¥/und</th>
+                <th style={{padding:"5px 6px",textAlign:"left"}}>Cot</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>Und</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>Peso real</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>Peso vol</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>Precio ¥/und</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>Mercancía ¥</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>+ Com ({comPct}%)</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>Flete vol ¥</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>Flete peso ¥</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>Cert ¥</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>Transp CN ¥</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>Otros ¥</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>Total ¥</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>¥/und China</th>
+                <th style={{padding:"5px 6px",textAlign:"right"}}>CLP/und China</th>
               </tr>
             </thead>
             <tbody>
               {detallesCot.map(d => {
-                const shareVal = mercOp > 0 ? d.mercanciaRMB / mercOp : 1/detallesCot.length
-                const otrosShareCotRMB = otrosOpRMB * shareVal
+                const cbmOpLocal = detallesCot.reduce((s,x) => s + (x.cbm || 0), 0)
+                const shareCBM = (cbmOpLocal > 0 && d.cbm > 0)
+                  ? d.cbm / cbmOpLocal
+                  : (mercOp > 0 ? d.mercanciaRMB / mercOp : 1/detallesCot.length)
+                const certCotRMB = certOri
+                const transpCotRMB = Number(d.c.cost_transporte_interno_cn_rmb) || 0
+                const otrosOpSinTranspRMB = docOpV + despV + compraDV + (transpV > 0 ? 0 : logisticaLeg) + otrosGastosManualRMB + seguroOp
+                const otrosShareCotRMB = otrosOpSinTranspRMB * shareCBM
                 const comisionCotRMB = d.mercanciaRMB * comPct / 100
-                const totalCotRMB = d.mercanciaRMB + comisionCotRMB + d.fleteRMB + certOri + otrosShareCotRMB
+                const conComisionCotRMB = d.mercanciaRMB + comisionCotRMB
+                const fleteVolCot = d.pesoVol * fleteRmbKg
+                const fletePesoCot = d.pesoReal * fleteRmbKg
+                const precioUndRMB = d.u > 0 ? d.mercanciaRMB / d.u : 0
+                const totalCotRMB = d.mercanciaRMB + comisionCotRMB + d.fleteRMB + certCotRMB + transpCotRMB + otrosShareCotRMB
+                const totalCotCLP = (totalCotRMB / TC_RMB) * tc
                 const undRMB = d.u > 0 ? totalCotRMB / d.u : 0
+                const undCLP = d.u > 0 ? totalCotCLP / d.u : 0
                 return (
-                  <tr key={d.c._id} style={{borderTop:"1px solid #fef3c7"}}>
-                    <td style={{padding:"5px 8px",fontWeight:700,color:"#0f172a"}}>{d.c.nro}</td>
-                    <td style={{padding:"5px 8px",textAlign:"right",color:"#475569"}}>{fmtN(d.u)}</td>
-                    <td style={{padding:"5px 8px",textAlign:"right",color:"#475569"}}>{`${fmtN(d.pesoReal,1)}kg`}</td>
-                    <td style={{padding:"5px 8px",textAlign:"right",color:"#475569"}}>{`${fmtN(d.pesoCobr,1)}kg`}</td>
-                    <td style={{padding:"5px 8px",textAlign:"right",color:"#475569"}}>{`¥${fmtN(d.mercanciaRMB,0)}`}</td>
-                    <td style={{padding:"5px 8px",textAlign:"right",color:"#475569"}}>{`¥${fmtN(d.fleteRMB,0)}`}</td>
-                    <td style={{padding:"5px 8px",textAlign:"right",fontWeight:700,color:"#0f172a"}}>{`¥${fmtN(totalCotRMB,0)}`}</td>
-                    <td style={{padding:"5px 8px",textAlign:"right",fontWeight:700,color:"#854d0e"}}>{`¥${fmtN(undRMB,2)}`}</td>
+                  <tr key={d.c._id || d.c.id} style={{borderTop:"1px solid #fef3c7"}}>
+                    <td style={{padding:"5px 6px",fontWeight:700,color:"#0f172a"}}>{d.c.nro}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>{fmtN(d.u)}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>{fmtN(d.pesoReal,1)}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>{fmtN(d.pesoVol,2)}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>{`¥${fmtN(precioUndRMB,2)}`}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>{`¥${fmtN(d.mercanciaRMB,0)}`}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>{`¥${fmtN(conComisionCotRMB,0)}`}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>{`¥${fmtN(fleteVolCot,2)}`}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>{`¥${fmtN(fletePesoCot,2)}`}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>{`¥${fmtN(certCotRMB,0)}`}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>{`¥${fmtN(transpCotRMB,0)}`}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"#475569"}}>{`¥${fmtN(otrosShareCotRMB,0)}`}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",fontWeight:700,color:"#0f172a"}}>{`¥${fmtN(totalCotRMB,0)}`}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",fontWeight:700,color:"#854d0e"}}>{`¥${fmtN(undRMB,2)}`}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",fontWeight:700,color:"#c47830"}}>{`$${fmtN(undCLP,0)}`}</td>
                   </tr>
                 )
               })}
               <tr style={{borderTop:"2px solid #fde047",background:"#fef3c7"}}>
-                <td style={{padding:"6px 8px",fontWeight:800,color:"#854d0e"}}>TOTAL</td>
-                <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:"#854d0e"}}>{fmtN(totalUnd)}</td>
-                <td colSpan={2} style={{padding:"6px 8px",textAlign:"right",fontSize:9,color:"#a16207",fontStyle:"italic"}}>(promedio →)</td>
-                <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(mercOp,0)}`}</td>
-                <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(fleteOp,0)}`}</td>
-                <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(totalRMB,0)}`}</td>
-                <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:"#854d0e"}}>{`¥${fmtN(costoUndRMB,2)}`}</td>
+                <td style={{padding:"6px 6px",fontWeight:800,color:"#854d0e"}}>TOTAL</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#854d0e"}}>{fmtN(totalUnd)}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#854d0e"}}>{fmtN(pesoRealTotal,1)}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#854d0e"}}>{fmtN(pesoVolTotal,2)}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontSize:9,color:"#a16207",fontStyle:"italic"}}>—</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(mercOp,0)}`}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(conComisionOp,0)}`}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(fleteVolOp,2)}`}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(fletePesoOp,2)}`}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(certOpRMB,0)}`}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(transpV,0)}`}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(docOpV + despV + compraDV + (transpV > 0 ? 0 : logisticaLeg) + otrosGastosManualRMB + seguroOp,0)}`}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#0f172a"}}>{`¥${fmtN(totalRMB,0)}`}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#854d0e"}}>{`¥${fmtN(costoUndRMB,2)}`}</td>
+                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:800,color:"#c47830"}}>{`$${fmtN(costoUndCLP,0)}`}</td>
               </tr>
             </tbody>
           </table>
