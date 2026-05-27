@@ -397,6 +397,8 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
   let docOp_op       = _takeMax("cost_doc_operacion_rmb");
   let despacho_op    = _takeMax("cost_despacho_aduanero_rmb");
   let compraDocs_op  = _takeMax("cost_compra_docs_rmb");
+  // Otros gastos manuales OP (editable admin desde panel RMB) — fee fijo por OP
+  let otrosGastosManual_op = Number(op?.cost_otros_gastos_op_rmb) || 0;
   // Transporte interno CN es PER COT (Sunny cobra individual, depende del origen).
   // Se trata directo, NO se prorratea. Coherente con tabla 1 (panel RMB).
   const transporteCnDirectoRMB = Number(d.cost_transporte_interno_cn_rmb) || 0;
@@ -431,6 +433,7 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
     + despacho_op    * share
     + compraDocs_op  * share
     + logistica_op   * share
+    + otrosGastosManual_op * share
     + seguroOpRMB    * share;
   // Compartidos USD (legacy) prorrateados:
   const compartidosCotUSD = (otrosUSD_op + formFUSD_op) * share;
@@ -6877,14 +6880,16 @@ Número de seguimiento: ${c.nro}`;
                                 const fleteSunnyTipo = fletePesoOp >= fleteVolOp ? "peso" : "volumen";
                                 const certOpRMB = certOri * cotsActivas.length;
                                 const seguroOp = Math.max(segMin, mercOp * segPct);
+                                // Otros gastos OP editables por admin (ajustes manuales, fees imprevistos, etc.)
+                                const otrosGastosManualRMB = Number(op.cost_otros_gastos_op_rmb) || 0;
                                 // Total costo flete según Sunny (col 26 "总运费"): flete + cert + gastos fijos + seguro + flete nacional
-                                const gastosFijosOp = docOpV + despV + compraDV + (transpV > 0 ? 0 : logisticaLeg);
+                                const gastosFijosOp = docOpV + despV + compraDV + (transpV > 0 ? 0 : logisticaLeg) + otrosGastosManualRMB;
                                 const fleteNacionalOp = transpV;
                                 const totalCostoFleteSunny = fleteCobradoSunny + certOpRMB + gastosFijosOp + seguroOp + fleteNacionalOp;
                                 // Logística legacy es duplicada del transporte_interno_cn nuevo: solo sumar
                                 // si NO hay transporte_interno_cn (compatibilidad OP-001 vieja).
                                 const logisticaEfectiva = transpV > 0 ? 0 : logisticaLeg;
-                                const otrosOpRMB = docOpV + despV + compraDV + transpV + logisticaEfectiva + seguroOp;
+                                const otrosOpRMB = docOpV + despV + compraDV + transpV + logisticaEfectiva + seguroOp + otrosGastosManualRMB;
                                 const totalRMB = mercOp + comisionOp + fleteOp + certOpRMB + otrosOpRMB;
                                 const totalUSDExtra = otrosUSDLeg + formFUSDLeg;
                                 const totalUSD = totalRMB / TC_RMB_USD + totalUSDExtra;
@@ -6940,23 +6945,53 @@ Número de seguimiento: ${c.nro}`;
                                           </tbody>
                                         </table>
                                         {/* Bloque 3: Gastos fijos desglosados */}
-                                        {(docOpV>0 || despV>0 || compraDV>0 || (transpV===0 && logisticaLeg>0)) && (
-                                          <table style={{width:"100%",borderCollapse:"collapse",background:"#fff",borderRadius:8,overflow:"hidden",border:"1px solid #fde047",marginBottom:8}}>
-                                            <tbody>
-                                              <tr style={{background:"#fef3c7"}}>
-                                                <td colSpan={2} style={{padding:"5px 10px",fontSize:10,fontWeight:700,color:"#854d0e",textTransform:"uppercase",letterSpacing:1}}>固定杂费 Gastos fijos OP (desglose)</td>
-                                              </tr>
-                                              {docOpV>0   && rowRMB("· Doc. operación", docOpV)}
-                                              {despV>0    && rowRMB("· Despacho aduanero CN", despV)}
-                                              {compraDV>0 && rowRMB("· Compra docs", compraDV)}
-                                              {logisticaLeg>0 && transpV===0 && rowRMB("· Logística Yiwu→SH (legacy)", logisticaLeg)}
-                                              <tr style={{background:"#fef3c7",borderTop:"1px solid #c47830"}}>
-                                                <td style={{padding:"6px 10px",fontSize:11,fontWeight:700,color:"#78350f"}}>= Total gastos fijos</td>
-                                                <td style={{padding:"6px 10px",fontSize:12,textAlign:"right",fontWeight:800,color:"#c47830"}}>¥{fmtN(gastosFijosOp,2)}</td>
-                                              </tr>
-                                            </tbody>
-                                          </table>
-                                        )}
+                                        <table style={{width:"100%",borderCollapse:"collapse",background:"#fff",borderRadius:8,overflow:"hidden",border:"1px solid #fde047",marginBottom:8}}>
+                                          <tbody>
+                                            <tr style={{background:"#fef3c7"}}>
+                                              <td colSpan={2} style={{padding:"5px 10px",fontSize:10,fontWeight:700,color:"#854d0e",textTransform:"uppercase",letterSpacing:1}}>固定杂费 Gastos fijos OP (desglose)</td>
+                                            </tr>
+                                            {docOpV>0   && rowRMB("· Doc. operación", docOpV)}
+                                            {despV>0    && rowRMB("· Despacho aduanero CN", despV)}
+                                            {compraDV>0 && rowRMB("· Compra docs", compraDV)}
+                                            {logisticaLeg>0 && transpV===0 && rowRMB("· Logística Yiwu→SH (legacy)", logisticaLeg)}
+                                            {/* Otros gastos manuales editables por admin */}
+                                            <tr style={{borderBottom:"1px solid #fde68a"}}>
+                                              <td style={{padding:"6px 10px",fontSize:11,color:"#78350f"}}>
+                                                · Otros gastos (manual)
+                                                <div style={{fontSize:9,color:"#a16207",fontStyle:"italic"}}>ajustes, fees imprevistos, extras</div>
+                                              </td>
+                                              <td style={{padding:"4px 10px",textAlign:"right"}}>
+                                                <span style={{fontSize:11,color:"#78350f",marginRight:4}}>¥</span>
+                                                <input
+                                                  type="number"
+                                                  step="0.01"
+                                                  min="0"
+                                                  defaultValue={otrosGastosManualRMB || ""}
+                                                  placeholder="0"
+                                                  onBlur={async (e) => {
+                                                    const nuevoVal = Number(e.target.value) || 0;
+                                                    if (nuevoVal === otrosGastosManualRMB) return;
+                                                    try {
+                                                      const { data: fresca } = await supabase.from("operaciones").select("datos").eq("id", op.id).single();
+                                                      const datosMerged = { ...(fresca?.datos || op), cost_otros_gastos_op_rmb: nuevoVal };
+                                                      const { error } = await supabase.from("operaciones").update({ datos: datosMerged, updated_at: new Date().toISOString() }).eq("id", op.id);
+                                                      if (error) throw error;
+                                                      setOperaciones(prev => prev.map(o => o.id === op.id ? { ...o, cost_otros_gastos_op_rmb: nuevoVal } : o));
+                                                      showToast(`✓ Otros gastos OP actualizado: ¥${fmtN(nuevoVal, 2)}`);
+                                                    } catch (err) {
+                                                      showToast("⚠️ Error al guardar: " + (err.message || "?"), "err");
+                                                    }
+                                                  }}
+                                                  style={{width:90,padding:"4px 7px",border:"1px solid #fde047",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"inherit",background:"#fffbeb",color:"#0f172a",fontWeight:600}}
+                                                />
+                                              </td>
+                                            </tr>
+                                            <tr style={{background:"#fef3c7",borderTop:"1px solid #c47830"}}>
+                                              <td style={{padding:"6px 10px",fontSize:11,fontWeight:700,color:"#78350f"}}>= Total gastos fijos</td>
+                                              <td style={{padding:"6px 10px",fontSize:12,textAlign:"right",fontWeight:800,color:"#c47830"}}>¥{fmtN(gastosFijosOp,2)}</td>
+                                            </tr>
+                                          </tbody>
+                                        </table>
                                         {/* Bloque 4: Cert + Seguro + Flete nacional + TOTAL COSTO FLETE */}
                                         <table style={{width:"100%",borderCollapse:"collapse",background:"#fff",borderRadius:8,overflow:"hidden",border:"1px solid #fde047"}}>
                                           <tbody>
