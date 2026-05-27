@@ -2033,6 +2033,7 @@ function ResumenRMBOp({ op, cots, supabase, onSaved }) {
   const despV = Number(op.cost_despacho_aduanero_rmb) || 0
   const compraDV = Number(op.cost_compra_docs_rmb) || 0
   const transpV = Number(op.cost_transporte_interno_cn_rmb) || 0
+  const otrosGastosManualRMB = Number(op.cost_otros_gastos_op_rmb) || 0
   const fleteRmbKg = Number(op.flete_rmb_kg_consolidado ?? cc.flete_rmb_kg) || 0
   const otrosUSDLeg = Number(cc.otros_usd) || 0
   const formFUSDLeg = (Number(cc.form_f_usd_por_producto)||0) * cotsActivas.length
@@ -2060,7 +2061,7 @@ function ResumenRMBOp({ op, cots, supabase, onSaved }) {
   const certOpRMB = certOri * cotsActivas.length
   const seguroOp = Math.max(segMin, mercOp * segPct)
   const logisticaEfectiva = transpV > 0 ? 0 : logisticaLeg
-  const otrosOpRMB = docOpV + despV + compraDV + transpV + logisticaEfectiva + seguroOp
+  const otrosOpRMB = docOpV + despV + compraDV + transpV + logisticaEfectiva + seguroOp + otrosGastosManualRMB
   const totalRMB = mercOp + comisionOp + fleteOp + certOpRMB + otrosOpRMB
   const totalUSDExtra = otrosUSDLeg + formFUSDLeg
   const totalUSD = totalRMB / TC_RMB + totalUSDExtra
@@ -2099,6 +2100,7 @@ function ResumenRMBOp({ op, cots, supabase, onSaved }) {
           {compraDV > 0 && <RowRMB lbl="📑 Compra docs" val={compraDV} hint="Fijo OP" />}
           {transpV > 0 && <RowRMB lbl="🚚 Transporte interno CN" val={transpV} hint="Fijo OP" />}
           {logisticaEfectiva > 0 && transpV === 0 && <RowRMB lbl="🛣️ Logística Yiwu→SH (legacy)" val={logisticaEfectiva} />}
+          {otrosGastosManualRMB > 0 && <RowRMB lbl="➕ Otros gastos / 其他费用" val={otrosGastosManualRMB} hint="Ajustes manuales ZAGA" />}
           <RowRMB lbl={`🛡️ Seguro (${segPctLabel}% sobre merc., mín ¥${segMin})`} val={seguroOp} />
           {totalUSDExtra > 0 && (
             <div style={{marginTop:8,padding:"6px 10px",background:"#fefce8",borderRadius:6,border:"1px dashed #fde047",fontSize:10,color:"#78350f"}}>
