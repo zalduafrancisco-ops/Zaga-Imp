@@ -7289,7 +7289,20 @@ Número de seguimiento: ${c.nro}`;
                                         <tbody>
                                           {detalles.map((d) => (
                                             <tr key={d.cot.id} style={{borderTop:"1px solid #d1fae5"}}>
-                                              <td style={{padding:"6px 8px",color:"#0f172a",fontWeight:700}}>{d.cot.nro}<div style={{fontSize:9,color:"#64748b",fontWeight:400}}>{(d.cot.cliente||"-").slice(0,14)}</div></td>
+                                              <td style={{padding:"6px 8px",color:"#0f172a",fontWeight:700}}>
+                                                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                                  <span>{d.cot.nro}</span>
+                                                  {d.cot.link_alibaba && (
+                                                    <a href={d.cot.link_alibaba} target="_blank" rel="noopener noreferrer"
+                                                       title={`Ver producto en Alibaba: ${(d.cot.producto||"").slice(0,60)}`}
+                                                       style={{color:"#2d78c8",textDecoration:"none",fontSize:13}}>
+                                                      🔗
+                                                    </a>
+                                                  )}
+                                                </div>
+                                                <div style={{fontSize:9,color:"#64748b",fontWeight:400}}>{(d.cot.cliente||"-").slice(0,14)}</div>
+                                                {d.cot.producto && <div style={{fontSize:9,color:"#94a3b8",fontWeight:400,fontStyle:"italic",marginTop:1}}>{(d.cot.producto||"").slice(0,28)}</div>}
+                                              </td>
                                               <td style={{padding:"6px 8px",textAlign:"right",color:"#475569"}}>{fmtN(d.und)}</td>
                                               <td style={{padding:"6px 8px",textAlign:"right",color:"#475569",fontWeight:600}}>{fmt(d.costoUndCIva)}</td>
                                               <td style={{padding:"6px 8px",textAlign:"right",color:"#0f172a",fontWeight:700}}>{fmt(d.costoConIvaAduana)}</td>
