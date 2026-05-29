@@ -3083,8 +3083,10 @@ Número de seguimiento: ${c.nro}`;
         const cot = cotizaciones.find(x => x.id === moverCotId);
         if (!cot) return null;
         const opActual = operaciones.find(o => o.id === cot.operacion_id);
-        // OPs candidatas: abiertas (no cerradas), del mismo transporte, distintas a la actual
-        const OPS_CERRADAS = ["pagada","en_camino","en_bodega","completada","no_prospero"];
+        // OPs candidatas: pueden recibir nuevas cots si aún no despachó de China.
+        // "pagada" = cliente ya pagó pero mercancía sigue en China → SI se puede consolidar.
+        // "en_camino"/"en_bodega"/"completada" = ya despachó → NO se puede agregar.
+        const OPS_CERRADAS = ["en_camino","en_bodega","completada","no_prospero"];
         const opsCandidatas = operaciones.filter(o =>
           o.id !== cot.operacion_id &&
           !OPS_CERRADAS.includes(o.estado) &&
@@ -3153,11 +3155,13 @@ Número de seguimiento: ${c.nro}`;
                     {opsCandidatas.map(o => {
                       const cotsOp = (o.cotizaciones||[]).map(cid => cotizaciones.find(x=>x.id===cid)).filter(Boolean);
                       const undsOp = cotsOp.reduce((s,x)=>s + (Number(x.unidades)||0), 0);
+                      const esPagada = o.estado === "pagada";
                       return (
-                        <button key={o.id} onClick={()=>mover(o.id)} style={{textAlign:"left",background:"#f8fafc",color:"#0f172a",border:"1px solid #e2e8f0",borderRadius:10,padding:"12px 14px",fontSize:12,cursor:"pointer",fontFamily:"inherit",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+                        <button key={o.id} onClick={()=>mover(o.id)} style={{textAlign:"left",background:esPagada?"#fffbeb":"#f8fafc",color:"#0f172a",border:`1px solid ${esPagada?"#fde68a":"#e2e8f0"}`,borderRadius:10,padding:"12px 14px",fontSize:12,cursor:"pointer",fontFamily:"inherit",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
                           <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontWeight:800,color:"#0f172a",marginBottom:2}}>{o.nro} <span style={{fontSize:10,background:"#dbeafe",color:"#1e40af",borderRadius:4,padding:"1px 6px",marginLeft:6,fontWeight:600,textTransform:"uppercase"}}>{o.estado}</span></div>
+                            <div style={{fontWeight:800,color:"#0f172a",marginBottom:2}}>{o.nro} <span style={{fontSize:10,background:esPagada?"#fef3c7":"#dbeafe",color:esPagada?"#92400e":"#1e40af",borderRadius:4,padding:"1px 6px",marginLeft:6,fontWeight:600,textTransform:"uppercase"}}>{o.estado}</span></div>
                             <div style={{fontSize:11,color:"#64748b"}}>{cotsOp.length} cots · {fmtN(undsOp)} unidades · transporte {o.transporte || "—"}</div>
+                            {esPagada && <div style={{fontSize:10,color:"#a16207",marginTop:3,fontStyle:"italic"}}>⚠️ Pagada — solo agregar si aún NO ha despachado de China</div>}
                           </div>
                           <div style={{fontSize:18,color:"#92400e"}}>→</div>
                         </button>
