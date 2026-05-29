@@ -1201,7 +1201,12 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                           {tot>0&&!isRech&&precioValido&&(
                             <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:1}}>
                               <div style={{fontSize:14,fontWeight:800,color:"#040c18"}}>{fmt(tot)}</div>
-                              {und>0 && <div style={{fontSize:10,color:"#64748b",fontWeight:600}}>{fmt(tot/und)}/und</div>}
+                              {und>0 && (
+                                <div style={{fontSize:10,color:"#64748b",fontWeight:600,textAlign:"right",lineHeight:1.3}}>
+                                  {fmt(tot/und)}/und c/IVA
+                                  <div style={{fontSize:9,color:"#94a3b8",fontWeight:500}}>{fmt((tot/und)/1.19)} neto</div>
+                                </div>
+                              )}
                             </div>
                           )}
                           {!precioValido&&!isRech&&<div style={{fontSize:10,color:"#94a3b8",fontStyle:"italic"}}>⏳ Cotizando</div>}
