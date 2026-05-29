@@ -2224,7 +2224,12 @@ function ResumenRMBOp({ op, cots, supabase, onSaved }) {
                     <div style={{fontSize:9,color:"#854d0e",fontWeight:700,letterSpacing:0.5,textTransform:"uppercase",marginBottom:4}}>💸 Pagos / 已付款</div>
                     {pagosSunny.map(p => (
                       <div key={p.orden} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:10,padding:"2px 0",color:"#475569"}}>
-                        <span>第{p.orden}次 Pago {p.orden} {p.fecha && <span style={{color:"#94a3b8",fontSize:9}}>· {p.fecha}</span>}</span>
+                        <span>
+                          第{p.orden}次 Pago {p.orden}
+                          {p.fecha
+                            ? <span style={{color:"#94a3b8",fontSize:9,marginLeft:4}}>· {p.fecha}</span>
+                            : <span style={{color:"#a16207",fontSize:9,marginLeft:4,fontStyle:"italic"}}>· 日期未填 / sin fecha</span>}
+                        </span>
                         <span style={{fontWeight:700,color:"#0f172a"}}>¥{fmtN(p.rmb,2)}</span>
                       </div>
                     ))}

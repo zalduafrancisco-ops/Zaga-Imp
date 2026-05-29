@@ -7204,7 +7204,12 @@ Número de seguimiento: ${c.nro}`;
                                                       ) : (
                                                         pagosSunny.map(p => (
                                                           <div key={p.orden} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"3px 0",color:"#475569"}}>
-                                                            <span>Pago {p.orden} {p.fecha && <span style={{color:"#94a3b8",fontSize:10}}>· {p.fecha}</span>}</span>
+                                                            <span>
+                                                              Pago {p.orden}
+                                                              {p.fecha
+                                                                ? <span style={{color:"#94a3b8",fontSize:10,marginLeft:6}}>· {p.fecha}</span>
+                                                                : <span style={{color:"#c0392b",fontSize:10,marginLeft:6,fontStyle:"italic"}}>· (sin fecha — cárgala en "Pagos reales OP")</span>}
+                                                            </span>
                                                             <span style={{fontWeight:700,color:"#0f172a"}}>¥{fmtN(p.rmb,2)}</span>
                                                           </div>
                                                         ))
