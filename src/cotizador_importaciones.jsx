@@ -8853,6 +8853,15 @@ Número de seguimiento: ${c.nro}`;
             return contModo === "aereo" ? esAereo : !esAereo;
           };
           const cotsMes = cotizaciones.filter(filtroBase);
+          // Conteo TOTAL de cierres Luisa del mes (aéreas + marítimas sumadas).
+          // Define la tasa global aplicable a ambos modos.
+          const cotsLuisaTotalMes = cotizaciones.filter(c =>
+            c.gestor === "luisa" &&
+            c.estado === "completada" &&
+            c.fecha_llegada_real &&
+            c.fecha_llegada_real.substring(0,7) === contMes
+          );
+          const tasaLuisaTotal = cotsLuisaTotalMes.length >= 6 ? 0.25 : 0.20;
 
           // ─── MARÍTIMO ─────────────────────────────────────────────────
           const filasMar = cotsMes.map(c => {
@@ -8866,8 +8875,8 @@ Número de seguimiento: ${c.nro}`;
             return { c, u, precioUnd, cobrado, costoChina, ganImpCot, esLuisa };
           });
           const cotsLuisaMes = filasMar.filter(f => f.esLuisa);
-          // Tasa Luisa para este mes (mismo criterio que panel Luisa: >=6 cierres → 25%, sino 20%)
-          const tasaLuisaMes = cotsLuisaMes.length >= 6 ? 0.25 : 0.20;
+          // Tasa Luisa: usa el TOTAL combinado del mes (aéreas + marítimas), no solo marítimas.
+          const tasaLuisaMes = tasaLuisaTotal;
           const filasMarConCom = filasMar.map(f => ({
             ...f,
             comLuisa: f.esLuisa ? f.ganImpCot * tasaLuisaMes : 0,
@@ -8896,7 +8905,8 @@ Número de seguimiento: ${c.nro}`;
             return { c, u, precioUnd, cobradoIva, cobradoNeto, ivaCobradoCliente, costoChina, ivaAduana, ivaAgente, ivaRecuperable, esLuisa, ganImpCot };
           });
           const cotsLuisaAer = filasAer.filter(f => f.esLuisa);
-          const tasaLuisaAer = cotsLuisaAer.length >= 6 ? 0.25 : 0.20;
+          // Misma tasa que marítimo: usa total combinado del mes.
+          const tasaLuisaAer = tasaLuisaTotal;
           const filasAerConCom = filasAer.map(f => ({
             ...f,
             comLuisa: f.esLuisa ? f.ganImpCot * tasaLuisaAer : 0,
