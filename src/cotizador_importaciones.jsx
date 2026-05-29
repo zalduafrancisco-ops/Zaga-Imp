@@ -7159,8 +7159,11 @@ Número de seguimiento: ${c.nro}`;
                                   // Si NO, el margen es el input editable y el precio se deriva.
                                   const opCerrada = ["pagada","en_camino","en_bodega","completada"].includes(op.estado);
                                   const precioAcordadoIvaUnd = Number(cot.precio_final_acordado_und) || 0;
+                                  // Si admin tocó el margen del panel → prioridad al input (re-negociación).
+                                  // Solo si NO hay edición pendiente Y la cot tiene precio acordado, usa el acordado fijo.
+                                  const hayEdicionPanel = margenesPorCot[cot.id] !== undefined && margenesPorCot[cot.id] !== null;
                                   let margenPct, precioNetoUnd, precioIvaUnd, totalIvaCliente, totalNetoCliente, ganancia;
-                                  if (precioAcordadoIvaUnd > 0 && (opCerrada || op.consolidado_aplicado_cliente)) {
+                                  if (!hayEdicionPanel && precioAcordadoIvaUnd > 0 && (opCerrada || op.consolidado_aplicado_cliente)) {
                                     precioIvaUnd = precioAcordadoIvaUnd;
                                     precioNetoUnd = precioIvaUnd / 1.19;
                                     totalIvaCliente = precioIvaUnd * und;
