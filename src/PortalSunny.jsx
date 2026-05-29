@@ -2214,16 +2214,10 @@ function ResumenRMBOp({ op, cots, supabase, onSaved }) {
               <div style={{background:"#fffbeb",borderRadius:8,border:"2px solid #facc15",padding:"10px 12px"}}>
                 <div style={{fontSize:10,color:"#a16207",fontWeight:700,letterSpacing:0.5,textTransform:"uppercase",marginBottom:6}}>💰 总金额商定/Valor real acordado</div>
                 {realRMB > 0 && (
-                  <>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:3}}>
-                      <span style={{color:"#78350f"}}>RMB total / 人民币</span>
-                      <span style={{fontWeight:800,color:"#c47830",fontSize:15}}>{`¥${fmtN(realRMB,2)}`}</span>
-                    </div>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#475569",marginBottom:2}}>
-                      <span>USD</span>
-                      <span style={{fontWeight:600}}>${`${fmtN(realUSD,2)}`}</span>
-                    </div>
-                  </>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:3}}>
+                    <span style={{color:"#78350f"}}>RMB total / 人民币</span>
+                    <span style={{fontWeight:800,color:"#c47830",fontSize:15}}>{`¥${fmtN(realRMB,2)}`}</span>
+                  </div>
                 )}
                 {pagosSunny.length > 0 && (
                   <div style={{marginTop:8,paddingTop:6,borderTop:"1px dashed #fde68a"}}>

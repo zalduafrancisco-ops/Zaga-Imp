@@ -7183,23 +7183,6 @@ Número de seguimiento: ${c.nro}`;
                                                 </div>
                                               </div>
                                               {realRMB > 0 && (<>
-                                                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#475569",marginBottom:3}}>
-                                                  <span>USD (÷ TC {TC_RMB_USD})</span>
-                                                  <span style={{fontWeight:700,color:"#0f172a"}}>${fmtN(realUSD,2)}</span>
-                                                </div>
-                                                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#475569",marginBottom:3}}>
-                                                  <span>CLP (× TC {tc})</span>
-                                                  <span style={{fontWeight:700,color:"#c47830"}}>{fmt(realCLP)}</span>
-                                                </div>
-                                                <div style={{marginTop:6,paddingTop:6,borderTop:"1px dashed #fde047",display:"flex",justifyContent:"space-between",fontSize:11}}>
-                                                  <span style={{color:"#78350f"}}>Δ vs cotizador (¥{fmtN(totalRMB,2)})</span>
-                                                  <span style={{fontWeight:700,color:diffRMB>=0?"#0d9870":"#c0392b"}}>
-                                                    {diffRMB>=0?"+":""}¥{fmtN(diffRMB,2)} ({diffRMB>=0?"+":""}{margenColchon.toFixed(1)}%)
-                                                  </span>
-                                                </div>
-                                                <div style={{fontSize:9,color:"#a16207",marginTop:3,fontStyle:"italic",textAlign:"center"}}>
-                                                  {diffRMB > 0 ? "ZAGA paga más a Sunny que lo cotizado — costo real ↑" : diffRMB < 0 ? "ZAGA paga menos a Sunny — colchón de margen ↓" : "Idéntico al cotizado"}
-                                                </div>
                                                 {/* Pagos hechos a Sunny + saldo por pagar */}
                                                 {(() => {
                                                   const egresos = op.pagos_reales?.egresos || {};
