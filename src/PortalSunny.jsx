@@ -2197,6 +2197,58 @@ function ResumenRMBOp({ op, cots, supabase, onSaved }) {
               <span style={{fontWeight:700,color:"#c47830"}}>{`¥${fmtN(costoUndRMB,2)}`}</span>
             </div>
           </div>
+          {/* Valor REAL acordado a pagar a China + pagos + saldo (read-only para Sunny) */}
+          {(() => {
+            const realRMB = Number(op.monto_real_china_rmb) || 0
+            const realUSD = realRMB / TC_RMB
+            const realCLP = realUSD * tc
+            const egresos = op.pagos_reales?.egresos || {}
+            const pagosSunny = ["pago1_sunny","pago2_sunny","pago3_sunny"].map((k,i) => {
+              const p = egresos[k] || {}
+              return { orden: i+1, rmb: Number(p.rmb)||0, fecha: p.fecha||null }
+            }).filter(p => p.rmb > 0)
+            const totalPagadoRMB = pagosSunny.reduce((s,p) => s + p.rmb, 0)
+            const saldoRMB = realRMB - totalPagadoRMB
+            if (realRMB <= 0 && pagosSunny.length === 0) return null
+            return (
+              <div style={{background:"#fffbeb",borderRadius:8,border:"2px solid #facc15",padding:"10px 12px"}}>
+                <div style={{fontSize:10,color:"#a16207",fontWeight:700,letterSpacing:0.5,textTransform:"uppercase",marginBottom:6}}>💰 总金额商定/Valor real acordado</div>
+                {realRMB > 0 && (
+                  <>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:3}}>
+                      <span style={{color:"#78350f"}}>RMB total / 人民币</span>
+                      <span style={{fontWeight:800,color:"#c47830",fontSize:15}}>{`¥${fmtN(realRMB,2)}`}</span>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#475569",marginBottom:2}}>
+                      <span>USD</span>
+                      <span style={{fontWeight:600}}>${`${fmtN(realUSD,2)}`}</span>
+                    </div>
+                  </>
+                )}
+                {pagosSunny.length > 0 && (
+                  <div style={{marginTop:8,paddingTop:6,borderTop:"1px dashed #fde68a"}}>
+                    <div style={{fontSize:9,color:"#854d0e",fontWeight:700,letterSpacing:0.5,textTransform:"uppercase",marginBottom:4}}>💸 Pagos / 已付款</div>
+                    {pagosSunny.map(p => (
+                      <div key={p.orden} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:10,padding:"2px 0",color:"#475569"}}>
+                        <span>第{p.orden}次 Pago {p.orden} {p.fecha && <span style={{color:"#94a3b8",fontSize:9}}>· {p.fecha}</span>}</span>
+                        <span style={{fontWeight:700,color:"#0f172a"}}>¥{fmtN(p.rmb,2)}</span>
+                      </div>
+                    ))}
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:10,padding:"3px 0",borderTop:"1px dashed #fde68a",marginTop:3,color:"#475569"}}>
+                      <span>已付 Total pagado</span>
+                      <span style={{fontWeight:700,color:"#0d9870"}}>¥{fmtN(totalPagadoRMB,2)}</span>
+                    </div>
+                    {realRMB > 0 && (
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"5px 7px",background:saldoRMB > 0.5 ? "#fef3c7" : "#dcfce7",borderRadius:5,marginTop:5}}>
+                        <span style={{fontWeight:700,color:saldoRMB > 0.5 ? "#92400e" : "#15803d",fontSize:10}}>{saldoRMB > 0.5 ? "⏳ 余额 Saldo" : "✓ 已付清 Pagado"}</span>
+                        <span style={{fontWeight:800,color:saldoRMB > 0.5 ? "#c47830" : "#16a34a",fontSize:12}}>{saldoRMB > 0.5 ? `¥${fmtN(saldoRMB,2)}` : "✓"}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       </div>
       <div style={{marginTop:10,background:"#fff",borderRadius:8,border:"1px solid #fde047",overflow:"hidden"}}>

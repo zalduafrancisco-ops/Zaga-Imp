@@ -7142,6 +7142,107 @@ Número de seguimiento: ${c.nro}`;
                                             <span style={{fontWeight:700,color:"#c47830"}}>{fmt(costoUndCLP)}</span>
                                           </div>
                                         </div>
+                                        {/* Valor REAL acordado a pagar a China (editable, visible por Sunny) */}
+                                        {(() => {
+                                          const realRMB = Number(op.monto_real_china_rmb) || 0;
+                                          const realUSD = realRMB / TC_RMB_USD;
+                                          const realCLP = realUSD * tc;
+                                          const diffRMB = realRMB - totalRMB;
+                                          const margenColchon = totalRMB > 0 ? (diffRMB / totalRMB) * 100 : 0;
+                                          return (
+                                            <div style={{marginTop:8,background:realRMB > 0 ? "#fffbeb" : "#fff",borderRadius:8,border:`2px solid ${realRMB > 0 ? "#facc15" : "#fde047"}`,padding:"12px 14px"}}>
+                                              <div style={{fontSize:10,color:"#a16207",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                                <span>💰 Valor real acordado a pagar a China</span>
+                                                <span style={{fontSize:9,background:"#fef3c7",color:"#92400e",padding:"2px 6px",borderRadius:6,fontWeight:500,letterSpacing:0,textTransform:"none"}}>visible por Sunny</span>
+                                              </div>
+                                              <div style={{fontSize:10,color:"#854d0e",marginBottom:8,fontStyle:"italic",lineHeight:1.5}}>
+                                                Monto exacto que ZAGA pagará a Sunny por esta OP. El cotizador calcula con colchón de seguridad — aquí registra el acordado real.
+                                              </div>
+                                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13,marginBottom:5,gap:8,flexWrap:"wrap"}}>
+                                                <span style={{color:"#78350f"}}>RMB total</span>
+                                                <div style={{display:"flex",alignItems:"center",gap:4}}>
+                                                  <span style={{fontSize:11,color:"#78350f"}}>¥</span>
+                                                  <input type="number" step="0.01" min="0"
+                                                    defaultValue={realRMB || ""}
+                                                    placeholder="0,00"
+                                                    onBlur={async (e) => {
+                                                      const nuevoVal = Number(e.target.value) || 0;
+                                                      if (nuevoVal === realRMB) return;
+                                                      try {
+                                                        const { data: fresca } = await supabase.from("operaciones").select("datos").eq("id", op.id).single();
+                                                        const datosMerged = { ...(fresca?.datos||op), monto_real_china_rmb: nuevoVal };
+                                                        const { error } = await supabase.from("operaciones").update({ datos: datosMerged, updated_at: new Date().toISOString() }).eq("id", op.id);
+                                                        if (error) throw error;
+                                                        setOperaciones(prev => prev.map(o => o.id === op.id ? { ...o, monto_real_china_rmb: nuevoVal } : o));
+                                                        showToast(`✓ Valor real China actualizado: ¥${fmtN(nuevoVal,2)}`);
+                                                      } catch (err) {
+                                                        showToast("⚠️ Error: " + (err.message || "?"), "err");
+                                                      }
+                                                    }}
+                                                    style={{width:120,padding:"5px 8px",border:"1px solid #facc15",borderRadius:6,fontSize:13,textAlign:"right",fontFamily:"inherit",fontWeight:700,background:"#fff",color:"#c47830"}}/>
+                                                </div>
+                                              </div>
+                                              {realRMB > 0 && (<>
+                                                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#475569",marginBottom:3}}>
+                                                  <span>USD (÷ TC {TC_RMB_USD})</span>
+                                                  <span style={{fontWeight:700,color:"#0f172a"}}>${fmtN(realUSD,2)}</span>
+                                                </div>
+                                                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#475569",marginBottom:3}}>
+                                                  <span>CLP (× TC {tc})</span>
+                                                  <span style={{fontWeight:700,color:"#c47830"}}>{fmt(realCLP)}</span>
+                                                </div>
+                                                <div style={{marginTop:6,paddingTop:6,borderTop:"1px dashed #fde047",display:"flex",justifyContent:"space-between",fontSize:11}}>
+                                                  <span style={{color:"#78350f"}}>Δ vs cotizador (¥{fmtN(totalRMB,2)})</span>
+                                                  <span style={{fontWeight:700,color:diffRMB>=0?"#0d9870":"#c0392b"}}>
+                                                    {diffRMB>=0?"+":""}¥{fmtN(diffRMB,2)} ({diffRMB>=0?"+":""}{margenColchon.toFixed(1)}%)
+                                                  </span>
+                                                </div>
+                                                <div style={{fontSize:9,color:"#a16207",marginTop:3,fontStyle:"italic",textAlign:"center"}}>
+                                                  {diffRMB > 0 ? "ZAGA paga más a Sunny que lo cotizado — costo real ↑" : diffRMB < 0 ? "ZAGA paga menos a Sunny — colchón de margen ↓" : "Idéntico al cotizado"}
+                                                </div>
+                                                {/* Pagos hechos a Sunny + saldo por pagar */}
+                                                {(() => {
+                                                  const egresos = op.pagos_reales?.egresos || {};
+                                                  const pagosSunny = ["pago1_sunny","pago2_sunny","pago3_sunny"].map((k,i) => {
+                                                    const p = egresos[k] || {};
+                                                    return {
+                                                      orden: i+1,
+                                                      rmb: Number(p.rmb) || 0,
+                                                      fecha: p.fecha || null,
+                                                    };
+                                                  }).filter(p => p.rmb > 0);
+                                                  const totalPagadoRMB = pagosSunny.reduce((s,p) => s + p.rmb, 0);
+                                                  const saldoRMB = realRMB - totalPagadoRMB;
+                                                  return (
+                                                    <div style={{marginTop:10,paddingTop:8,borderTop:"2px solid #fde047"}}>
+                                                      <div style={{fontSize:10,color:"#854d0e",fontWeight:700,letterSpacing:0.5,textTransform:"uppercase",marginBottom:6}}>💸 Pagos hechos a Sunny</div>
+                                                      {pagosSunny.length === 0 ? (
+                                                        <div style={{fontSize:11,color:"#94a3b8",fontStyle:"italic",textAlign:"center",padding:"6px 0"}}>Sin pagos registrados todavía. Cárgalos en "💰 Pagos reales OP" más abajo.</div>
+                                                      ) : (
+                                                        pagosSunny.map(p => (
+                                                          <div key={p.orden} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"3px 0",color:"#475569"}}>
+                                                            <span>Pago {p.orden} {p.fecha && <span style={{color:"#94a3b8",fontSize:10}}>· {p.fecha}</span>}</span>
+                                                            <span style={{fontWeight:700,color:"#0f172a"}}>¥{fmtN(p.rmb,2)}</span>
+                                                          </div>
+                                                        ))
+                                                      )}
+                                                      {totalPagadoRMB > 0 && (
+                                                        <div style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"4px 0",borderTop:"1px dashed #fde68a",marginTop:4,color:"#475569"}}>
+                                                          <span>Total pagado</span>
+                                                          <span style={{fontWeight:700,color:"#0d9870"}}>¥{fmtN(totalPagadoRMB,2)}</span>
+                                                        </div>
+                                                      )}
+                                                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,padding:"6px 8px",background:saldoRMB > 0.5 ? "#fef3c7" : "#dcfce7",borderRadius:6,marginTop:6}}>
+                                                        <span style={{fontWeight:700,color:saldoRMB > 0.5 ? "#92400e" : "#15803d"}}>{saldoRMB > 0.5 ? "⏳ Saldo por pagar" : "✓ Pagado completo"}</span>
+                                                        <span style={{fontWeight:800,color:saldoRMB > 0.5 ? "#c47830" : "#16a34a",fontSize:13}}>{saldoRMB > 0.5 ? `¥${fmtN(saldoRMB,2)}` : "✓"}</span>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })()}
+                                              </>)}
+                                            </div>
+                                          );
+                                        })()}
                                       </div>
                                     </div>
                                     {/* Tabla por cot con costo unitario — formato Excel Sunny */}
