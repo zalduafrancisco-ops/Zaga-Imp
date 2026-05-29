@@ -6806,7 +6806,9 @@ Número de seguimiento: ${c.nro}`;
                 {operaciones.map(op=>{
                   const cots=cotizaciones.filter(c=>op.cotizaciones?.includes(c.id));
                   const totalUnd=cots.reduce((s,c)=>s+Number(c.unidades||0),0);
-                  const clientesOp=op.clientes&&op.clientes.length>0?op.clientes:[...new Set(cots.map(c=>c.cliente).filter(Boolean))];
+                  // Siempre derivar clientesOp de las cots actuales para reflejar movimientos cot ↔ OP en vivo.
+                  // (Antes usaba op.clientes estatico que quedaba desactualizado al mover una cot a otra OP.)
+                  const clientesOp = [...new Set(cots.map(c => (c.cliente||"").trim()).filter(Boolean))];
                   const clienteUnico = clientesOp.length === 1;
                   const expanded = opOpenId === op.id;
                   // Calcular consolidado de cada cot solo si está expandido (perf)
