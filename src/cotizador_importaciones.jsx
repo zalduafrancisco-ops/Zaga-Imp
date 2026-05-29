@@ -7944,16 +7944,28 @@ Número de seguimiento: ${c.nro}`;
               const mesAnterior=new Date(hoy.getFullYear(),hoy.getMonth()-1,1);
               const mesAnt=`${mesAnterior.getFullYear()}-${String(mesAnterior.getMonth()+1).padStart(2,"0")}`;
 
-              // Importaciones de Luisa con 1er pago recibido y ganancia calculada, agrupadas por mes.
-              // Excluye cots sin precio/costo cargado (ganImp=0) para no inflar el conteo con cots vacias.
-              const luisaCerradas=cotizaciones.filter(c=>
-                c.gestor==="luisa"&&c.tipo!=="propia"&&c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["no_prospero"].includes(c.estado)&&(Number(c.calc?.ganImp)||0)>0
-              );
+              // Importaciones de Luisa con ganancia calculada, agrupadas por mes.
+              // Marítimas: devengo en mes de pago1 cliente (cobro temprano, costos previsibles desde cotizacion).
+              // Aéreas: devengo en mes de fecha_llegada_real (estado completada) — el costo china real se conoce recien al despacho.
+              const luisaCerradas=cotizaciones.filter(c=>{
+                if (c.gestor !== "luisa" || c.tipo === "propia") return false;
+                if (["no_prospero"].includes(c.estado)) return false;
+                if ((Number(c.calc?.ganImp)||0) <= 0) return false;
+                const esAereo = c.transporte === "aereo";
+                if (esAereo) {
+                  // Aéreo: solo cuando completada (mercancia ya llego a Chile)
+                  return c.estado === "completada" && c.fecha_llegada_real;
+                }
+                // Marítimo: cuando se confirma pago1 del cliente
+                return c.checklist?.pago1_cliente && c.fecha_pago1_cliente;
+              });
 
-              // Agrupar por mes de fecha_pago1_cliente
+              // Agrupar por mes (criterio diferente segun transporte)
               const porMes={};
               luisaCerradas.forEach(c=>{
-                const m=c.fecha_pago1_cliente.substring(0,7);
+                const esAereo = c.transporte === "aereo";
+                const fechaRef = esAereo ? c.fecha_llegada_real : c.fecha_pago1_cliente;
+                const m = fechaRef.substring(0,7);
                 if(!porMes[m]) porMes[m]=[];
                 porMes[m].push(c);
               });
@@ -8007,7 +8019,7 @@ Número de seguimiento: ${c.nro}`;
                     <span style={{fontSize:20}}>👩‍💼</span>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,fontSize:14,color:"#a85590"}}>Comisiones Luisa</div>
-                      <div style={{fontSize:11,color:"#64748b"}}>20% por 1–5 cierres · 25% por 6+ cierres (sobre el TOTAL del mes, marítimo + aéreo) · Base: ganancia importación</div>
+                      <div style={{fontSize:11,color:"#64748b"}}>20% por 1–5 cierres · 25% por 6+ cierres (sobre el TOTAL del mes, marítimo + aéreo) · 🚢 Marítimo: devenga al pago1 · ✈️ Aéreo: devenga al completar</div>
                     </div>
                     <button onClick={()=>setSimModal(true)} style={{background:"#a8559018",color:"#a85590",border:"1px solid #f9a8d4",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700,whiteSpace:"nowrap"}}>🧮 Simulación total</button>
                   </div>
