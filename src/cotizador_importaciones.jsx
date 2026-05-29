@@ -8553,13 +8553,22 @@ Número de seguimiento: ${c.nro}`;
 
           const todas=cotizaciones.filter(c=>c.gestor==="luisa"&&c.tipo!=="propia");
           const enProceso=todas.filter(c=>["solicitud","cotizada","pagada","en_camino"].includes(c.estado));
-          const cerradas=todas.filter(c=>c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["no_prospero"].includes(c.estado));
+          // Cerradas (devengo): marítimas al confirmar pago1; aéreas al completar (llegada real).
+          // Excluye ganImp<=0 y rechazadas.
+          const cerradas=todas.filter(c=>{
+            if(["no_prospero"].includes(c.estado)) return false;
+            if((Number(c.calc?.ganImp)||0)<=0) return false;
+            if(c.transporte==="aereo") return c.estado==="completada" && c.fecha_llegada_real;
+            return c.checklist?.pago1_cliente && c.fecha_pago1_cliente;
+          });
           const completadas=todas.filter(c=>c.estado==="completada");
 
           // Ganancias reales por mes (base para comisión)
+          // Aéreas se agrupan por mes de fecha_llegada_real; marítimas por fecha_pago1_cliente.
           const porMes={};
           cerradas.forEach(c=>{
-            const m=c.fecha_pago1_cliente.substring(0,7);
+            const fechaRef=c.transporte==="aereo" ? c.fecha_llegada_real : c.fecha_pago1_cliente;
+            const m=fechaRef.substring(0,7);
             if(!porMes[m]) porMes[m]=[];
             porMes[m].push(c);
           });
@@ -8791,7 +8800,16 @@ Número de seguimiento: ${c.nro}`;
                     </div>
                     <div style={{textAlign:"right"}}>
                       <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",marginBottom:2}}>Tu total histórico</div>
-                      <div style={{fontSize:26,fontWeight:800,color:"#a85590"}}>{fmt(cerradas.reduce((s,c)=>s+((c.calc?.ganImp||0)*(cerradas.filter(x=>x.fecha_pago1_cliente?.substring(0,7)===c.fecha_pago1_cliente?.substring(0,7)).length>=6?0.25:0.20)),0))}</div>
+                      <div style={{fontSize:26,fontWeight:800,color:"#a85590"}}>{fmt(cerradas.reduce((s,c)=>{
+                        const fc=c.transporte==="aereo"?c.fecha_llegada_real:c.fecha_pago1_cliente;
+                        const m=fc?.substring(0,7);
+                        const nMes=cerradas.filter(x=>{
+                          const fx=x.transporte==="aereo"?x.fecha_llegada_real:x.fecha_pago1_cliente;
+                          return fx?.substring(0,7)===m;
+                        }).length;
+                        const pct=nMes>=6?0.25:0.20;
+                        return s+(c.calc?.ganImp||0)*pct;
+                      },0))}</div>
                     </div>
                   </div>
                 </div>
