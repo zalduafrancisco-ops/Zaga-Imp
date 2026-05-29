@@ -1624,6 +1624,7 @@ export default function App({ supabase, usuario, onLogout }){
   const [vistaOpCliente,setVistaOpCliente] = useState(null);
   const [vistaValidarId,setVistaValidarId] = useState(null); // ID de cot aérea para validar
   const [validarForm,setValidarForm]     = useState({}); // costos Chile editables + margen + precio acordado
+  const [moverCotId,setMoverCotId]       = useState(null); // ID de cot que se quiere mover a otra OP
   const [margenesPorCot,setMargenesPorCot] = useState({}); // {cotId: pct} margen objetivo por cot en panel OP
   // Notificaciones cots nuevas creadas por cliente (autoservicio portal cliente)
   const [cotsVistas,setCotsVistas] = useState(() => {
@@ -3077,6 +3078,99 @@ Número de seguimiento: ${c.nro}`;
       )}
 
       {/* MODAL VISTA VALIDAR — cotización aérea con desglose costos + precio sugerido */}
+      {/* MODAL MOVER COT A OTRA OP */}
+      {moverCotId && (()=>{
+        const cot = cotizaciones.find(x => x.id === moverCotId);
+        if (!cot) return null;
+        const opActual = operaciones.find(o => o.id === cot.operacion_id);
+        // OPs candidatas: abiertas (no cerradas), del mismo transporte, distintas a la actual
+        const OPS_CERRADAS = ["pagada","en_camino","en_bodega","completada","no_prospero"];
+        const opsCandidatas = operaciones.filter(o =>
+          o.id !== cot.operacion_id &&
+          !OPS_CERRADAS.includes(o.estado) &&
+          (!o.transporte || o.transporte === cot.transporte || cot.transporte === "ambos")
+        );
+        const cerrar = () => setMoverCotId(null);
+        const mover = async (opDestinoId) => {
+          if (!confirm(`¿Mover ${cot.nro} de ${opActual?.nro || "OP origen"} a ${operaciones.find(o=>o.id===opDestinoId)?.nro || "OP destino"}?\n\nLas dos OPs se recalculan automáticamente. El precio acordado al cliente NO cambia.`)) return;
+          try {
+            const opOrigenId = cot.operacion_id;
+            // 1. Actualizar cot.operacion_id
+            const cotNuevo = { ...cot, operacion_id: opDestinoId };
+            await supabase.from("cotizaciones").update({ datos: cotNuevo, updated_at: new Date().toISOString() }).eq("id", cot.id);
+            // 2. Sacar cot de OP origen
+            if (opOrigenId) {
+              const opOrigen = operaciones.find(o => o.id === opOrigenId);
+              if (opOrigen) {
+                const cotsActualizadas = (opOrigen.cotizaciones || []).filter(cid => cid !== cot.id);
+                const opOrigenNuevo = { ...opOrigen, cotizaciones: cotsActualizadas };
+                await supabase.from("operaciones").update({ datos: opOrigenNuevo, updated_at: new Date().toISOString() }).eq("id", opOrigenId);
+              }
+            }
+            // 3. Agregar cot a OP destino
+            const opDestino = operaciones.find(o => o.id === opDestinoId);
+            const cotsDestino = [...((opDestino.cotizaciones)||[]), cot.id];
+            const opDestinoNuevo = { ...opDestino, cotizaciones: cotsDestino };
+            await supabase.from("operaciones").update({ datos: opDestinoNuevo, updated_at: new Date().toISOString() }).eq("id", opDestinoId);
+            // 4. Actualizar state local
+            setCotizaciones(prev => prev.map(c => c.id === cot.id ? cotNuevo : c));
+            setOperaciones(prev => prev.map(o => {
+              if (o.id === opOrigenId) return { ...o, cotizaciones: (o.cotizaciones||[]).filter(cid => cid !== cot.id) };
+              if (o.id === opDestinoId) return { ...o, cotizaciones: [...((o.cotizaciones)||[]), cot.id] };
+              return o;
+            }));
+            showToast(`✓ ${cot.nro} movida a ${opDestino.nro}`);
+            cerrar();
+          } catch (err) {
+            showToast("⚠️ Error al mover: " + (err.message || "?"), "err");
+          }
+        };
+        return (
+          <div style={{position:"fixed",inset:0,background:"#000c",zIndex:1300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={e=>e.target===e.currentTarget&&cerrar()}>
+            <div style={{maxWidth:560,width:"100%",background:"#fff",borderRadius:14,padding:24,boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+                <div>
+                  <div style={{fontSize:11,color:"#94a3b8",letterSpacing:1.5,textTransform:"uppercase",fontWeight:700,marginBottom:4}}>🔄 Mover cotización</div>
+                  <div style={{fontSize:18,fontWeight:800,color:"#0f172a"}}>{cot.nro} · {cot.producto}</div>
+                  <div style={{fontSize:12,color:"#64748b",marginTop:2}}>👤 {cot.cliente} · {fmtN(cot.unidades)} und · {cot.transporte}</div>
+                </div>
+                <button onClick={cerrar} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"6px 12px",fontSize:13,cursor:"pointer"}}>✕</button>
+              </div>
+              <div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:8,padding:"10px 14px",fontSize:11,color:"#854d0e",marginBottom:14}}>
+                <b>📦 OP actual:</b> {opActual?.nro || "—"} (estado: {opActual?.estado || "—"})<br/>
+                <b>💡 Importante:</b> el precio acordado al cliente <b>no cambia</b>. Las dos OPs (origen y destino) recalculan automáticamente sus totales y share por CBM.
+              </div>
+              {opsCandidatas.length === 0 ? (
+                <div style={{padding:"24px 14px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,fontSize:12,color:"#c0392b",textAlign:"center"}}>
+                  <div style={{fontSize:22,marginBottom:6}}>⚠️</div>
+                  No hay OPs abiertas compatibles con el transporte {cot.transporte}.<br/>
+                  <span style={{fontSize:10,color:"#94a3b8",fontStyle:"italic"}}>(Las OPs cerradas — pagada, en camino, en bodega, completada — no pueden recibir cots nuevas.)</span>
+                </div>
+              ) : (
+                <div>
+                  <div style={{fontSize:11,color:"#64748b",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Selecciona OP destino ({opsCandidatas.length} disponibles)</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:360,overflowY:"auto"}}>
+                    {opsCandidatas.map(o => {
+                      const cotsOp = (o.cotizaciones||[]).map(cid => cotizaciones.find(x=>x.id===cid)).filter(Boolean);
+                      const undsOp = cotsOp.reduce((s,x)=>s + (Number(x.unidades)||0), 0);
+                      return (
+                        <button key={o.id} onClick={()=>mover(o.id)} style={{textAlign:"left",background:"#f8fafc",color:"#0f172a",border:"1px solid #e2e8f0",borderRadius:10,padding:"12px 14px",fontSize:12,cursor:"pointer",fontFamily:"inherit",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontWeight:800,color:"#0f172a",marginBottom:2}}>{o.nro} <span style={{fontSize:10,background:"#dbeafe",color:"#1e40af",borderRadius:4,padding:"1px 6px",marginLeft:6,fontWeight:600,textTransform:"uppercase"}}>{o.estado}</span></div>
+                            <div style={{fontSize:11,color:"#64748b"}}>{cotsOp.length} cots · {fmtN(undsOp)} unidades · transporte {o.transporte || "—"}</div>
+                          </div>
+                          <div style={{fontSize:18,color:"#92400e"}}>→</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {vistaValidarId && (()=>{
         const c = cotizaciones.find(x => x.id === vistaValidarId);
         if (!c) return null;
@@ -5601,6 +5695,7 @@ Número de seguimiento: ${c.nro}`;
                         }} style={{background:"#c4783022",color:"#c47830",border:"1px solid #c4783055",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700}}>🛬 Validar</button>}
                         {!isPropia&&<button onClick={()=>setVistaId(c.id)} style={{background:"#2a8aaa22",color:"#2a8aaa",border:"1px solid #06b6d433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📄 Vista cliente</button>}
                         <button onClick={()=>handleEdit(c)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>✏️ Editar</button>
+                        {c.operacion_id && <button onClick={()=>setMoverCotId(c.id)} title="Mover esta cotización a otra OP abierta (sin afectar el precio acordado al cliente)" style={{background:"#fef3c7",color:"#92400e",border:"1px solid #fde68a",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:600}}>🔄 Mover OP</button>}
                         <button onClick={()=>handleDuplicar(c)} title="Duplicar para crear variante del mismo producto" style={{background:"#eef6ff",color:"#2d78c8",border:"1px solid #bfdbfe",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>📋 Duplicar</button>
                         <button onClick={()=>handleDelete(c.id)} style={{background:"#fff1f2",color:"#c0392b",border:"1px solid #ef444433",borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>🗑</button>
                       </div>
