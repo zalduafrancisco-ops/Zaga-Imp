@@ -7944,9 +7944,10 @@ Número de seguimiento: ${c.nro}`;
               const mesAnterior=new Date(hoy.getFullYear(),hoy.getMonth()-1,1);
               const mesAnt=`${mesAnterior.getFullYear()}-${String(mesAnterior.getMonth()+1).padStart(2,"0")}`;
 
-              // Importaciones de Luisa con 1er pago recibido, agrupadas por mes
+              // Importaciones de Luisa con 1er pago recibido y ganancia calculada, agrupadas por mes.
+              // Excluye cots sin precio/costo cargado (ganImp=0) para no inflar el conteo con cots vacias.
               const luisaCerradas=cotizaciones.filter(c=>
-                c.gestor==="luisa"&&c.tipo!=="propia"&&c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["no_prospero"].includes(c.estado)
+                c.gestor==="luisa"&&c.tipo!=="propia"&&c.checklist?.pago1_cliente&&c.fecha_pago1_cliente&&!["no_prospero"].includes(c.estado)&&(Number(c.calc?.ganImp)||0)>0
               );
 
               // Agrupar por mes de fecha_pago1_cliente
