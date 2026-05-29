@@ -1198,7 +1198,12 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                               </div>
                             </div>
                           )}
-                          {tot>0&&!isRech&&precioValido&&<div style={{fontSize:14,fontWeight:800,color:"#040c18"}}>{fmt(tot)}</div>}
+                          {tot>0&&!isRech&&precioValido&&(
+                            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:1}}>
+                              <div style={{fontSize:14,fontWeight:800,color:"#040c18"}}>{fmt(tot)}</div>
+                              {und>0 && <div style={{fontSize:10,color:"#64748b",fontWeight:600}}>{fmt(tot/und)}/und</div>}
+                            </div>
+                          )}
                           {!precioValido&&!isRech&&<div style={{fontSize:10,color:"#94a3b8",fontStyle:"italic"}}>⏳ Cotizando</div>}
                           <div style={{fontSize:18,color:"#cbd5e1",transition:"transform .2s",transform:isOpen?"rotate(180deg)":"none"}}>⌄</div>
                         </div>
