@@ -7284,11 +7284,16 @@ Número de seguimiento: ${c.nro}`;
                                             <th title="Costo neto total + IVA aduana total prorrateado (recuperable F29). Es lo que sale de caja al momento del despacho para liberar esta cot." style={{padding:"7px 8px",textAlign:"right",fontWeight:700,cursor:"help",textDecoration:"underline dotted #14532d99"}}>Costo total c/IVA ℹ️</th>
                                             <th title="Precio neto por unidad × 1,19 (IVA al cliente)." style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#15803d",cursor:"help",textDecoration:"underline dotted #15803d99"}}>Precio /und c/IVA ℹ️</th>
                                             <th title="Lo que el cliente paga total en la factura (precio /und c/IVA × unidades)." style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#15803d",cursor:"help",textDecoration:"underline dotted #15803d99"}}>Venta total c/IVA ℹ️</th>
+                                            {op.consolidado_aplicado_cliente && <th style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#854d0e"}} title="Guardar el nuevo precio (acordado tras negociar con el cliente) solo para esta cot, sin tocar las demás.">Acción</th>}
                                           </tr>
                                         </thead>
                                         <tbody>
-                                          {detalles.map((d) => (
-                                            <tr key={d.cot.id} style={{borderTop:"1px solid #d1fae5"}}>
+                                          {detalles.map((d) => {
+                                            const precioActualBD = Number(d.cot.precio_final_acordado_und) || 0;
+                                            const precioNuevo = Math.round(d.precioIvaUnd);
+                                            const hayCambio = op.consolidado_aplicado_cliente && precioActualBD > 0 && Math.abs(precioActualBD - precioNuevo) > 0.5;
+                                          return (
+                                            <tr key={d.cot.id} style={{borderTop:"1px solid #d1fae5", background: hayCambio ? "#fef3c7" : "transparent"}}>
                                               <td style={{padding:"6px 8px",color:"#0f172a",fontWeight:700}}>
                                                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                                                   <span>{d.cot.nro}</span>
@@ -7306,10 +7311,40 @@ Número de seguimiento: ${c.nro}`;
                                               <td style={{padding:"6px 8px",textAlign:"right",color:"#475569"}}>{fmtN(d.und)}</td>
                                               <td style={{padding:"6px 8px",textAlign:"right",color:"#475569",fontWeight:600}}>{fmt(d.costoUndCIva)}</td>
                                               <td style={{padding:"6px 8px",textAlign:"right",color:"#0f172a",fontWeight:700}}>{fmt(d.costoConIvaAduana)}</td>
-                                              <td style={{padding:"6px 8px",textAlign:"right",color:"#15803d",fontWeight:700}}>{fmt(d.precioIvaUnd)}</td>
+                                              <td style={{padding:"6px 8px",textAlign:"right",color:"#15803d",fontWeight:700}}>
+                                                {fmt(d.precioIvaUnd)}
+                                                {hayCambio && <div style={{fontSize:9,color:"#a16207",fontWeight:500,marginTop:1}}>antes {fmt(precioActualBD)}</div>}
+                                              </td>
                                               <td style={{padding:"6px 8px",textAlign:"right",color:"#15803d",fontWeight:800}}>{fmt(d.totalIvaCliente)}</td>
+                                              {op.consolidado_aplicado_cliente && (
+                                                <td style={{padding:"6px 4px",textAlign:"center"}}>
+                                                  {hayCambio ? (
+                                                    <button
+                                                      onClick={async () => {
+                                                        try {
+                                                          const cotId = d.cot.id;
+                                                          const { data: fresca } = await supabase.from("cotizaciones").select("datos").eq("id", cotId).single();
+                                                          const datosMerged = { ...(fresca?.datos||d.cot), precio_final_acordado_und: precioNuevo };
+                                                          const { error } = await supabase.from("cotizaciones").update({ datos: datosMerged, updated_at: new Date().toISOString() }).eq("id", cotId);
+                                                          if (error) throw error;
+                                                          setCotizaciones(prev => prev.map(c => c.id===cotId ? { ...c, precio_final_acordado_und: precioNuevo } : c));
+                                                          showToast(`✓ ${d.cot.nro} precio actualizado: ${fmt(precioNuevo)}/und c/IVA`);
+                                                        } catch (err) {
+                                                          showToast("⚠️ Error: " + (err.message||"?"), "err");
+                                                        }
+                                                      }}
+                                                      title={`Guardar precio nuevo ${fmt(precioNuevo)} /und c/IVA solo para ${d.cot.nro}. NO toca las demás cots.`}
+                                                      style={{background:"#fbbf24",color:"#78350f",border:"1px solid #f59e0b",borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}
+                                                    >
+                                                      💾 Guardar
+                                                    </button>
+                                                  ) : (
+                                                    <span style={{fontSize:10,color:"#94a3b8"}}>—</span>
+                                                  )}
+                                                </td>
+                                              )}
                                             </tr>
-                                          ))}
+                                          );})}
                                           <tr style={{borderTop:"2px solid #16a34a",background:"#dcfce7"}}>
                                             <td style={{padding:"8px",fontSize:11,fontWeight:800,color:"#14532d"}}>TOTAL OP</td>
                                             <td style={{padding:"8px",textAlign:"right",fontWeight:800,color:"#14532d"}}>{fmtN(totUnd)}</td>
@@ -7317,13 +7352,15 @@ Número de seguimiento: ${c.nro}`;
                                             <td style={{padding:"8px",textAlign:"right",fontSize:13,fontWeight:800,color:"#0f172a"}}>{fmt(totCostoCIva)}</td>
                                             <td style={{padding:"8px",textAlign:"right",fontSize:10,color:"#475569",fontStyle:"italic"}}>(prom. {fmt(totUnd>0?totVentaIva/totUnd:0)})</td>
                                             <td style={{padding:"8px",textAlign:"right",fontSize:13,fontWeight:800,color:"#15803d"}}>{fmt(totVentaIva)}</td>
+                                            {op.consolidado_aplicado_cliente && <td style={{padding:"8px",textAlign:"center",fontSize:10,color:"#94a3b8"}}>—</td>}
                                           </tr>
                                         </tbody>
                                       </table>
                                     </div>
                                     <div style={{marginTop:8,fontSize:10,color:"#15803d",fontStyle:"italic",lineHeight:1.6}}>
                                       💡 <b>Costo c/IVA ≠ Costo × 1,19.</b> Es <b>Costo neto + IVA aduana proporcional</b> (sale de caja al despacho, recuperable F29). El IVA aduana solo grava el CIF (mercancía + flete + seguro), no la aduana chilena ni servicios del agente.<br/>
-                                      <b>Precio c/IVA</b> = precio neto × 1,19 (lo que el cliente paga en la factura). Pasa el mouse sobre los títulos ℹ️ para ver fórmulas.
+                                      <b>Precio c/IVA</b> = precio neto × 1,19 (lo que el cliente paga en la factura). Pasa el mouse sobre los títulos ℹ️ para ver fórmulas.<br/>
+                                      {op.consolidado_aplicado_cliente && <span><b>💾 Negociación individual:</b> si cambias el % util de una cot, aparece un botón "Guardar" en la columna Acción para actualizar SOLO ese precio (sin tocar las demás cots).</span>}
                                     </div>
                                   </div>
 
