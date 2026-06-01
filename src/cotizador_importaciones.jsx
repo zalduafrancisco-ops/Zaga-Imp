@@ -8893,13 +8893,21 @@ Número de seguimiento: ${c.nro}`;
                     {[...meses].reverse().map(m=>{
                       const {n,pct,base,com,emp,aereo,maritimo}=calcMes(porMes[m]);
                       const esPendiente=m===mesAnt&&hoy.getDate()<=5;
+                      // Pago/bonos del mes (mismos datos que panel admin)
+                      const pagoMes = pagosLuisa[m] || null;
+                      const bonosMes = pagoMes?.bonos || [];
+                      const totalBonos = bonosMes.reduce((s,b)=>s+(Number(b.monto)||0),0);
+                      const comisionConBonos = com + totalBonos;
+                      const yaPagado = !!pagoMes?.pagado;
+                      const isFrancisco = (usuario?.nombre||"").toLowerCase()==="francisco";
                       return(
                         <div key={m} style={{background:esPendiente?"#08121e":"#f8fafc",borderRadius:10,padding:"12px 16px",border:`1px solid ${esPendiente?"#c0392b33":"#1a2d45"}`}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
                             <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                               <span style={{fontWeight:700,fontSize:13,textTransform:"capitalize",color:esPendiente?"#c0392b":"#0f172a"}}>{monthLabel(m)}</span>
                               <span style={{background:n>=6?"#c9a05522":"#a8559022",color:n>=6?"#c9a055":"#a85590",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:`1px solid ${n>=6?"#c9a05544":"#a8559044"}`}}>{n} {n>=6?"cierres · 25% 🏆":"cierres · 20%"}</span>
-                              {esPendiente&&<span style={{background:"#c0392b18",color:"#c0392b",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:"1px solid #ef444433"}}>⚠ Pago pendiente</span>}
+                              {esPendiente&&!yaPagado&&<span style={{background:"#c0392b18",color:"#c0392b",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:"1px solid #ef444433"}}>⚠ Pago pendiente</span>}
+                              {yaPagado&&<span style={{background:"#dcfce7",color:"#15803d",fontSize:10,fontWeight:700,borderRadius:20,padding:"2px 8px",border:"1px solid #86efac"}}>✓ Pagado</span>}
                             </div>
                             <div style={{display:"flex",gap:20,alignItems:"center"}}>
                               <div style={{textAlign:"right"}}>
@@ -8945,6 +8953,77 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                             </div>
                           ))}
+
+                          {/* Bonos extra + accion pago */}
+                          <div style={{marginTop:12,paddingTop:10,borderTop:"1px dashed #cbd5e1"}}>
+                            {bonosMes.length>0 && (
+                              <div style={{marginBottom:8}}>
+                                <div style={{fontSize:9,color:"#b8922e",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>🎁 Bonos extra ({bonosMes.length})</div>
+                                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                                  {bonosMes.map((b,i)=>(
+                                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"4px 8px",background:"#fffbeb",borderRadius:6,border:"1px solid #fde68a"}}>
+                                      <span style={{color:"#92400e"}}>
+                                        {b.descripcion||"Bono"}{b.autor?<span style={{color:"#a16207",fontSize:10}}> · por {b.autor}</span>:null}
+                                      </span>
+                                      <span style={{display:"flex",alignItems:"center",gap:8}}>
+                                        <b style={{color:"#92400e"}}>+{fmt(Number(b.monto)||0)}</b>
+                                        {isFrancisco && !yaPagado && (
+                                          <button onClick={async()=>{
+                                            if(!confirm(`Eliminar bono "${b.descripcion||"sin descripcion"}" de ${fmt(Number(b.monto)||0)}?`)) return;
+                                            const nuevos = bonosMes.filter((_,j)=>j!==i);
+                                            const {data,error}=await supabase.from("pagos_luisa").upsert({mes:m,pagado:yaPagado,bonos:nuevos,updated_at:new Date().toISOString()},{onConflict:"mes"}).select().single();
+                                            if(error){showToast("Error: "+error.message,"err");return;}
+                                            setPagosLuisa(p=>({...p,[m]:data}));
+                                            showToast("✓ Bono eliminado");
+                                          }} style={{background:"transparent",border:"none",color:"#c0392b",cursor:"pointer",fontSize:11,padding:"0 4px"}} title="Eliminar bono">✕</button>
+                                        )}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {bonosMes.length>0 && (
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:"#a8559010",borderRadius:7,border:"1px solid #a8559033",marginBottom:8}}>
+                                <span style={{fontSize:11,fontWeight:700,color:"#a85590"}}>Total a pagar (comisión + bonos)</span>
+                                <span style={{fontSize:16,fontWeight:800,color:"#a85590"}}>{fmt(comisionConBonos)}</span>
+                              </div>
+                            )}
+
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                              <div style={{display:"flex",gap:6}}>
+                                {isFrancisco && !yaPagado && (
+                                  <button onClick={()=>{setBonoModalMes(m);setBonoForm({monto:"",descripcion:""});}} style={{background:"#fef3c7",color:"#92400e",border:"1px solid #fde68a",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700}} title="Solo Francisco puede agregar bonos">+ Bono extra</button>
+                                )}
+                              </div>
+                              <div>
+                                {yaPagado ? (
+                                  <div style={{display:"flex",alignItems:"center",gap:8,background:"#dcfce7",border:"1px solid #86efac",borderRadius:7,padding:"6px 12px"}}>
+                                    <span style={{fontSize:12,color:"#15803d",fontWeight:700}}>✓ Pagado el {pagoMes.fecha_pago ? new Date(pagoMes.fecha_pago).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"}) : "—"} · {fmt(Number(pagoMes.monto_pagado)||0)}</span>
+                                    {isFrancisco && (
+                                      <button onClick={async()=>{
+                                        if(!confirm("Revertir el pago de este mes?")) return;
+                                        const {data,error}=await supabase.from("pagos_luisa").upsert({mes:m,pagado:false,fecha_pago:null,monto_pagado:null,bonos:bonosMes,autor_pago:null,updated_at:new Date().toISOString()},{onConflict:"mes"}).select().single();
+                                        if(error){showToast("Error: "+error.message,"err");return;}
+                                        setPagosLuisa(p=>({...p,[m]:data}));
+                                        showToast("Pago revertido");
+                                      }} style={{background:"transparent",border:"none",color:"#15803d",cursor:"pointer",fontSize:10,textDecoration:"underline",padding:0}} title="Revertir pago (solo Francisco)">revertir</button>
+                                    )}
+                                  </div>
+                                ) : isFrancisco ? (
+                                  <button onClick={async()=>{
+                                    const fechaHoy=new Date().toISOString().split("T")[0];
+                                    if(!confirm(`Marcar como pagado el mes de ${monthLabel(m)} por ${fmt(comisionConBonos)}?`)) return;
+                                    const {data,error}=await supabase.from("pagos_luisa").upsert({mes:m,pagado:true,fecha_pago:fechaHoy,monto_pagado:comisionConBonos,bonos:bonosMes,autor_pago:usuario?.nombre||"admin",updated_at:new Date().toISOString()},{onConflict:"mes"}).select().single();
+                                    if(error){showToast("Error: "+error.message,"err");return;}
+                                    setPagosLuisa(p=>({...p,[m]:data}));
+                                    showToast(`✓ Comisión ${monthLabel(m)} marcada como pagada`);
+                                  }} style={{background:"#a85590",color:"#fff",border:"none",borderRadius:7,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700}}>💸 Marcar como pagado</button>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
