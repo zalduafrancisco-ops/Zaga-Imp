@@ -7973,10 +7973,11 @@ Número de seguimiento: ${c.nro}`;
                   // Aéreo: solo cuando completada (mercancia ya llego a Chile)
                   return c.estado === "completada" && c.fecha_llegada_real;
                 }
-                // Marítimo: requiere flag pago1 + estado coherente (post-pago).
-                // Si flag=true pero estado=cotizada (inconsistencia), no cuenta.
-                const ESTADOS_POST_PAGO1 = ["pagada","en_camino","en_bodega","completada"];
-                return c.checklist?.pago1_cliente && c.fecha_pago1_cliente && ESTADOS_POST_PAGO1.includes(c.estado);
+                // Marítimo: estado es la fuente de verdad. El flag pago1 quedo legacy
+                // (ya no se usa el concepto de pago1/pago2, solo pagada -> completada).
+                // fecha_pago1_cliente se sigue auto-seteando al pasar a "pagada".
+                const ESTADOS_DEVENGO = ["pagada","en_camino","en_bodega","completada"];
+                return ESTADOS_DEVENGO.includes(c.estado) && c.fecha_pago1_cliente;
               });
 
               // Agrupar por mes (criterio diferente segun transporte)
@@ -8572,14 +8573,16 @@ Número de seguimiento: ${c.nro}`;
 
           const todas=cotizaciones.filter(c=>c.gestor==="luisa"&&c.tipo!=="propia");
           const enProceso=todas.filter(c=>["solicitud","cotizada","pagada","en_camino"].includes(c.estado));
-          // Cerradas (devengo): marítimas al confirmar pago1; aéreas al completar (llegada real).
-          // Excluye ganImp<=0, rechazadas e inconsistencias (flag pago1 con estado=cotizada).
+          // Cerradas (devengo): marítimas cuando pasan a estado "pagada" o posterior;
+          // aéreas cuando completan (llegada real). Excluye ganImp<=0 y rechazadas.
+          // Nota: ya no usamos el flag pago1_cliente (era concepto legacy de pago 30/70).
+          // fecha_pago1_cliente sigue siendo el campo de fecha — se auto-setea al pasar a "pagada".
           const cerradas=todas.filter(c=>{
             if(["no_prospero"].includes(c.estado)) return false;
             if((Number(c.calc?.ganImp)||0)<=0) return false;
             if(c.transporte==="aereo") return c.estado==="completada" && c.fecha_llegada_real;
-            const ESTADOS_POST_PAGO1 = ["pagada","en_camino","en_bodega","completada"];
-            return c.checklist?.pago1_cliente && c.fecha_pago1_cliente && ESTADOS_POST_PAGO1.includes(c.estado);
+            const ESTADOS_DEVENGO = ["pagada","en_camino","en_bodega","completada"];
+            return ESTADOS_DEVENGO.includes(c.estado) && c.fecha_pago1_cliente;
           });
           const completadas=todas.filter(c=>c.estado==="completada");
 
