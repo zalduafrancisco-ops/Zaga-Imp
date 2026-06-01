@@ -248,12 +248,22 @@ function calcCliente(d) {
   const gan1=pago100?ganImp:(dCl-tCh*pDep)+difCom, gan2=pago100?0:(prCl-tCh*(1-pDep))+serv;
 
   // ── Ajuste manual: si hay precio_final_acordado_und, sobrescribe totClIva y ajusta margen ──
+  // REGLA: el precio acordado solo "manda" cuando el flujo lo fija explicitamente:
+  //   - aereo: validado con boton (precio queda fijo)
+  //   - validada_admin: flag explicito
+  //   - consolidado_aplicado_cliente: OP consolidada aplicada
+  // En maritimo sin OP / sin validar, el precio se ajusta dinamico con el margen (negociacion en curso).
   const precioFinalAcordadoUnd = Number(d.precio_final_acordado_und) || 0;
   const precioFinalAcordadoTotal = precioFinalAcordadoUnd > 0 && u > 0 ? precioFinalAcordadoUnd * u : 0;
+  const overrideValido = (
+    d.transporte === "aereo" ||
+    d.validada_admin === true ||
+    d.consolidado_aplicado_cliente === true
+  );
   let totClIvaFinal = totClIva;
   let ajusteManual = 0;
   let ganImpAjustado = ganImp;
-  if (precioFinalAcordadoTotal > 0) {
+  if (precioFinalAcordadoTotal > 0 && overrideValido) {
     totClIvaFinal = precioFinalAcordadoTotal;
     // El ajuste va al margen: diff entre acordado y calculado (ambos c/IVA), pasado a neto
     const totClFinalNeto = precioFinalAcordadoTotal / 1.19;
@@ -2636,8 +2646,10 @@ Número de seguimiento: ${c.nro}`;
               const isAereo = cot.transporte === "aereo";
               // IVA: aéreo siempre lleva IVA; marítimo respeta flag con_iva del form
               const conIva = isAereo || !!cot.con_iva;
-              // Precio: usar acordado si existe, sino calcular según conIva
-              const precioAcordadoUnd = Number(cot.precio_final_acordado_und) || 0;
+              // Precio: usar acordado si existe Y el flujo lo fija (aereo/validada/consolidado aplicado);
+              // en maritimo standalone el precio sigue el calculo dinamico (negociacion)
+              const overrideValido = isAereo || cot.validada_admin === true || cot.consolidado_aplicado_cliente === true;
+              const precioAcordadoUnd = overrideValido ? (Number(cot.precio_final_acordado_und) || 0) : 0;
               const totClConIva = Number(cot.calc?.totClIvaFinal) || Number(cot.calc?.totClIva) || (Number(cot.calc?.totCl)||0)*1.19 || 0;
               const totClSinIva = Number(cot.calc?.totCl) || 0;
               const totalFinal = precioAcordadoUnd > 0 ? precioAcordadoUnd * u : (conIva ? totClConIva : totClSinIva);
@@ -3773,7 +3785,8 @@ Número de seguimiento: ${c.nro}`;
         const isAereo = cot.transporte === "aereo";
         // IVA: aéreo siempre lleva IVA; marítimo respeta flag con_iva
         const conIva = isAereo || !!cot.con_iva;
-        const precioAcordadoUnd = Number(cot.precio_final_acordado_und) || 0;
+        const overrideValido = isAereo || cot.validada_admin === true || cot.consolidado_aplicado_cliente === true;
+        const precioAcordadoUnd = overrideValido ? (Number(cot.precio_final_acordado_und) || 0) : 0;
         const totClConIva = Number(cot.calc?.totClIvaFinal) || Number(cot.calc?.totClIva) || (Number(cot.calc?.totCl)||0)*1.19 || 0;
         const totClSinIva = Number(cot.calc?.totCl) || 0;
         const totalFinal = precioAcordadoUnd > 0 ? precioAcordadoUnd * u : (conIva ? totClConIva : totClSinIva);
@@ -5436,9 +5449,11 @@ Número de seguimiento: ${c.nro}`;
                               .map(([l,v,col])=>(<div key={l} style={{textAlign:"center"}}><div style={{fontSize:10,color:"#444",marginBottom:2}}>{l}</div><div style={{fontSize:12,fontWeight:600,color:col}}>{v}</div></div>))
                           : c.pago_100
                           ? (() => {
-                              // Cliente = precio acordado c/IVA si existe, sino calc.p1ClIva
-                              const totClienteCIva = Number(c.precio_final_acordado_und) > 0 && Number(c.unidades) > 0
-                                ? Number(c.precio_final_acordado_und) * Number(c.unidades)
+                              // Cliente = precio acordado c/IVA si existe Y el flujo lo fija; sino calc dinamico
+                              const overrideValido = c.transporte === "aereo" || c.validada_admin === true || c.consolidado_aplicado_cliente === true;
+                              const precioAcd = overrideValido ? (Number(c.precio_final_acordado_und) || 0) : 0;
+                              const totClienteCIva = precioAcd > 0 && Number(c.unidades) > 0
+                                ? precioAcd * Number(c.unidades)
                                 : (c.calc.p1ClIva || c.calc.p1Cl || 0);
                               const totChina = c.calc.p1Ch || c.calc.tCh || 0;
                               return (

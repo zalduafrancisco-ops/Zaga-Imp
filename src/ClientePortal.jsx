@@ -1119,10 +1119,17 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                   var bg = EST_BG[c.estado]||"#eff6ff"
                   var label = getEstLabel(c)
                   var cl = c.calc; var conIva = !!c.con_iva
-                  // Si admin fijó precio_final_acordado_und, usarlo como fuente de verdad para los montos.
-                  // (Override del calculado: prioriza lo que el cliente efectivamente pagó.)
+                  // Si admin fijó precio_final_acordado_und, usarlo como fuente de verdad para los montos
+                  // SOLO cuando el flujo lo fija explicitamente: aereo, validada, consolidado aplicado, o ya en proceso de pago.
+                  // En maritimo standalone "cotizada" el precio se ajusta dinamico con la negociacion.
                   var und = Number(c.unidades)||0
-                  var totAcordado = (Number(c.precio_final_acordado_und)>0 && und>0) ? Number(c.precio_final_acordado_und)*und : null
+                  var _overrideValido = (
+                    c.transporte === "aereo" ||
+                    c.validada_admin === true ||
+                    c.consolidado_aplicado_cliente === true ||
+                    ['pagada','en_camino','en_bodega','completada'].includes(c.estado)
+                  )
+                  var totAcordado = (_overrideValido && Number(c.precio_final_acordado_und)>0 && und>0) ? Number(c.precio_final_acordado_und)*und : null
                   var pctDep = (Number(c.pct_deposito)||30)/100
                   var p1, p2, tot
                   if(totAcordado!==null){
