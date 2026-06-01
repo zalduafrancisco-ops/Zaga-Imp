@@ -1590,6 +1590,8 @@ export default function App({ supabase, usuario, onLogout }){
   const cotizacionesRef = useRef([]);
   // Operaciones consolidadas (aéreas)
   const [operaciones, setOperaciones] = useState([]);
+  // Pagos de comisiones Luisa por mes (key: "YYYY-MM" → {pagado, fecha_pago, monto_pagado, bonos, notas})
+  const [pagosLuisa, setPagosLuisa] = useState({});
   const [opEditId, setOpEditId] = useState(null);          // operación en edición
   const [opOpenId, setOpOpenId] = useState(null);          // operación expandida en lista
   const [opForm, setOpForm] = useState(null);              // formulario operación
@@ -1665,6 +1667,9 @@ export default function App({ supabase, usuario, onLogout }){
   const [resumenChina,setResumenChina] = useState(null);
   const [backupModal,setBackupModal] = useState(null); // null | "export" | "import"
   const [simModal,setSimModal]       = useState(false);
+  // Bono/pago Luisa: mes que se esta editando + form temporal
+  const [bonoModalMes,setBonoModalMes] = useState(null);
+  const [bonoForm,setBonoForm]         = useState({monto:"",descripcion:""});
   // Contabilidad — selector mes (formato YYYY-MM) y submodo maritimo/aereo
   const [contMes, setContMes]        = useState(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;});
   const [contModo, setContModo]      = useState("maritimo"); // "maritimo" | "aereo"
@@ -1728,6 +1733,14 @@ export default function App({ supabase, usuario, onLogout }){
         setOperaciones(opData.map(r=>({...r.datos,id:r.id,_created:r.created_at,_updated:r.updated_at})));
       }
     }catch(e){ /* tabla operaciones puede no existir aún */ }
+    try{
+      const {data:pagosData}=await supabase.from("pagos_luisa").select("*");
+      if(pagosData&&Array.isArray(pagosData)){
+        const map={};
+        pagosData.forEach(p=>{ map[p.mes]=p; });
+        setPagosLuisa(map);
+      }
+    }catch(e){ /* tabla pagos_luisa puede no existir aún */ }
     setCargando(false);
   };
 
@@ -8066,6 +8079,13 @@ Número de seguimiento: ${c.nro}`;
                       const {pct,aereo,maritimo,comisionTotal,baseTotal,nroTotal}=calcComisionMes(lista);
                       const ganEmpresa=baseTotal-comisionTotal;
                       const esMesAnt=m===mesAnt;
+                      // Pago/bonos del mes
+                      const pagoMes = pagosLuisa[m] || null;
+                      const bonosMes = pagoMes?.bonos || [];
+                      const totalBonos = bonosMes.reduce((s,b)=>s+(Number(b.monto)||0),0);
+                      const comisionConBonos = comisionTotal + totalBonos;
+                      const yaPagado = !!pagoMes?.pagado;
+                      const isFrancisco = (usuario?.nombre||"").toLowerCase()==="francisco";
                       return(
                         <div key={m} style={{background:"#ffffff",borderRadius:10,padding:"12px 16px",border:`1px solid ${esMesAnt?"#e9d5ff":"#e2e8f0"}`}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:10}}>
@@ -8114,6 +8134,78 @@ Número de seguimiento: ${c.nro}`;
                               </div>
                             </div>
                           ))}
+
+                          {/* Bonos extra + accion pago */}
+                          <div style={{marginTop:12,paddingTop:10,borderTop:"1px dashed #e2e8f0"}}>
+                            {bonosMes.length>0 && (
+                              <div style={{marginBottom:8}}>
+                                <div style={{fontSize:10,color:"#b8922e",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>🎁 Bonos extra ({bonosMes.length})</div>
+                                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                                  {bonosMes.map((b,i)=>(
+                                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"4px 8px",background:"#fffbeb",borderRadius:6,border:"1px solid #fde68a"}}>
+                                      <span style={{color:"#92400e"}}>
+                                        {b.descripcion||"Bono"}{b.autor?<span style={{color:"#a16207",fontSize:10}}> · por {b.autor}</span>:null}
+                                      </span>
+                                      <span style={{display:"flex",alignItems:"center",gap:8}}>
+                                        <b style={{color:"#92400e"}}>+{fmt(Number(b.monto)||0)}</b>
+                                        {isFrancisco && !yaPagado && (
+                                          <button onClick={async()=>{
+                                            if(!confirm(`Eliminar bono "${b.descripcion||"sin descripcion"}" de ${fmt(Number(b.monto)||0)}?`)) return;
+                                            const nuevos = bonosMes.filter((_,j)=>j!==i);
+                                            const {data,error}=await supabase.from("pagos_luisa").upsert({mes:m,pagado:yaPagado,bonos:nuevos,updated_at:new Date().toISOString()},{onConflict:"mes"}).select().single();
+                                            if(error){showToast("Error: "+error.message,"err");return;}
+                                            setPagosLuisa(p=>({...p,[m]:data}));
+                                            showToast("✓ Bono eliminado");
+                                          }} style={{background:"transparent",border:"none",color:"#c0392b",cursor:"pointer",fontSize:11,padding:"0 4px"}} title="Eliminar bono">✕</button>
+                                        )}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Linea TOTAL FINAL si hay bonos */}
+                            {bonosMes.length>0 && (
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:"#a8559010",borderRadius:7,border:"1px solid #a8559033",marginBottom:8}}>
+                                <span style={{fontSize:12,fontWeight:700,color:"#a85590"}}>Total a pagar (comisión + bonos)</span>
+                                <span style={{fontSize:17,fontWeight:800,color:"#a85590"}}>{fmt(comisionConBonos)}</span>
+                              </div>
+                            )}
+
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                              <div style={{display:"flex",gap:6}}>
+                                {isFrancisco && !yaPagado && (
+                                  <button onClick={()=>{setBonoModalMes(m);setBonoForm({monto:"",descripcion:""});}} style={{background:"#fef3c7",color:"#92400e",border:"1px solid #fde68a",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700}} title="Solo Francisco puede agregar bonos">+ Bono extra</button>
+                                )}
+                              </div>
+                              <div>
+                                {yaPagado ? (
+                                  <div style={{display:"flex",alignItems:"center",gap:8,background:"#dcfce7",border:"1px solid #86efac",borderRadius:7,padding:"6px 12px"}}>
+                                    <span style={{fontSize:13,color:"#15803d",fontWeight:700}}>✓ Pagado el {pagoMes.fecha_pago ? new Date(pagoMes.fecha_pago).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"}) : "—"} · {fmt(Number(pagoMes.monto_pagado)||0)}</span>
+                                    {isFrancisco && (
+                                      <button onClick={async()=>{
+                                        if(!confirm("Revertir el pago de este mes?")) return;
+                                        const {data,error}=await supabase.from("pagos_luisa").upsert({mes:m,pagado:false,fecha_pago:null,monto_pagado:null,bonos:bonosMes,autor_pago:null,updated_at:new Date().toISOString()},{onConflict:"mes"}).select().single();
+                                        if(error){showToast("Error: "+error.message,"err");return;}
+                                        setPagosLuisa(p=>({...p,[m]:data}));
+                                        showToast("Pago revertido");
+                                      }} style={{background:"transparent",border:"none",color:"#15803d",cursor:"pointer",fontSize:10,textDecoration:"underline",padding:0}} title="Revertir pago (solo Francisco)">revertir</button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <button onClick={async()=>{
+                                    const fechaHoy=new Date().toISOString().split("T")[0];
+                                    if(!confirm(`Marcar como pagado el mes de ${monthLabel(m)} por ${fmt(comisionConBonos)}?`)) return;
+                                    const {data,error}=await supabase.from("pagos_luisa").upsert({mes:m,pagado:true,fecha_pago:fechaHoy,monto_pagado:comisionConBonos,bonos:bonosMes,autor_pago:usuario?.nombre||"admin",updated_at:new Date().toISOString()},{onConflict:"mes"}).select().single();
+                                    if(error){showToast("Error: "+error.message,"err");return;}
+                                    setPagosLuisa(p=>({...p,[m]:data}));
+                                    showToast(`✓ Comisión ${monthLabel(m)} marcada como pagada`);
+                                  }} style={{background:"#a85590",color:"#fff",border:"none",borderRadius:7,padding:"7px 14px",fontSize:12,cursor:"pointer",fontWeight:700}}>💸 Marcar como pagado</button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
@@ -8176,6 +8268,48 @@ Número de seguimiento: ${c.nro}`;
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ══ MODAL AGREGAR BONO LUISA (solo Francisco) ══ */}
+        {bonoModalMes && (usuario?.nombre||"").toLowerCase()==="francisco" && (
+          <div style={{position:"fixed",inset:0,background:"#000c",zIndex:1600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+            <div style={{background:"#ffffff",borderRadius:14,border:"1px solid #fde68a",width:"100%",maxWidth:480,padding:24}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:15,color:"#92400e"}}>🎁 Agregar bono extra — {monthLabel(bonoModalMes)}</div>
+                  <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Suma al pago de comisión del mes</div>
+                </div>
+                <button onClick={()=>setBonoModalMes(null)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:13}}>✕</button>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                <div>
+                  <label style={{display:"block",fontSize:10,color:"#92400e",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Monto (CLP)</label>
+                  <input type="number" autoFocus value={bonoForm.monto} onChange={e=>setBonoForm(p=>({...p,monto:e.target.value}))} placeholder="Ej: 100000" style={{width:"100%",background:"#fffbeb",border:"1px solid #fde68a",borderRadius:8,padding:"10px 12px",fontSize:15,fontWeight:700,color:"#92400e",outline:"none",boxSizing:"border-box"}}/>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:10,color:"#92400e",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Descripción</label>
+                  <input type="text" value={bonoForm.descripcion} onChange={e=>setBonoForm(p=>({...p,descripcion:e.target.value}))} placeholder="Ej: Bono cierre trimestral, premio cliente nuevo, etc" style={{width:"100%",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:8,padding:"10px 12px",fontSize:13,color:"#0f172a",outline:"none",boxSizing:"border-box"}}/>
+                </div>
+              </div>
+              <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:18}}>
+                <button onClick={()=>setBonoModalMes(null)} style={{background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:7,padding:"8px 14px",fontSize:12,cursor:"pointer",fontWeight:600}}>Cancelar</button>
+                <button onClick={async()=>{
+                  const monto=Number(bonoForm.monto)||0;
+                  if(monto<=0){showToast("El monto debe ser mayor a 0","err");return;}
+                  if(!bonoForm.descripcion.trim()){showToast("Agregá una descripción","err");return;}
+                  const m=bonoModalMes;
+                  const actual=pagosLuisa[m]||{mes:m,pagado:false,bonos:[]};
+                  const nuevoBono={monto,descripcion:bonoForm.descripcion.trim(),fecha:new Date().toISOString().split("T")[0],autor:usuario?.nombre||"Francisco"};
+                  const bonosNuevos=[...(actual.bonos||[]),nuevoBono];
+                  const {data,error}=await supabase.from("pagos_luisa").upsert({mes:m,pagado:actual.pagado||false,bonos:bonosNuevos,updated_at:new Date().toISOString()},{onConflict:"mes"}).select().single();
+                  if(error){showToast("Error: "+error.message,"err");return;}
+                  setPagosLuisa(p=>({...p,[m]:data}));
+                  setBonoModalMes(null);
+                  showToast(`✓ Bono ${fmt(monto)} agregado a ${monthLabel(m)}`);
+                }} style={{background:"#92400e",color:"#fff",border:"none",borderRadius:7,padding:"8px 16px",fontSize:12,cursor:"pointer",fontWeight:700}}>Guardar bono</button>
+              </div>
+            </div>
           </div>
         )}
 
