@@ -7973,8 +7973,10 @@ Número de seguimiento: ${c.nro}`;
                   // Aéreo: solo cuando completada (mercancia ya llego a Chile)
                   return c.estado === "completada" && c.fecha_llegada_real;
                 }
-                // Marítimo: cuando se confirma pago1 del cliente
-                return c.checklist?.pago1_cliente && c.fecha_pago1_cliente;
+                // Marítimo: requiere flag pago1 + estado coherente (post-pago).
+                // Si flag=true pero estado=cotizada (inconsistencia), no cuenta.
+                const ESTADOS_POST_PAGO1 = ["pagada","en_camino","en_bodega","completada"];
+                return c.checklist?.pago1_cliente && c.fecha_pago1_cliente && ESTADOS_POST_PAGO1.includes(c.estado);
               });
 
               // Agrupar por mes (criterio diferente segun transporte)
@@ -8571,12 +8573,13 @@ Número de seguimiento: ${c.nro}`;
           const todas=cotizaciones.filter(c=>c.gestor==="luisa"&&c.tipo!=="propia");
           const enProceso=todas.filter(c=>["solicitud","cotizada","pagada","en_camino"].includes(c.estado));
           // Cerradas (devengo): marítimas al confirmar pago1; aéreas al completar (llegada real).
-          // Excluye ganImp<=0 y rechazadas.
+          // Excluye ganImp<=0, rechazadas e inconsistencias (flag pago1 con estado=cotizada).
           const cerradas=todas.filter(c=>{
             if(["no_prospero"].includes(c.estado)) return false;
             if((Number(c.calc?.ganImp)||0)<=0) return false;
             if(c.transporte==="aereo") return c.estado==="completada" && c.fecha_llegada_real;
-            return c.checklist?.pago1_cliente && c.fecha_pago1_cliente;
+            const ESTADOS_POST_PAGO1 = ["pagada","en_camino","en_bodega","completada"];
+            return c.checklist?.pago1_cliente && c.fecha_pago1_cliente && ESTADOS_POST_PAGO1.includes(c.estado);
           });
           const completadas=todas.filter(c=>c.estado==="completada");
 
