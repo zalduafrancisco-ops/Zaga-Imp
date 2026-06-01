@@ -155,7 +155,9 @@ function calcCliente(d) {
   const conFact=!!d.requiere_factura, conIva = isAereo ? true : !!d.con_iva, pago100 = isAereo ? true : !!d.pago_100;
   // Modelo marítimo v2: cots NUEVAS (desde 2026-05-24) → comisión calculada 6.5% sobre china,
   // no se ingresa manual. Cots viejas (sin modelo_v2) → comR manual como siempre.
-  const esV2Mar = !isAereo && !pago100 && d.modelo_v2 === true;
+  // V2 aplica igual con pago_100 (sin servicio, margen por volumen); la comisión prestamo
+  // se anula porque no hay saldo aplazado.
+  const esV2Mar = !isAereo && d.modelo_v2 === true;
   const comREff = pago100 ? 0 : (esV2Mar ? (pCh * u * (1-pDep) * 0.065) : comR);
 
   // ── CDA aéreo: solo NETOS que se trasladan al cliente como ítem en factura ──
@@ -4148,10 +4150,10 @@ Número de seguimiento: ${c.nro}`;
                 ) : (
                   <BLOCK title="🇨🇳 Cotización China" accent="#2d78c8">
                     {(()=>{
-                      const esMaritimoV2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !form.pago_100;
+                      const esMaritimoV2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos");
                       return esMaritimoV2 && (
                         <div style={{fontSize:11,color:"#5b21b6",background:"#faf5ff",borderRadius:8,padding:"8px 12px",border:"1px solid #e9d5ff",marginBottom:10}}>
-                          ✨ <b>Modelo marítimo v2:</b> margen sugerido según volumen (&lt;1.000 und → 20% · 1.000–1.999 → 15% · ≥2.000 → 10%) · comisión 6.5% calculada automática · sin ítem servicio.
+                          ✨ <b>Modelo marítimo v2:</b> margen sugerido según volumen (&lt;1.000 und → 20% · 1.000–1.999 → 15% · ≥2.000 → 10%){form.pago_100 ? " · sin servicio ni comisión préstamo (pago 100%)" : " · comisión 6.5% calculada automática · sin ítem servicio"}.
                         </div>
                       );
                     })()}
@@ -4436,9 +4438,9 @@ Número de seguimiento: ${c.nro}`;
                       </div>
                     )}
                     {(()=>{
-                      const esMaritimoV2_PV = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !form.pago_100;
+                      const esMaritimoV2_PV = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos");
                       // V1: muestra "Precio de venta al cliente" (precio + margen calculado).
-                      // V2: oculto, se reemplaza por el bloque % Margen abajo.
+                      // V2: oculto, se reemplaza por el bloque % Margen abajo (aplica tambien con pago_100).
                       if (esMaritimoV2_PV) return null;
                       return (
                     <div style={{background:"#f0fdf4",borderRadius:9,padding:"12px 14px",marginBottom:14,border:"1px solid #1aa35844"}}>
@@ -4480,8 +4482,8 @@ Número de seguimiento: ${c.nro}`;
                       );
                     })()}
 
-                    {/* V2 marítimo: bloque ajuste de % margen (reemplaza ajuste por precio final) */}
-                    {form.modelo_v2===true && (form.transporte==="maritimo"||form.transporte==="ambos") && !form.pago_100 && Number(form.precio_china)>0 && Number(form.unidades)>0 && (()=>{
+                    {/* V2 marítimo: bloque ajuste de % margen (reemplaza ajuste por precio final). Aplica tambien con pago_100. */}
+                    {form.modelo_v2===true && (form.transporte==="maritimo"||form.transporte==="ambos") && Number(form.precio_china)>0 && Number(form.unidades)>0 && (()=>{
                       const pCh = Number(form.precio_china)||0;
                       const mar = Number(form.margen_und)||0;
                       const u = Number(form.unidades)||0;
@@ -4607,8 +4609,8 @@ Número de seguimiento: ${c.nro}`;
                     })()}
 
                     {(()=>{
-                      const esMaritimoV2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !form.pago_100;
-                      // V2: ocultar % servicio (eliminado) y % comisión préstamo (fijo 6.5%)
+                      const esMaritimoV2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos");
+                      // V2: ocultar % servicio (eliminado) y % comisión préstamo (fijo 6.5% si no pago_100, 0 si pago_100)
                       if (esMaritimoV2) return null;
                       return (
                         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
@@ -4708,7 +4710,7 @@ Número de seguimiento: ${c.nro}`;
 
                 {/* TABLA 2: según tipo */}
                 {form.tipo==="cliente"&&(()=>{
-                  const esMaritimoV2_T2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !form.pago_100 && !calcActual.isAereo;
+                  const esMaritimoV2_T2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !calcActual.isAereo;
                   return (
                   <BLOCK title="📄 Tabla 2 — Cotización al Cliente" accent="#1aa358">
                     <ROW label="Precio por unidad (China + margen)" value={fmt(calcActual.pCUnd)} accent="#1aa358" big/>
@@ -4783,7 +4785,7 @@ Número de seguimiento: ${c.nro}`;
 
                 {/* TABLA 3: GANANCIA */}
                 {form.tipo==="cliente"&&(()=>{
-                  const esMaritimoV2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !form.pago_100 && !calcActual.isAereo;
+                  const esMaritimoV2 = form.modelo_v2 === true && (form.transporte === "maritimo" || form.transporte === "ambos") && !calcActual.isAereo;
                   return (
                   <div style={{background:"#fffbeb",borderRadius:12,padding:20,marginBottom:16,border:"1px solid #fde68a"}}>
                     <div style={{fontSize:11,color:"#c9a055",letterSpacing:2,fontWeight:700,marginBottom:14,textTransform:"uppercase"}}>⭐ Tabla 3 — Resumen Ganancia ZAGA</div>
