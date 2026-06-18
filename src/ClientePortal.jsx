@@ -504,9 +504,18 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     if(!c.calc) return s
     return s+(c.con_iva?(c.calc.totClIva||c.calc.totCl||0):(c.calc.totCl||0))
   },0)
-  // Saldo pendiente: suma del 2do pago de cots con 1er pago confirmado pero 2do pago NO confirmado
-  // (excluye pago_100 porque en ese caso no hay 2do pago). Replica la lógica de cálculo p2 del render individual.
-  var conSaldoPendiente = todas.filter(function(c){ return c.checklist&&c.checklist.pago1_cliente&&!c.checklist.pago2_cliente&&!c.pago_100 })
+  // Saldo pendiente: solo cuenta cuando la importación está REALMENTE en proceso de pago.
+  // Estados válidos: pagada_china (Pagada/Importando), en_camino, en_bodega.
+  // Excluye estados que no tienen sentido como "saldo pendiente": cotizada/aceptada (1er pago aún
+  // no debería estar), completada (ya pagó todo), rechazada/anulada/no_procesada (canceladas).
+  // También excluye pago_100 porque en ese caso no hay 2do pago.
+  var ESTADOS_CON_SALDO = ['pagada_china','en_camino','en_bodega']
+  var conSaldoPendiente = todas.filter(function(c){
+    return ESTADOS_CON_SALDO.includes(c.estado)
+      && c.checklist&&c.checklist.pago1_cliente
+      && !c.checklist.pago2_cliente
+      && !c.pago_100
+  })
   var saldoPendiente = conSaldoPendiente.reduce(function(s,c){
     var und = Number(c.unidades)||0
     var _overrideValido = (
