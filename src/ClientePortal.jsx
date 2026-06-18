@@ -504,6 +504,26 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
     if(!c.calc) return s
     return s+(c.con_iva?(c.calc.totClIva||c.calc.totCl||0):(c.calc.totCl||0))
   },0)
+  // Saldo pendiente: suma del 2do pago de cots con 1er pago confirmado pero 2do pago NO confirmado
+  // (excluye pago_100 porque en ese caso no hay 2do pago). Replica la lógica de cálculo p2 del render individual.
+  var conSaldoPendiente = todas.filter(function(c){ return c.checklist&&c.checklist.pago1_cliente&&!c.checklist.pago2_cliente&&!c.pago_100 })
+  var saldoPendiente = conSaldoPendiente.reduce(function(s,c){
+    var und = Number(c.unidades)||0
+    var _overrideValido = (
+      c.transporte === "aereo" ||
+      c.validada_admin === true ||
+      c.consolidado_aplicado_cliente === true ||
+      ['pagada','en_camino','en_bodega','completada'].includes(c.estado)
+    )
+    var totAcordado = (_overrideValido && Number(c.precio_final_acordado_und)>0 && und>0) ? Number(c.precio_final_acordado_und)*und : null
+    if(totAcordado!==null){
+      var pctDep = (Number(c.pct_deposito)||30)/100
+      return s + totAcordado*(1-pctDep)
+    }
+    if(!c.calc) return s
+    return s + (c.con_iva?(c.calc.p2ClIva||c.calc.p2Cl||0):(c.calc.p2Cl||0))
+  },0)
+  var countSaldoPendiente = conSaldoPendiente.length
   // "Pendientes de confirmación" = cliente recibió cotización pero aún no confirmó pago.
   // Solo aplica al estado "cotizada". El resto de estados (pagada, en_camino, etc.) ya están avanzados.
   var pendientesConf = todas.filter(function(c){ return c.calc&&c.estado==='cotizada'&&!(c.checklist&&c.checklist.pago1_cliente) })
@@ -948,14 +968,29 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
               </div>
             </div>
 
-            {/* TOTAL INVERTIDO */}
+            {/* TOTAL INVERTIDO + SALDO PENDIENTE (card split) */}
             {totalInvertido>0&&(
-              <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px 18px",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
-                <div>
-                  <div style={{fontSize:12,color:"#64748b",fontWeight:600,marginBottom:2}}>💰 Total invertido con ZAGA</div>
-                  <div style={{fontSize:11,color:"#94a3b8"}}>Solo importaciones con 1er pago confirmado</div>
+              <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px 18px",marginBottom:18,display:"flex",alignItems:"stretch",gap:16,flexWrap:"wrap",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+                {/* Total invertido */}
+                <div style={{flex:"1 1 240px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                  <div>
+                    <div style={{fontSize:12,color:"#64748b",fontWeight:600,marginBottom:2}}>💰 Total invertido con ZAGA</div>
+                    <div style={{fontSize:11,color:"#94a3b8"}}>Importaciones con 1er pago confirmado</div>
+                  </div>
+                  <div style={{fontSize:22,fontWeight:800,color:"#040c18",whiteSpace:"nowrap"}}>{fmt(totalInvertido)}</div>
                 </div>
-                <div style={{fontSize:26,fontWeight:800,color:"#040c18"}}>{fmt(totalInvertido)}</div>
+                {/* Separador vertical (solo si hay saldo pendiente) */}
+                {saldoPendiente>0&&<div style={{width:1,background:"#e2e8f0",alignSelf:"stretch"}}/>}
+                {/* Saldo pendiente */}
+                {saldoPendiente>0&&(
+                  <div style={{flex:"1 1 240px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                    <div>
+                      <div style={{fontSize:12,color:"#d97706",fontWeight:600,marginBottom:2}}>⏳ Saldo pendiente</div>
+                      <div style={{fontSize:11,color:"#94a3b8"}}>{countSaldoPendiente} {countSaldoPendiente===1?"importación esperando":"importaciones esperando"} 2do pago</div>
+                    </div>
+                    <div style={{fontSize:22,fontWeight:800,color:"#d97706",whiteSpace:"nowrap"}}>{fmt(saldoPendiente)}</div>
+                  </div>
+                )}
               </div>
             )}
 
