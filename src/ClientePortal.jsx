@@ -510,12 +510,13 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   // no debería estar), completada (ya pagó todo), no_prospero (cancelada).
   // También excluye pago_100 porque en ese caso no hay 2do pago.
   var ESTADOS_CON_SALDO = ['pagada','en_camino','en_bodega']
-  var conSaldoPendiente = todas.filter(function(c){
+  var esSaldoPendiente = function(c){
     return ESTADOS_CON_SALDO.includes(c.estado)
       && c.checklist&&c.checklist.pago1_cliente
       && !c.checklist.pago2_cliente
       && !c.pago_100
-  })
+  }
+  var conSaldoPendiente = todas.filter(esSaldoPendiente)
   var saldoPendiente = conSaldoPendiente.reduce(function(s,c){
     var und = Number(c.unidades)||0
     var _overrideValido = (
@@ -555,7 +556,9 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
   }
   var filtradas = todas.filter(function(c){
     if(c.id===openId) return true  // siempre mostrar la card abierta
-    var pF = filtro==="todas" ? true : c.estado===filtro
+    var pF = filtro==="todas" ? true
+           : filtro==="saldo_pendiente" ? esSaldoPendiente(c)
+           : c.estado===filtro
     var pT = filtroTransporte==="todos" ? true
            : filtroTransporte==="aereo" ? c.transporte==="aereo"
            : (!c.transporte || c.transporte==="maritimo" || c.transporte==="ambos") // marítimo incluye legacy sin definir
@@ -990,11 +993,34 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
                 </div>
                 {/* Separador vertical (solo si hay saldo pendiente) */}
                 {saldoPendiente>0&&<div style={{width:1,background:"#e2e8f0",alignSelf:"stretch"}}/>}
-                {/* Saldo pendiente */}
+                {/* Saldo pendiente — clickable para filtrar */}
                 {saldoPendiente>0&&(
-                  <div style={{flex:"1 1 240px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                  <div
+                    onClick={function(){
+                      setFiltro(filtro==="saldo_pendiente"?"todas":"saldo_pendiente")
+                      setTimeout(function(){
+                        var el = document.getElementById("lista-importaciones")
+                        if(el) el.scrollIntoView({behavior:"smooth",block:"start"})
+                      },100)
+                    }}
+                    title={filtro==="saldo_pendiente"?"Quitar filtro":"Click para ver solo las importaciones con saldo pendiente"}
+                    style={{
+                      flex:"1 1 240px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",
+                      cursor:"pointer",borderRadius:10,padding:"6px 10px",margin:"-6px -10px",
+                      background:filtro==="saldo_pendiente"?"#fff7ed":"transparent",
+                      border:"1px solid "+(filtro==="saldo_pendiente"?"#fdba74":"transparent"),
+                      transition:"all .15s"
+                    }}
+                    onMouseEnter={function(e){ if(filtro!=="saldo_pendiente") e.currentTarget.style.background="#fffbf5" }}
+                    onMouseLeave={function(e){ if(filtro!=="saldo_pendiente") e.currentTarget.style.background="transparent" }}
+                  >
                     <div>
-                      <div style={{fontSize:12,color:"#d97706",fontWeight:600,marginBottom:2}}>⏳ Saldo pendiente</div>
+                      <div style={{fontSize:12,color:"#d97706",fontWeight:600,marginBottom:2,display:"flex",alignItems:"center",gap:6}}>
+                        ⏳ Saldo pendiente
+                        <span style={{fontSize:10,color:"#94a3b8",fontWeight:500}}>
+                          {filtro==="saldo_pendiente"?"· filtro activo ✓":"· click para filtrar"}
+                        </span>
+                      </div>
                       <div style={{fontSize:11,color:"#94a3b8"}}>{countSaldoPendiente} {countSaldoPendiente===1?"importación esperando":"importaciones esperando"} 2do pago</div>
                     </div>
                     <div style={{fontSize:22,fontWeight:800,color:"#d97706",whiteSpace:"nowrap"}}>{fmt(saldoPendiente)}</div>
@@ -1148,7 +1174,22 @@ export default function ClientePortal({ supabase, perfil, onLogout }) {
               </div>
             </div>
 
+            {/* INDICADOR FILTRO SALDO PENDIENTE ACTIVO */}
+            {filtro==="saldo_pendiente"&&(
+              <div style={{background:"#fff7ed",border:"1px solid #fdba74",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+                <div style={{fontSize:13,color:"#9a3412",fontWeight:600}}>
+                  ⏳ Mostrando solo importaciones con saldo pendiente del 2do pago
+                  <span style={{color:"#c2410c",fontWeight:500,marginLeft:6}}>({filtradas.length} {filtradas.length===1?"resultado":"resultados"})</span>
+                </div>
+                <button onClick={function(){ setFiltro("todas") }}
+                  style={{background:"#fff",border:"1px solid #fdba74",color:"#9a3412",borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>
+                  ✕ Limpiar filtro
+                </button>
+              </div>
+            )}
+
             {/* LISTA */}
+            <div id="lista-importaciones"></div>
             {filtradas.length===0?(
               <div style={{textAlign:"center",padding:48,color:"#94a3b8"}}>
                 <div style={{fontSize:32,marginBottom:8}}>🔍</div>
