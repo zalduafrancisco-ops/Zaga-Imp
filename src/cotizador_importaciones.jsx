@@ -2181,6 +2181,39 @@ export default function App({ supabase, usuario, onLogout }){
   const handleSaveSolicitud=async()=>{
     if(!form.producto){ showToast("Ingresa el nombre del producto","err"); return; }
     if(form.tipo==="cliente"&&!form.cliente){ showToast("Ingresa el nombre del cliente","err"); return; }
+
+    // ── MODO AMBOS en SOLICITUD: crear 2 cots independientes con los mismos datos base.
+    // Solo aplica al CREAR (no al editar). Mismas unidades para ambas — Luisa ajusta despues.
+    // (Sin este split, la cot ambos no es visible en portal Sunny por RLS.)
+    if(!editId && form.transporte === "ambos"){
+      const checklDef=form.tipo==="propia"?CHECKLIST_PROPIA:CHECKLIST_CLIENTE;
+      const baseChecklist = Object.fromEntries(checklDef.map(c=>[c.key,false]));
+      const now = Date.now();
+      const nroBase = cotizaciones.reduce((m,c)=>{
+        const n = parseInt(String(c.nro||"").replace(/^COT-/, ""), 10);
+        return isNaN(n) ? m : Math.max(m, n);
+      }, 0);
+      const cotMar = {
+        ...form, transporte:"maritimo",
+        id: now.toString(), nro:`COT-${String(nroBase+1).padStart(3,"0")}`,
+        estado:"solicitud", calc:null, fecha_llegada_est:"", motivo_no_procesada:"",
+        checklist:{...baseChecklist},
+      };
+      const cotAer = {
+        ...form, transporte:"aereo",
+        pago_100:true, con_iva:true, requiere_factura:true,
+        pct_servicio: (!form.pct_servicio||Number(form.pct_servicio)===4) ? 6 : form.pct_servicio,
+        id: (now+1).toString(), nro:`COT-${String(nroBase+2).padStart(3,"0")}`,
+        estado:"solicitud", calc:null, fecha_llegada_est:"", motivo_no_procesada:"",
+        checklist:{...baseChecklist},
+      };
+      await persist([cotAer, cotMar, ...cotizaciones]);
+      showToast(`Solicitudes ${cotMar.nro} (🚢) y ${cotAer.nro} (✈️) registradas ✓`);
+      setResumenChina(cotMar);
+      setEditId(null); setForm(defaultForm); setTab("tracker");
+      return;
+    }
+
     const id=editId||Date.now().toString();
     const prev=editId?cotizaciones.find(c=>c.id===editId):null;
     // Usar MAX(nro)+1 en lugar de length+1 — evita duplicados si se borraron cots
