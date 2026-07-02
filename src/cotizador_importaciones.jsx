@@ -561,6 +561,33 @@ function calcCostoRealZaga(d, op, cotsEnOp = []) {
   };
 }
 
+// Ganancia real total de una OP consolidada — misma lógica que la tabla
+// "Costo y propuesta cliente": por cot, venta neta − costo neto (China+Aduana).
+// OP cerrada usa precio_final_acordado_und congelado; sino margen objetivo.
+function calcGananciaOP(op, allCots = []) {
+  // TODAS las cots de la OP (el share/prorrateo de calcCostoRealZaga se calcula sobre este set,
+  // igual que la tabla). Solo se SUMAN las que no son no_prospero.
+  const cotsOP = (allCots || []).filter(c => (op?.cotizaciones || []).includes(c.id));
+  const consolidados = cotsOP.filter(c => !["no_prospero"].includes(c.estado));
+  let total = 0;
+  for (const cot of consolidados) {
+    const cz = calcCostoRealZaga(cot, op, cotsOP);
+    const costoNeto = (cz.totalChinaCLP || 0) + (cz.totalChileCLP || 0);
+    const und = Number(cot.unidades) || 0;
+    const precioAcordadoIvaUnd = Number(cot.precio_final_acordado_und) || 0;
+    let ganancia;
+    if (precioAcordadoIvaUnd > 0) {
+      ganancia = (precioAcordadoIvaUnd / 1.19) * und - costoNeto;
+    } else {
+      const costoUnd = und > 0 ? costoNeto / und : 0;
+      const margenPct = Number(cot.margen_objetivo_pct ?? 30);
+      ganancia = und > 0 ? (costoUnd / (1 - margenPct / 100)) * und - costoNeto : 0;
+    }
+    total += ganancia;
+  }
+  return Math.round(total);
+}
+
 // ── Cálculo de consolidación aérea ──────────────────────────────────────────
 // Dada una cotización y la operación a la que pertenece (con todas sus cots),
 // devuelve standalone, consolidado y ahorro distribuido según regla:
@@ -6901,6 +6928,12 @@ Número de seguimiento: ${c.nro}`;
                               if (!confirm(msg)) return;
                               try {
                                 const newOp = {...op, estado: nuevoEst};
+                                // Al completar: congelar fecha de llegada (default hoy, editable)
+                                // y la ganancia real de la OP para la comisión de Luisa.
+                                if (nuevoEst === "completada") {
+                                  if (!newOp.fecha_llegada_op) newOp.fecha_llegada_op = new Date().toISOString().split("T")[0];
+                                  newOp.ganancia_op_clp = calcGananciaOP(op, cots);
+                                }
                                 delete newOp.id;
                                 await supabase.from("operaciones").update({datos:newOp,updated_at:new Date().toISOString()}).eq("id",op.id);
                                 if (nuevoEstadoCot && cotsAfectables.length > 0) {
@@ -6935,6 +6968,21 @@ Número de seguimiento: ${c.nro}`;
                               <option value="completada">✓ Completada (recibido)</option>
                               <option value="no_prospero">❌ No prosperó</option>
                             </select>
+                            {op.estado==="completada" && (
+                              <span onClick={e=>e.stopPropagation()} style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:10,fontWeight:700,background:"#f0fdf4",color:"#15803d",border:"1px solid #bbf7d0",padding:"2px 8px",borderRadius:10}} title="Fecha de llegada a Chile — define el mes de comisión de Luisa">
+                                📅 Llegó:
+                                <input type="date" value={op.fecha_llegada_op||""} onChange={async(e)=>{
+                                  const fecha = e.target.value;
+                                  const newOp = {...op, fecha_llegada_op: fecha};
+                                  if (!(Number(newOp.ganancia_op_clp)||0)) newOp.ganancia_op_clp = calcGananciaOP(op, cots);
+                                  delete newOp.id;
+                                  await supabase.from("operaciones").update({datos:newOp,updated_at:new Date().toISOString()}).eq("id",op.id);
+                                  setOperaciones(prev=>prev.map(o=>o.id===op.id?{...newOp,id:op.id}:o));
+                                  showToast(`✓ Fecha llegada OP ${op.nro} → ${fecha}`);
+                                }} style={{border:"1px solid #bbf7d0",borderRadius:5,fontSize:10,padding:"1px 3px",fontFamily:"inherit",background:"#fff",color:"#15803d"}}/>
+                                {(Number(op.ganancia_op_clp)||0)>0 && <span title="Comisión Luisa = 25% de la ganancia real de la OP">💼 {fmt(Math.round((Number(op.ganancia_op_clp)||0)*0.25))}</span>}
+                              </span>
+                            )}
                             {op.recotizacion_pendiente_sunny&&!op.recotizacion_completada_sunny&&(
                               <span style={{fontSize:10,fontWeight:700,background:"#fff7ed",color:"#c47830",border:"1px solid #fed7aa",padding:"2px 8px",borderRadius:10}}>📢 Esperando Sunny</span>
                             )}
@@ -8010,7 +8058,10 @@ Número de seguimiento: ${c.nro}`;
               // Importaciones de Luisa con ganancia calculada, agrupadas por mes.
               // Marítimas: devengo en mes de pago1 cliente (cobro temprano, costos previsibles desde cotizacion).
               // Aéreas: devengo en mes de fecha_llegada_real (estado completada) — el costo china real se conoce recien al despacho.
+              // Cotizaciones dentro de una OP se pagan a nivel OP (no individual) — evitar doble conteo
+              const idsEnOps = new Set((operaciones||[]).flatMap(o => o.cotizaciones || []));
               const luisaCerradas=cotizaciones.filter(c=>{
+                if (idsEnOps.has(c.id)) return false;
                 if (c.gestor !== "luisa" || c.tipo === "propia") return false;
                 if (["no_prospero"].includes(c.estado)) return false;
                 if ((Number(c.calc?.ganImp)||0) <= 0) return false;
@@ -8026,9 +8077,30 @@ Número de seguimiento: ${c.nro}`;
                 return ESTADOS_DEVENGO.includes(c.estado) && c.fecha_pago1_cliente;
               });
 
+              // OPs completadas con fecha de llegada → comisión de Luisa sobre la ganancia
+              // real de la OP. Se modelan como un "cierre" aéreo más para reusar el panel.
+              const opsCerradas=(operaciones||[]).filter(op=>{
+                if (op.estado !== "completada" || !op.fecha_llegada_op) return false;
+                if ((Number(op.ganancia_op_clp)||0) <= 0) return false;
+                const cotsOp = cotizaciones.filter(c => (op.cotizaciones||[]).includes(c.id));
+                return cotsOp.some(c => c.gestor === "luisa");
+              }).map(op=>{
+                const cotsOp = cotizaciones.filter(c => (op.cotizaciones||[]).includes(c.id));
+                const clientesOp = [...new Set(cotsOp.map(c=>(c.cliente||"").trim()).filter(Boolean))];
+                return {
+                  id:"op-"+op.id, esOP:true, nro:op.nro,
+                  cliente: clientesOp.join(", ").slice(0,28) || (cotsOp.length+" cots"),
+                  producto: `Operación (${cotsOp.length} cots)`,
+                  transporte:"aereo",
+                  calc:{ ganImp: Number(op.ganancia_op_clp)||0 },
+                  fecha_llegada_real: op.fecha_llegada_op,
+                  estado:"completada",
+                };
+              });
+
               // Agrupar por mes (criterio diferente segun transporte)
               const porMes={};
-              luisaCerradas.forEach(c=>{
+              [...luisaCerradas, ...opsCerradas].forEach(c=>{
                 const esAereo = c.transporte === "aereo";
                 const fechaRef = esAereo ? c.fecha_llegada_real : c.fecha_pago1_cliente;
                 const m = fechaRef.substring(0,7);
