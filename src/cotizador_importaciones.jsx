@@ -8816,17 +8816,39 @@ Número de seguimiento: ${c.nro}`;
           // aéreas cuando completan (llegada real). Excluye ganImp<=0 y rechazadas.
           // Nota: ya no usamos el flag pago1_cliente (era concepto legacy de pago 30/70).
           // fecha_pago1_cliente sigue siendo el campo de fecha — se auto-setea al pasar a "pagada".
-          const cerradas=todas.filter(c=>{
+          const idsEnOps = new Set((operaciones||[]).flatMap(o => o.cotizaciones || []));
+          const cerradasCots=todas.filter(c=>{
+            if(idsEnOps.has(c.id)) return false; // las de una OP van por la comisión de la OP
             if(["no_prospero"].includes(c.estado)) return false;
             if((Number(c.calc?.ganImp)||0)<=0) return false;
             if(c.transporte==="aereo") return c.estado==="completada" && c.fecha_llegada_real;
             const ESTADOS_DEVENGO = ["pagada","en_camino","en_bodega","completada"];
             return ESTADOS_DEVENGO.includes(c.estado) && c.fecha_pago1_cliente;
           });
+          // OPs completadas con fecha de llegada → cierre de Luisa sobre la ganancia real de la OP
+          const opsCerradas=(operaciones||[]).filter(op=>{
+            if(op.estado!=="completada" || !op.fecha_llegada_op) return false;
+            if((Number(op.ganancia_op_clp)||0)<=0) return false;
+            const cotsOp=cotizaciones.filter(c=>(op.cotizaciones||[]).includes(c.id));
+            return cotsOp.some(c=>c.gestor==="luisa");
+          }).map(op=>{
+            const cotsOp=cotizaciones.filter(c=>(op.cotizaciones||[]).includes(c.id));
+            const clientesOp=[...new Set(cotsOp.map(c=>(c.cliente||"").trim()).filter(Boolean))];
+            return {
+              id:"op-"+op.id, esOP:true, nro:op.nro,
+              cliente: clientesOp.join(", ").slice(0,28) || (cotsOp.length+" cots"),
+              producto:`Operación (${cotsOp.length} cots)`,
+              transporte:"aereo",
+              calc:{ ganImp: Number(op.ganancia_op_clp)||0 },
+              fecha_llegada_real: op.fecha_llegada_op,
+              estado:"completada",
+            };
+          });
+          const cerradas=[...cerradasCots, ...opsCerradas];
           const completadas=todas.filter(c=>c.estado==="completada");
 
           // Ganancias reales por mes (base para comisión)
-          // Aéreas se agrupan por mes de fecha_llegada_real; marítimas por fecha_pago1_cliente.
+          // Aéreas/OPs se agrupan por mes de fecha_llegada_real; marítimas por fecha_pago1_cliente.
           const porMes={};
           cerradas.forEach(c=>{
             const fechaRef=c.transporte==="aereo" ? c.fecha_llegada_real : c.fecha_pago1_cliente;
