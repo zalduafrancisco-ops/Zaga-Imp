@@ -5486,10 +5486,40 @@ Número de seguimiento: ${c.nro}`;
                             </div>
                             );
                           })()}
-                          {/* Marca de validada para info */}
-                          {c.validada_admin===true && (c.transporte==="maritimo"||c.transporte==="ambos") && c.estado==="cotizada" && (
-                            <div style={{fontSize:11,color:"#0d9870",marginTop:6,fontWeight:600}}>✅ Validada · cliente la ve {c.fecha_validacion_admin?`(${fmtFechaCorta(c.fecha_validacion_admin)})`:""}</div>
-                          )}
+                          {/* Marca de validada + opción de recalcular precio (solo marítimo, solo cotizada) */}
+                          {c.validada_admin===true && (c.transporte==="maritimo"||c.transporte==="ambos") && c.estado==="cotizada" && (()=>{
+                            // Precio dinámico de HOY (mismo cálculo que el botón validar)
+                            const u = Number(c.unidades) || 0;
+                            const conIvaCot = !!c.con_iva;
+                            const totalCliNuevo = u > 0
+                              ? (conIvaCot
+                                  ? Number(c.calc?.totClIva || (c.calc?.totCl||0)*1.19)
+                                  : Number(c.calc?.totCl || 0))
+                              : 0;
+                            const precioUndNuevo = u > 0 ? Math.round(totalCliNuevo / u) : 0;
+                            const precioActual = Math.round(Number(c.precio_final_acordado_und) || 0);
+                            const difiere = precioUndNuevo > 0 && Math.abs(precioUndNuevo - precioActual) >= 1;
+                            return (
+                              <div style={{marginTop:6,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                                <span style={{fontSize:11,color:"#0d9870",fontWeight:600}}>✅ Validada · precio fijado {fmt(precioActual)}/und {c.fecha_validacion_admin?`(${fmtFechaCorta(c.fecha_validacion_admin)})`:""}</span>
+                                {difiere && (
+                                  <button onClick={async(e)=>{
+                                    e.stopPropagation();
+                                    if(!confirm(`🔄 Recalcular precio de ${c.nro} (marítima)?\n\nPrecio fijado actual:  $${precioActual.toLocaleString("es-CL")}/und\nPrecio recalculado (margen/costos de hoy):  $${precioUndNuevo.toLocaleString("es-CL")}/und\n\nEsto ACTUALIZA el precio que verá el cliente en ${c.nro}.\nSolo afecta a esta cotización — nada más cambia.`)) return;
+                                    try {
+                                      const { id, ...rest } = c;
+                                      const newDatos = { ...rest, precio_final_acordado_und: precioUndNuevo, fecha_validacion_admin: new Date().toISOString() };
+                                      await supabase.from("cotizaciones").update({datos:newDatos, updated_at:new Date().toISOString()}).eq("id", c.id);
+                                      setCotizaciones(prev => prev.map(x => x.id===c.id ? {...x, precio_final_acordado_und: precioUndNuevo, fecha_validacion_admin: newDatos.fecha_validacion_admin} : x));
+                                      showToast(`🔄 ${c.nro} recalculada — nuevo precio $${precioUndNuevo.toLocaleString("es-CL")}/und`);
+                                    } catch(err) { showToast("Error: "+(err.message||""),"err"); }
+                                  }} style={{background:"#c47830",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",fontSize:11,cursor:"pointer",fontWeight:700}} title="Actualizar el precio congelado al cálculo actual (solo esta cotización)">
+                                    🔄 Recalcular → {fmt(precioUndNuevo)}/und
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })()}
                           {diasEnTransito!==null&&<div style={{fontSize:11,color:"#b8922e",marginTop:2}}>⏱ En tránsito: {diasEnTransito}d</div>}
                           {c.fecha_llegada_real&&<div style={{fontSize:11,color:"#0d9870",marginTop:2}}>✅ Llegó a bodega: {c.fecha_llegada_real}{tiempoRealTransito!==null?` · ${tiempoRealTransito}d de tránsito`:""}</div>}
                           <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
