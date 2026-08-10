@@ -107,6 +107,7 @@ const makeDefaultForm = (usuario) => ({
   variantes:"", // colores, tallas, cantidades por variante
   fecha_llegada_real:"", sku_china:"",
   fulfillment_cliente:true, sku_bodega:"", fulfillment_producto_creado:false,
+  llega_bodega_zaga:false, // ¿la recibimos nosotros? define si hay que prepararle SKU
   fulfillment_costo_real:"", fulfillment_notas:"",
   dim_largo:"", dim_ancho:"", dim_alto:"", dim_m3:"", dim_und_caja:"", dim_tipo:"caja", peso_kg:"",
   negociacion_rondas:[], // [{fecha, nota, unidades_prop, precio_prop, estado:"pendiente"|"aplicada"|"rechazada"}]
@@ -2146,7 +2147,7 @@ export default function App({ supabase, usuario, onLogout }){
         "negociacion_rondas","historial",
         "notas_historial","notas_internas","notas_china_historial","nota_china_nueva",
         "notas_cliente_historial",
-        "sku_bodega","fulfillment_producto_creado",
+        "sku_bodega","fulfillment_producto_creado","llega_bodega_zaga",
         "recotizacion_pendiente_sunny","recotizacion_completada_sunny",
         "nro_factura_cliente","link_factura_cliente",
       ];
@@ -6410,6 +6411,21 @@ Número de seguimiento: ${c.nro}`;
                               <div style={{fontSize:10,color:"#c47830",marginBottom:12,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>📦 Post-pago — Bodega</div>
                               <div className="ff-grid" style={{display:"grid",gridTemplateColumns:"1fr",gap:16}}>
                                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                                  {/* A DONDE LLEGA la mercaderia. Es el unico dato que
+                                      operaciones ZAGA no puede deducir solo, y define si
+                                      hay que crearle SKU y etiqueta antes de que llegue.
+                                      Sin esto, la bandeja de "por preparar" de zagahub
+                                      mostraria TODAS las importaciones, incluidas las que
+                                      van directo a la bodega del cliente. */}
+                                  <label style={{display:"flex",alignItems:"flex-start",gap:9,background:c.llega_bodega_zaga?"#ecfdf5":"#f8fafc",border:"1px solid "+(c.llega_bodega_zaga?"#10b98155":"#e2e8f0"),borderRadius:8,padding:"10px 12px",cursor:"pointer"}}>
+                                    <input type="checkbox" checked={!!c.llega_bodega_zaga} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,llega_bodega_zaga:e.target.checked}:x)); }} style={{marginTop:2,cursor:"pointer"}}/>
+                                    <span>
+                                      <span style={{fontSize:12,fontWeight:700,color:c.llega_bodega_zaga?"#0d9870":"#334155"}}>La mercadería llega a la bodega de ZAGA</span>
+                                      <span style={{display:"block",fontSize:10.5,color:"#64748b",marginTop:2}}>
+                                        Márcalo si nosotros la recibimos. Operaciones prepara el SKU y la etiqueta antes de que llegue. Si va directo a la bodega del cliente, déjalo sin marcar.
+                                      </span>
+                                    </span>
+                                  </label>
                                   <div>
                                     <div style={{fontSize:10,color:"#b8922e",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>🏷 SKU China</div>
                                     <input value={c.sku_china||""} onChange={async e=>{ await persist(cotizacionesRef.current.map(x=>x.id===c.id?{...x,sku_china:e.target.value}:x));}} placeholder="Ej: CN-20394-A" style={{width:"100%",background:"#f8fafc",border:"1px solid #f59e0b44",borderRadius:7,color:"#b8922e",padding:"7px 10px",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
